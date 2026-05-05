@@ -216,7 +216,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="flex flex-col gap-3">
                       {filteredServices.length > 0 ? (
                         filteredServices.map(service => (
                           <ServiceSelectionCard 
@@ -515,25 +515,23 @@ function ServiceSelectionCard({ service, isSelected, onSelect }: { service: Serv
     <motion.div 
       whileTap={{ scale: 0.98 }}
       className={`
-        flex flex-col h-40 p-5 cursor-pointer transition-all duration-500 border relative group
+        flex flex-row items-center justify-between p-6 gap-4 cursor-pointer transition-all duration-500 border relative group
         ${isSelected ? 'bg-brand-black text-brand-white border-brand-black shadow-luxury' : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'}
       `}
       onClick={onSelect}
     >
-      <div className="flex-1 flex flex-col justify-between">
-        <h3 className="font-serif italic text-lg leading-tight uppercase group-hover:translate-y-[-2px] transition-transform duration-500 line-clamp-2">{service.name}</h3>
-        <div className="space-y-1">
-           <p className={`text-[11px] font-black tracking-widest uppercase ${isSelected ? 'text-white/80' : 'text-brand-gray-600'}`}>
-            {service.duration > 60 ? `${Math.round(service.duration/60)} HR` : `${service.duration} MIN`}
-          </p>
-          <p className="font-black text-xs tracking-tighter">KES {service.price.toLocaleString()}</p>
-        </div>
+      <div className="flex-1">
+        <h3 className="font-serif italic text-lg leading-tight uppercase group-hover:translate-x-1 transition-transform duration-500 break-words">{service.name}</h3>
+        <p className={`mt-2 text-[11px] font-black tracking-widest uppercase ${isSelected ? 'text-white/80' : 'text-brand-gray-600'}`}>
+          {service.duration > 60 ? `${Math.round(service.duration/60)} HR` : `${service.duration} MIN`}
+        </p>
       </div>
-      {isSelected && (
-        <div className="absolute top-2 right-2">
-          <CheckCircle2 size={12} className="text-white" />
+      <div className="flex flex-col items-end gap-3">
+        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-brand-white bg-brand-white' : 'border-brand-gray-200 group-hover:border-brand-black'}`}>
+          {isSelected && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
         </div>
-      )}
+        <p className="font-black text-xs tracking-tighter whitespace-nowrap">KES {service.price.toLocaleString()}</p>
+      </div>
     </motion.div>
   );
 }
