@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/db';
 import { errorHandler } from './middleware/errorHandler';
 import Service from './models/Service';
+import mongoose from 'mongoose';
 
 // Routes
 import serviceRoutes from './routes/serviceRoutes';
@@ -18,6 +19,10 @@ dotenv.config();
  * This runs once on startup so you always have sample data.
  */
 async function seedServices(): Promise<void> {
+  if (mongoose.connection.readyState !== 1) {
+    console.warn('⚠️ Skipping database seeding: No active MongoDB connection.');
+    return;
+  }
   const count = await Service.countDocuments();
   if (count === 0) {
     const services = [
@@ -65,6 +70,24 @@ async function startServer(): Promise<void> {
 
   // ── Database ─────────────────────────────────────────────
   await connectDB();
+  
+  // ── DB Status Middleware ─────────────────────────────────
+  // Prevents Mongoose buffering timeouts by returning 503 if DB is down
+  app.use((req, res, next) => {
+    const isDbConnected = mongoose.connection.readyState === 1;
+    const isApiRoute = req.path.startsWith('/api');
+    const isHealthCheck = req.path === '/api/health';
+
+    if (isApiRoute && !isHealthCheck && !isDbConnected) {
+      return res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database is currently disconnected. Please check MONGODB_URI.',
+        code: 'DB_DISCONNECTED'
+      });
+    }
+    next();
+  });
+
   await seedServices();
 
   // ── API Routes ───────────────────────────────────────────
@@ -87,3 +110,4 @@ async function startServer(): Promise<void> {
 }
 
 startServer();
+// Backend restart trigger
