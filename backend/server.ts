@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 import serviceRoutes from './routes/serviceRoutes';
 import bookingRoutes from './routes/bookingRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -94,6 +95,7 @@ async function startServer(): Promise<void> {
   app.use('/api/services', serviceRoutes);
   app.use('/api/bookings', bookingRoutes);
   app.use('/api/availability', availabilityRoutes);
+  app.use('/api/admin', adminRoutes);
 
   // ── Health Check ─────────────────────────────────────────
   app.get('/api/health', (_req, res) => {

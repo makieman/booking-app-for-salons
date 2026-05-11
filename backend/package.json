@@ -12,7 +12,8 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "luxon": "^3.7.2",
-    "mongoose": "^9.5.0"
+    "mongoose": "^9.5.0",
+    "resend": "^6.12.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

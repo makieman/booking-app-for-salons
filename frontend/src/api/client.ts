@@ -19,6 +19,23 @@ export async function getServices() {
 }
 
 /**
+ * Creates a new service.
+ * Endpoint: POST /api/services
+ */
+export async function createService(data: { name: string; duration: number; price: number; description?: string }) {
+  const res = await fetch(`${API_BASE}/services`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to create service');
+  }
+  return res.json();
+}
+
+/**
  * Fetches bookings, optionally filtered by date.
  * Endpoint: GET /api/bookings?date=YYYY-MM-DD
  */
@@ -38,6 +55,7 @@ export async function getBookings(date?: string) {
 export async function createBooking(data: {
   customerName: string;
   phone: string;
+  email?: string;     // Optional — used for email notifications
   serviceId: string;
   date: string;
   startTime: string;
@@ -66,3 +84,51 @@ export async function getAvailability(date: string, serviceId: string) {
   if (!res.ok) throw new Error('Failed to fetch availability');
   return res.json();
 }
+
+/**
+ * Admin: Fetches all bookings, optionally filtered by status.
+ * Endpoint: GET /api/admin/bookings?status=pending
+ */
+export async function getAdminBookings(status?: string) {
+  const url = status
+    ? `${API_BASE}/admin/bookings?status=${status}`
+    : `${API_BASE}/admin/bookings`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch admin bookings');
+  return res.json();
+}
+
+/**
+ * Admin: Confirm or cancel a booking.
+ * Endpoint: PATCH /api/admin/bookings/:id
+ */
+export async function updateBookingStatus(id: string, status: 'confirmed' | 'cancelled') {
+  const res = await fetch(`${API_BASE}/admin/bookings/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update booking status');
+  }
+  return res.json();
+}
+
+/**
+ * Admin: Update a service's details (name, duration, price, description).
+ * Endpoint: PATCH /api/services/:id
+ */
+export async function updateService(id: string, data: Partial<{ name: string; duration: number; price: number; description: string }>) {
+  const res = await fetch(`${API_BASE}/services/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update service');
+  }
+  return res.json();
+}
+

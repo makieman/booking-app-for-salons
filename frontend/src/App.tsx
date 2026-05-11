@@ -7,6 +7,10 @@ import * as api from './api/client';
 
 export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const ADMIN_PIN = '1234'; // Change this to your preferred PIN
   const [activeStep, setActiveStep] = useState<BookingStep>('service');
   
   // Data from API
@@ -20,7 +24,7 @@ export default function App() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [clientInfo, setClientInfo] = useState({ name: '', phone: '' });
+  const [clientInfo, setClientInfo] = useState({ name: '', phone: '', email: '' });
   const [searchQuery, setSearchQuery] = useState('');
 
   const dateCtaRef = useRef<HTMLButtonElement>(null);
@@ -84,12 +88,13 @@ export default function App() {
   }, [searchQuery, services]);
 
   const handleConfirmBooking = async () => {
-    if (!selectedService || !selectedTime || !clientInfo.name || !clientInfo.phone) return;
+    if (!selectedService || !selectedTime || !clientInfo.name || !clientInfo.phone || !clientInfo.email) return;
 
     try {
         const newBooking = await api.createBooking({
             customerName: clientInfo.name,
             phone: clientInfo.phone,
+            email: clientInfo.email,
             serviceId: selectedService._id,
             date: selectedDate,
             startTime: selectedTime,
@@ -107,7 +112,7 @@ export default function App() {
     setSelectedService(null);
     setSelectedTime(null);
     setSelectedDate(new Date().toISOString().split('T')[0]);
-    setClientInfo({ name: '', phone: '' });
+    setClientInfo({ name: '', phone: '', email: '' });
   };
 
   const handleStepBack = () => {
@@ -145,6 +150,120 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── PIN Gate Modal ─────────────────────────────── */}
+      <AnimatePresence>
+        {showPinModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-brand-black/60 backdrop-blur-sm"
+            onClick={() => setShowPinModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.96 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-brand-white w-[88%] max-w-xs p-8 space-y-8 border-2 border-brand-black"
+            >
+              {/* Header */}
+              <div className="space-y-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-brand-gray-400">Studio Access</p>
+                <h2 className="text-3xl font-serif italic tracking-tight leading-none">Admin Panel</h2>
+              </div>
+
+              {/* PIN dots */}
+              <motion.div
+                animate={pinError ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
+                transition={{ duration: 0.4 }}
+                className="flex justify-center gap-4"
+              >
+                {[0, 1, 2, 3].map(i => (
+                  <div
+                    key={i}
+                    className={`w-4 h-4 border-2 transition-all duration-200 ${
+                      i < pin.length ? 'bg-brand-black border-brand-black' : 'bg-transparent border-brand-gray-300'
+                    }`}
+                  />
+                ))}
+              </motion.div>
+
+              {pinError && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center text-[11px] font-black uppercase tracking-widest text-red-500 -mt-4"
+                >
+                  Incorrect PIN
+                </motion.p>
+              )}
+
+              {/* Number pad */}
+              <div className="grid grid-cols-3 gap-2">
+                {[1,2,3,4,5,6,7,8,9].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => {
+                      if (pin.length >= 4) return;
+                      const next = pin + String(n);
+                      setPin(next);
+                      setPinError(false);
+                      if (next.length === 4) {
+                        if (next === ADMIN_PIN) {
+                          setIsAdmin(true);
+                          setShowPinModal(false);
+                          setPin('');
+                        } else {
+                          setPinError(true);
+                          setTimeout(() => setPin(''), 600);
+                        }
+                      }
+                    }}
+                    className="py-4 text-xl font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
+                  >
+                    {n}
+                  </button>
+                ))}
+                <button
+                  onClick={() => { setPin(''); setPinError(false); }}
+                  className="py-4 text-[11px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all text-brand-gray-500"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={() => {
+                    if (pin.length >= 4) return;
+                    const next = pin + '0';
+                    setPin(next);
+                    setPinError(false);
+                    if (next.length === 4) {
+                      if (next === ADMIN_PIN) {
+                        setIsAdmin(true);
+                        setShowPinModal(false);
+                        setPin('');
+                      } else {
+                        setPinError(true);
+                        setTimeout(() => setPin(''), 600);
+                      }
+                    }
+                  }}
+                  className="py-4 text-xl font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
+                >
+                  0
+                </button>
+                <button
+                  onClick={() => { setPin(p => p.slice(0, -1)); setPinError(false); }}
+                  className="py-4 text-[11px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all text-brand-gray-500"
+                >
+                  ⌫
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       <header className="px-8 py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100">
         <div className="flex items-center gap-5 cursor-pointer" onClick={resetFlow}>
@@ -166,7 +285,15 @@ export default function App() {
             <Phone size={18} />
           </a>
           <button 
-            onClick={() => setIsAdmin(!isAdmin)}
+            onClick={() => {
+              if (isAdmin) {
+                setIsAdmin(false);
+              } else {
+                setPin('');
+                setPinError(false);
+                setShowPinModal(true);
+              }
+            }}
             className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500"
           >
             {isAdmin ? <LayoutDashboard size={18} /> : <Settings size={18} />}
@@ -200,7 +327,7 @@ export default function App() {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-gray-300 group-focus-within:text-brand-black transition-colors" size={16} />
                         <input 
                           type="text"
-                          placeholder="SEARCH TREATMENT"
+                          placeholder="SEARCH SERVICE"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="w-full bg-brand-gray-50 border-b border-brand-gray-100 py-4 pl-12 pr-10 focus:outline-none focus:border-brand-black transition-all font-black text-[16px] tracking-[0.2em] uppercase placeholder:text-brand-gray-400"
@@ -228,7 +355,7 @@ export default function App() {
                         ))
                       ) : (
                         <div className="col-span-3 py-12 text-center border-2 border-dashed border-brand-gray-100">
-                          <p className="font-serif italic text-brand-gray-300">No treatments found matching your criteria.</p>
+                          <p className="font-serif italic text-brand-gray-300">No services found matching your criteria.</p>
                         </div>
                       )}
                     </div>
@@ -398,12 +525,24 @@ export default function App() {
                               />
                             </div>
                           </div>
+                          <div className="space-y-2 group">
+                             <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Electronic Mail</label>
+                            <div className="relative">
+                              <input 
+                                type="email" 
+                                placeholder="EMAIL ADDRESS"
+                                value={clientInfo.email}
+                                onChange={e => setClientInfo(prev => ({...prev, email: e.target.value}))}
+                                className="w-full bg-brand-white border-b-2 border-brand-gray-100 py-5 focus:outline-none focus:border-brand-black transition-all font-black text-base uppercase tracking-widest placeholder:text-brand-gray-200 placeholder:font-normal"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </section>
                     </div>
 
                     <button 
-                      disabled={!clientInfo.name || !clientInfo.phone}
+                      disabled={!clientInfo.name || !clientInfo.phone || !clientInfo.email}
                       onClick={handleConfirmBooking}
                       className="w-full bg-brand-black text-brand-white py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98]"
                     >
@@ -429,7 +568,7 @@ export default function App() {
                     
                     <div className="bg-brand-gray-50 w-full p-10 text-left space-y-8 border-2 border-brand-black">
                       <div className="flex justify-between items-baseline border-b border-brand-black/10 pb-6">
-                         <p className="text-[13px] uppercase tracking-[0.4em] font-black text-brand-gray-600">Order Ref</p>
+                         <p className="text-[13px] uppercase tracking-[0.4em] font-black text-brand-gray-600">Service Ref</p>
                         <p className="font-black text-xs uppercase italic">#LMN-{Math.random().toString(36).substr(2, 5).toUpperCase()}</p>
                       </div>
                       <div className="space-y-6">
@@ -438,7 +577,7 @@ export default function App() {
                           <span className="font-serif italic text-lg leading-none">Studio Lead</span>
                         </div>
                         <div className="flex justify-between items-center">
-                           <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Treatment</span>
+                           <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Service</span>
                           <span className="font-black text-sm leading-none uppercase">{selectedService?.name}</span>
                         </div>
                         <div className="flex justify-between items-center">
@@ -586,89 +725,423 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
   );
 }
 
-function AdminView({ bookings }: { bookings: Booking[] }) {
+function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
+  const [activeTab, setActiveTab] = useState<'ledger' | 'pending' | 'services'>('ledger');
+  const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
+  const [confirmedBookings, setConfirmedBookings] = useState<Booking[]>(initialBookings);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Add service form state
+  const [addForm, setAddForm] = useState({ name: '', duration: '', price: '', description: '' });
+  const [addLoading, setAddLoading] = useState(false);
+
+  // Edit price state: { [serviceId]: editedPrice }
+  const [editPrices, setEditPrices] = useState<Record<string, string>>({});
+  const [savingPrice, setSavingPrice] = useState<string | null>(null);
+
   const todayStr = new Date().toISOString().split('T')[0];
-  const todaysBookings = bookings.filter(b => b.date === todayStr);
-  const sortedBookings = [...todaysBookings].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const todaysConfirmed = confirmedBookings.filter(b => b.date === todayStr && b.status === 'confirmed');
+  const sortedToday = [...todaysConfirmed].sort((a, b) => a.startTime.localeCompare(b.startTime));
   const currentTime = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  // Fetch pending bookings when tab opens
+  useEffect(() => {
+    if (activeTab === 'pending') {
+      setLoadingPending(true);
+      api.getAdminBookings('pending')
+        .then(data => setPendingBookings(data))
+        .catch(console.error)
+        .finally(() => setLoadingPending(false));
+    }
+    if (activeTab === 'services') {
+      setLoadingServices(true);
+      api.getServices()
+        .then(data => {
+          setServices(data);
+          const prices: Record<string, string> = {};
+          data.forEach((s: Service) => { prices[s._id] = String(s.price); });
+          setEditPrices(prices);
+        })
+        .catch(console.error)
+        .finally(() => setLoadingServices(false));
+    }
+  }, [activeTab]);
+
+  const handleStatusUpdate = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
+    setActionLoading(bookingId);
+    try {
+      const updated = await api.updateBookingStatus(bookingId, status);
+      // Remove from pending queue
+      setPendingBookings(prev => prev.filter(b => b._id !== bookingId));
+      // If confirmed, add to daily ledger
+      if (status === 'confirmed') {
+        setConfirmedBookings(prev => [...prev, updated]);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handlePriceEdit = async (serviceId: string) => {
+    const newPrice = Number(editPrices[serviceId]);
+    if (isNaN(newPrice) || newPrice <= 0) return;
+    setSavingPrice(serviceId);
+    try {
+      const updated = await api.updateService(serviceId, { price: newPrice });
+      setServices(prev => prev.map(s => s._id === serviceId ? updated : s));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingPrice(null);
+    }
+  };
+
+  const handleAddService = async () => {
+    if (!addForm.name || !addForm.duration || !addForm.price) return;
+    setAddLoading(true);
+    try {
+      const newService = await api.createService({
+        name: addForm.name,
+        duration: Number(addForm.duration),
+        price: Number(addForm.price),
+        description: addForm.description,
+      });
+      setServices(prev => [...prev, newService]);
+      setEditPrices(prev => ({ ...prev, [newService._id]: String(newService.price) }));
+      setAddForm({ name: '', duration: '', price: '', description: '' });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const tabs: { key: 'ledger' | 'pending' | 'services'; label: string }[] = [
+    { key: 'ledger', label: 'Daily Ledger' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'services', label: 'Services' },
+  ];
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
+      {/* Tab Navigation */}
       <nav className="px-8 border-b border-brand-gray-100 flex gap-8">
-         <button className="py-4 text-[13px] font-black uppercase tracking-[0.2em] relative transition-all text-brand-black">
-          Daily Ledger
-          <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-black" />
-        </button>
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`py-4 text-[13px] font-black uppercase tracking-[0.2em] relative transition-all ${
+              activeTab === tab.key ? 'text-brand-black' : 'text-brand-gray-400 hover:text-brand-black'
+            }`}
+          >
+            {tab.label}
+            {tab.key === 'pending' && pendingBookings.length > 0 && (
+              <span className="ml-2 bg-brand-black text-brand-white text-[9px] font-black px-1.5 py-0.5 tracking-widest">
+                {pendingBookings.length}
+              </span>
+            )}
+            {activeTab === tab.key && (
+              <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-black" />
+            )}
+          </button>
+        ))}
       </nav>
 
       <div className="flex-1 overflow-y-auto px-8 py-10 space-y-12 scrollbar-hide">
-        <header className="space-y-4">
-          <div className="flex justify-between items-end">
-            <div className="space-y-1">
-              <h2 className="text-4xl font-serif font-black tracking-tight leading-none uppercase">Studio <br/>Management</h2>
-               <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[12px] pt-2">
-                Operations // {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-              </p>
-            </div>
-            <div className="text-right">
-               <p className="text-[13px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Local Time</p>
-              <p className="text-3xl font-black tracking-tighter">{currentTime}</p>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-4">
-            <div className="bg-brand-black p-6 flex flex-col justify-between h-28">
-               <p className="text-[11px] text-white/70 font-black uppercase tracking-[0.2em]">Total Sessions Today</p>
-              <h3 className="text-4xl font-black text-white">{todaysBookings.length}</h3>
-            </div>
-            <div className="border border-brand-gray-100 p-6 flex flex-col justify-between h-28">
-               <p className="text-[11px] text-brand-gray-600 font-black uppercase tracking-[0.2em]">Certified Artist</p>
-              <h3 className="text-xl font-serif italic text-brand-black">Flo Sisterlocks</h3>
-            </div>
-          </div>
-        </header>
-
-        <div className="space-y-6">
-          <div className="grid gap-6">
-            {sortedBookings.length === 0 ? (
-              <div className="p-20 text-center border-2 border-dashed border-brand-gray-100 italic font-serif text-brand-gray-300">
-                <p>The ledger is currently empty for today.</p>
+        {/* ── TAB 1: Daily Ledger ─────────────────────────── */}
+        {activeTab === 'ledger' && (
+          <>
+            <header className="space-y-4">
+              <div className="flex justify-between items-end">
+                <div className="space-y-1">
+                  <h2 className="text-4xl font-serif font-black tracking-tight leading-none uppercase">Studio <br/>Management</h2>
+                  <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[12px] pt-2">
+                    Operations // {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[13px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Local Time</p>
+                  <p className="text-3xl font-black tracking-tighter">{currentTime}</p>
+                </div>
               </div>
-            ) : (
-              sortedBookings.map((booking, idx) => {
-                const isPassed = booking.startTime < currentTime;
-                return (
-                  <motion.div 
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    key={booking._id} 
-                    className={`p-8 flex items-center justify-between border transition-all group ${isPassed ? 'opacity-30 grayscale border-brand-gray-50' : 'border-brand-gray-100 hover:border-brand-black hover:shadow-luxury'}`}
-                  >
-                    <div className="flex flex-col space-y-4">
-                       <div className="flex items-center gap-6">
+
+              <div className="grid grid-cols-2 gap-4 pt-4">
+                <div className="bg-brand-black p-6 flex flex-col justify-between h-28">
+                  <p className="text-[11px] text-white/70 font-black uppercase tracking-[0.2em]">Confirmed Today</p>
+                  <h3 className="text-4xl font-black text-white">{sortedToday.length}</h3>
+                </div>
+                <div className="border border-brand-gray-100 p-6 flex flex-col justify-between h-28">
+                  <p className="text-[11px] text-brand-gray-600 font-black uppercase tracking-[0.2em]">Certified Artist</p>
+                  <h3 className="text-xl font-serif italic text-brand-black">Flo Sisterlocks</h3>
+                </div>
+              </div>
+            </header>
+
+            <div className="space-y-6">
+              {sortedToday.length === 0 ? (
+                <div className="p-20 text-center border-2 border-dashed border-brand-gray-100 italic font-serif text-brand-gray-300">
+                  <p>No confirmed appointments for today.</p>
+                </div>
+              ) : (
+                sortedToday.map((booking, idx) => {
+                  const isPassed = booking.startTime < currentTime;
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      key={booking._id}
+                      className={`p-8 flex items-center justify-between border transition-all group ${isPassed ? 'opacity-30 grayscale border-brand-gray-50' : 'border-brand-gray-100 hover:border-brand-black hover:shadow-luxury'}`}
+                    >
+                      <div className="flex flex-col space-y-4">
+                        <div className="flex items-center gap-6">
                           <div className="w-14 h-14 bg-brand-black flex items-center justify-center font-black text-white text-xs italic tracking-tighter">
-                            {booking.customerName.split(' ').map(n=>n[0]).join('')}
+                            {booking.customerName.split(' ').map(n => n[0]).join('')}
                           </div>
                           <div>
                             <p className="font-serif italic text-2xl leading-none">{booking.customerName}</p>
-                             <p className="text-[13px] font-black uppercase text-brand-gray-600 mt-2 tracking-widest">{booking.phone}</p>
+                            <p className="text-[13px] font-black uppercase text-brand-gray-600 mt-2 tracking-widest">{booking.phone}</p>
                           </div>
-                       </div>
-                       <div className="flex items-center gap-4 border-t border-brand-gray-50 pt-4">
+                        </div>
+                        <div className="flex items-center gap-4 border-t border-brand-gray-50 pt-4">
                           <span className="w-2 h-2 rounded-full bg-brand-black"></span>
-                           <p className="text-[13px] font-black tracking-[0.2em] text-brand-black uppercase">{booking.startTime}</p>
+                          <p className="text-[13px] font-black tracking-[0.2em] text-brand-black uppercase">{booking.startTime}</p>
                           <span className="opacity-10 font-bold">—</span>
-                           <p className="text-[13px] font-bold text-brand-gray-600 uppercase tracking-widest">Service: {typeof booking.serviceId === 'object' ? booking.serviceId.name : 'Unknown'}</p>
-                       </div>
+                          <p className="text-[13px] font-bold text-brand-gray-600 uppercase tracking-widest">
+                            {typeof booking.serviceId === 'object' ? booking.serviceId.name : 'Unknown'}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── TAB 2: Pending Requests ─────────────────────── */}
+        {activeTab === 'pending' && (
+          <>
+            <header className="space-y-1">
+              <h2 className="text-4xl font-serif font-black tracking-tight leading-none uppercase">Pending<br/>Requests</h2>
+              <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[12px] pt-2">
+                Awaiting confirmation — {pendingBookings.length} request{pendingBookings.length !== 1 ? 's' : ''}
+              </p>
+            </header>
+
+            <div className="space-y-4">
+              {loadingPending ? (
+                <div className="p-20 text-center border border-brand-gray-100 font-serif italic text-brand-gray-300">
+                  Loading requests...
+                </div>
+              ) : pendingBookings.length === 0 ? (
+                <div className="p-20 text-center border-2 border-dashed border-brand-gray-100 italic font-serif text-brand-gray-300">
+                  <p>All clear — no pending requests.</p>
+                </div>
+              ) : (
+                <AnimatePresence>
+                  {pendingBookings.map((booking, idx) => {
+                    const serviceName = typeof booking.serviceId === 'object' ? booking.serviceId.name : 'Unknown';
+                    const servicePrice = typeof booking.serviceId === 'object' ? (booking.serviceId as Service).price : null;
+                    const isActing = actionLoading === booking._id;
+                    return (
+                      <motion.div
+                        key={booking._id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, x: -40, height: 0, marginBottom: 0 }}
+                        transition={{ delay: idx * 0.04, exit: { duration: 0.25 } }}
+                        className="border border-brand-gray-100 relative overflow-hidden"
+                      >
+                        {/* Request header */}
+                        <div className="p-6 border-b border-brand-gray-50">
+                          <div className="flex items-center gap-5">
+                            <div className="w-12 h-12 bg-brand-black flex-shrink-0 flex items-center justify-center font-black text-white text-sm italic font-serif">
+                              {booking.customerName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-serif italic text-2xl leading-none truncate">{booking.customerName}</p>
+                              <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mt-1.5">{booking.phone}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400">Requested</p>
+                              <p className="text-[12px] font-black mt-0.5">
+                                {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Booking details */}
+                        <div className="px-6 py-4 grid grid-cols-3 gap-4 border-b border-brand-gray-50">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Service</p>
+                            <p className="text-[13px] font-black uppercase">{serviceName}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Date</p>
+                            <p className="text-[13px] font-black">
+                              {new Date(booking.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Time</p>
+                            <p className="text-[13px] font-black">{booking.startTime}</p>
+                          </div>
+                        </div>
+
+                        {/* Price + Actions */}
+                        <div className="px-6 py-4 flex items-center justify-between gap-4">
+                          <p className="font-black text-lg tracking-tight">
+                            {servicePrice ? `KES ${servicePrice.toLocaleString()}` : '—'}
+                          </p>
+                          <div className="flex gap-3">
+                            <button
+                              disabled={isActing}
+                              onClick={() => handleStatusUpdate(booking._id, 'cancelled')}
+                              className="px-5 py-3 text-[11px] font-black uppercase tracking-[0.2em] border border-brand-gray-200 hover:border-brand-black transition-all disabled:opacity-40"
+                            >
+                              Decline
+                            </button>
+                            <button
+                              disabled={isActing}
+                              onClick={() => handleStatusUpdate(booking._id, 'confirmed')}
+                              className="px-5 py-3 text-[11px] font-black uppercase tracking-[0.2em] bg-brand-black text-white hover:bg-brand-gray-800 transition-all disabled:opacity-40 flex items-center gap-2"
+                            >
+                              {isActing ? (
+                                <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              ) : null}
+                              Confirm
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── TAB 3: Service Management ───────────────────── */}
+        {activeTab === 'services' && (
+          <>
+            <header className="space-y-1">
+              <h2 className="text-4xl font-serif font-black tracking-tight leading-none uppercase">Service<br/>Management</h2>
+              <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[12px] pt-2">
+                Edit prices // add new services
+              </p>
+            </header>
+
+            {/* Services list */}
+            <div className="space-y-3">
+              {loadingServices ? (
+                <div className="p-16 text-center border border-brand-gray-100 font-serif italic text-brand-gray-300">Loading...</div>
+              ) : services.map(service => {
+                const isSaving = savingPrice === service._id;
+                const currentEdit = editPrices[service._id] ?? String(service.price);
+                const isDirty = currentEdit !== String(service.price);
+                return (
+                  <div key={service._id} className="border border-brand-gray-100 p-5 hover:border-brand-black transition-all">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-serif italic text-lg leading-none">{service.name}</p>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mt-1.5">
+                          {service.duration > 60 ? `${Math.round(service.duration / 60)} HR` : `${service.duration} MIN`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[11px] font-black text-brand-gray-600 uppercase tracking-widest">KES</span>
+                        <input
+                          type="number"
+                          value={currentEdit}
+                          onChange={e => setEditPrices(prev => ({ ...prev, [service._id]: e.target.value }))}
+                          className="w-24 text-right font-black text-sm border-b-2 border-brand-gray-200 focus:border-brand-black focus:outline-none py-1 bg-transparent transition-colors"
+                        />
+                        {isDirty && (
+                          <button
+                            disabled={isSaving}
+                            onClick={() => handlePriceEdit(service._id)}
+                            className="px-3 py-1.5 bg-brand-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-brand-gray-800 transition-all disabled:opacity-40"
+                          >
+                            {isSaving ? '...' : 'Save'}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </motion.div>
+                  </div>
                 );
-              })
-            )}
-          </div>
-        </div>
+              })}
+            </div>
+
+            {/* Add Service Form */}
+            <div className="border-2 border-brand-black p-6 space-y-5">
+              <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4">New Service</p>
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Deep Conditioning"
+                    value={addForm.name}
+                    onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
+                    className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-black text-base uppercase tracking-widest placeholder:text-brand-gray-200 placeholder:font-normal placeholder:normal-case bg-transparent transition-colors"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Duration (min)</label>
+                    <input
+                      type="number"
+                      placeholder="60"
+                      value={addForm.duration}
+                      onChange={e => setAddForm(p => ({ ...p, duration: e.target.value }))}
+                      className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-black text-base bg-transparent transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Price (KES)</label>
+                    <input
+                      type="number"
+                      placeholder="2000"
+                      value={addForm.price}
+                      onChange={e => setAddForm(p => ({ ...p, price: e.target.value }))}
+                      className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-black text-base bg-transparent transition-colors"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Description (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Brief description"
+                    value={addForm.description}
+                    onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))}
+                    className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-black text-sm bg-transparent transition-colors placeholder:font-normal"
+                  />
+                </div>
+              </div>
+              <button
+                disabled={!addForm.name || !addForm.duration || !addForm.price || addLoading}
+                onClick={handleAddService}
+                className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {addLoading ? 'Adding...' : '+ Add Service'}
+              </button>
+            </div>
+          </>
+        )}
+
       </div>
     </div>
   );
 }
+

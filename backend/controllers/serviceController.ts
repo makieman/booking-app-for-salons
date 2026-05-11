@@ -7,8 +7,11 @@ import Service from '../models/Service';
  */
 export const createService = async (req: Request, res: Response) => {
   try {
-    const { name, duration, price } = req.body;
-    const newService = new Service({ name, duration, price });
+    const { name, duration, price, description } = req.body;
+    if (!name || !duration || price === undefined) {
+      return res.status(400).json({ error: 'name, duration, and price are required' });
+    }
+    const newService = new Service({ name, duration: Number(duration), price: Number(price), description });
     await newService.save();
     res.status(201).json(newService);
   } catch (error) {
@@ -26,5 +29,29 @@ export const getServices = async (req: Request, res: Response) => {
     res.json(services);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch services' });
+  }
+};
+
+/**
+ * PATCH /api/services/:id
+ * Updates a service's editable fields (name, duration, price, description).
+ */
+export const updateService = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, duration, price, description } = req.body;
+
+    const updates: Record<string, any> = {};
+    if (name !== undefined) updates.name = name;
+    if (duration !== undefined) updates.duration = Number(duration);
+    if (price !== undefined) updates.price = Number(price);
+    if (description !== undefined) updates.description = description;
+
+    const updated = await Service.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
+    if (!updated) return res.status(404).json({ error: 'Service not found' });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update service' });
   }
 };

@@ -26,9 +26,12 @@ export interface Booking {
   serviceId: string | Service;  // Can be populated or just an ID
   customerName: string;
   phone: string;
+  email?: string;     // Optional — used for email notifications
   date: string;       // YYYY-MM-DD
   startTime: string;  // HH:mm
   endTime: string;    // HH:mm
+  status: 'pending' | 'confirmed' | 'cancelled';
+  createdAt?: string;
 }
 
 export type BookingStep = 'service' | 'date' | 'time' | 'contact' | 'confirmation';

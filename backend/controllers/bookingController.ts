@@ -2,15 +2,20 @@ import { Request, Response } from 'express';
 import Booking from '../models/Booking';
 import Service from '../models/Service';
 import { DateTime } from 'luxon';
+import {
+  sendBookingRequestReceived,
+  sendAdminNewBookingAlert,
+} from '../services/emailService';
 
 /**
  * POST /api/bookings
  * Creates a new booking. Validates the service exists, calculates the end time
  * from the service duration, and checks for time slot overlaps.
+ * After saving, fires email notifications to the customer and admin (non-blocking).
  */
 export const createBooking = async (req: Request, res: Response) => {
   try {
-    const { customerName, phone, serviceId, date, startTime } = req.body;
+    const { customerName, phone, email, serviceId, date, startTime } = req.body;
 
     // Validate service exists
     const service = await Service.findById(serviceId);
@@ -41,13 +46,20 @@ export const createBooking = async (req: Request, res: Response) => {
     const newBooking = new Booking({
       customerName,
       phone,
+      email,  // optional — used for email notifications
       serviceId,
       date,
       startTime,
-      endTime: endTimeString
+      endTime: endTimeString,
     });
 
     await newBooking.save();
+
+    // ── Fire-and-forget email notifications (non-blocking) ─────────────────
+    // We intentionally do NOT await these — a failed email must never fail the booking.
+    void sendBookingRequestReceived(newBooking, service);
+    void sendAdminNewBookingAlert(newBooking, service);
+
     res.status(201).json(newBooking);
   } catch (error) {
     console.error(error);
