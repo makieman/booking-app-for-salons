@@ -1,9 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Settings, LayoutDashboard, Search, X } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Settings, LayoutDashboard, Search, X, WifiOff } from 'lucide-react';
 import { Service, Booking, BookingStep } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
+import { InstallPrompt } from './components/InstallPrompt';
 
 export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -12,6 +13,7 @@ export default function App() {
   const [pinError, setPinError] = useState(false);
   const ADMIN_PIN = '1234'; // Change this to your preferred PIN
   const [activeStep, setActiveStep] = useState<BookingStep>('service');
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   
   // Data from API
   const [services, setServices] = useState<Service[]>([]);
@@ -29,8 +31,14 @@ export default function App() {
 
   const dateCtaRef = useRef<HTMLButtonElement>(null);
 
-  // Initial Data Fetch
+  // Initial Data Fetch & Offline Listeners
   useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     const fetchInitialData = async () => {
       try {
         setIsLoading(true);
@@ -51,6 +59,11 @@ export default function App() {
       }
     };
     fetchInitialData();
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, [isAdmin]);
 
   // Fetch slots when date or service changes
@@ -88,7 +101,7 @@ export default function App() {
   }, [searchQuery, services]);
 
   const handleConfirmBooking = async () => {
-    if (!selectedService || !selectedTime || !clientInfo.name || !clientInfo.phone || !clientInfo.email) return;
+    if (!selectedService || !selectedTime || !clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline) return;
 
     try {
         const newBooking = await api.createBooking({
@@ -150,6 +163,8 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <InstallPrompt />
 
       {/* ── PIN Gate Modal ─────────────────────────────── */}
       <AnimatePresence>
@@ -530,10 +545,10 @@ export default function App() {
                             <div className="relative">
                               <input 
                                 type="email" 
-                                placeholder="EMAIL ADDRESS"
+                                placeholder="email@example.com"
                                 value={clientInfo.email}
                                 onChange={e => setClientInfo(prev => ({...prev, email: e.target.value}))}
-                                className="w-full bg-brand-white border-b-2 border-brand-gray-100 py-5 focus:outline-none focus:border-brand-black transition-all font-black text-base uppercase tracking-widest placeholder:text-brand-gray-200 placeholder:font-normal"
+                                className="w-full bg-brand-white border-b-2 border-brand-gray-100 py-5 focus:outline-none focus:border-brand-black transition-all font-black text-base lowercase tracking-normal placeholder:text-brand-gray-200 placeholder:font-normal"
                               />
                             </div>
                           </div>
@@ -542,11 +557,11 @@ export default function App() {
                     </div>
 
                     <button 
-                      disabled={!clientInfo.name || !clientInfo.phone || !clientInfo.email}
+                      disabled={!clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline}
                       onClick={handleConfirmBooking}
                       className="w-full bg-brand-black text-brand-white py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98]"
                     >
-                      Finalize Booking
+                      {isOffline ? 'Offline - Booking Disabled' : 'Finalize Booking'}
                     </button>
                   </motion.div>
                 )}
@@ -610,6 +625,21 @@ export default function App() {
           </div>
         )}
       </main>
+      
+      <AnimatePresence>
+        {isOffline && (
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            className="fixed bottom-0 left-0 right-0 bg-red-500 text-white p-3 flex justify-center items-center gap-2 text-sm font-bold z-50"
+          >
+            <WifiOff size={16} />
+            You are currently offline. Booking is disabled.
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="h-1 w-full bg-brand-black mt-auto"></div>
     </div>
   );

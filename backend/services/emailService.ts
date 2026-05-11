@@ -16,7 +16,13 @@ function getResend(): Resend {
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const FROM = process.env.FROM_EMAIL ?? 'onboarding@resend.dev';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? '';
+
+// Supports multiple admin emails separated by commas
+// e.g. ADMIN_EMAIL=flo@salon.com,assistant@salon.com
+const ADMIN_EMAILS: string[] = (process.env.ADMIN_EMAIL ?? '')
+  .split(',')
+  .map(e => e.trim())
+  .filter(Boolean);
 
 // ── Shared brand styles ───────────────────────────────────────────────────────
 const BRAND = {
@@ -267,7 +273,7 @@ export async function sendAdminNewBookingAlert(
   booking: IBooking,
   service: IService,
 ): Promise<void> {
-  if (!ADMIN_EMAIL) {
+  if (ADMIN_EMAILS.length === 0) {
     console.warn('[emailService] ADMIN_EMAIL not set — skipping admin alert');
     return;
   }
@@ -312,7 +318,7 @@ export async function sendAdminNewBookingAlert(
   `);
 
   await sendEmail({
-    to: ADMIN_EMAIL,
+    to: ADMIN_EMAILS,
     subject: `🔔 New Booking — ${booking.customerName} | ${service.name}`,
     html,
   });
