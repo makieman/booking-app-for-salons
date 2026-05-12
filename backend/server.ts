@@ -5,6 +5,11 @@ import connectDB from './config/db';
 import { errorHandler } from './middleware/errorHandler';
 import Service from './models/Service';
 import mongoose from 'mongoose';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Routes
 import serviceRoutes from './routes/serviceRoutes';
@@ -101,6 +106,20 @@ async function startServer(): Promise<void> {
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  // ── Static Files (Production) ────────────────────────────
+  if (process.env.NODE_ENV === 'production') {
+    const frontendDist = path.join(__dirname, '../frontend/dist');
+    app.use(express.static(frontendDist));
+
+    // Handle SPA routing: serve index.html for any unknown routes
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) {
+        return next(); // Let 404 handler or error handler catch missing API routes
+      }
+      res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+  }
 
   // ── Error Handler (must be last) ────────────────────────
   app.use(errorHandler);

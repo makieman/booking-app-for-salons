@@ -282,18 +282,11 @@ export default function App() {
       
       <header className="px-8 py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100">
         <div className="flex items-center gap-5 cursor-pointer" onClick={resetFlow}>
-          <div className="w-12 h-12 bg-brand-black flex items-center justify-center p-2 relative overflow-hidden group">
-            <div className="text-brand-white flex flex-col items-center z-10 transition-transform duration-500 group-hover:scale-110">
-              <span className="text-[18px] font-black leading-none tracking-tighter italic font-serif">F</span>
-              <div className="h-[1px] w-6 bg-brand-white/50 my-1"></div>
-              <span className="text-[8px] font-black tracking-[0.4em] uppercase opacity-90">LO</span>
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-tr from-brand-black to-brand-gray-900"></div>
-          </div>
-          <div className="flex flex-col">
-            <h1 className="text-3xl font-serif italic tracking-tight leading-none text-brand-black lowercase">flo sisterlocks</h1>
-            <p className="text-[11px] uppercase tracking-[0.4em] text-brand-gray-600 font-black mt-1.5 leading-none italic opacity-95">Certified consultant // eldoret</p>
-          </div>
+          <img 
+            src="/logo-transparent.png" 
+            alt="Flobooking Logo" 
+            className="h-16 w-auto object-contain drop-shadow-sm transition-transform duration-500 hover:scale-[1.02]" 
+          />
         </div>
         <div className="flex items-center gap-3">
           <a href="tel:0721530120" className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
