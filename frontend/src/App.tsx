@@ -281,12 +281,14 @@ export default function App() {
       </AnimatePresence>
       
       <header className="px-8 py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100">
-        <div className="flex items-center gap-5 cursor-pointer" onClick={resetFlow}>
-          <img 
-            src="/logo-transparent.png" 
-            alt="Flobooking Logo" 
-            className="h-16 w-auto object-contain drop-shadow-sm transition-transform duration-500 hover:scale-[1.02]" 
-          />
+        <div className="flex items-center gap-5 cursor-pointer group" onClick={resetFlow}>
+          <div className="h-16 w-16 bg-brand-black rounded-full flex items-center justify-center p-3 shadow-luxury transition-transform duration-500 group-hover:scale-105">
+            <img 
+              src="/logo-transparent.png" 
+              alt="Flobooking Logo" 
+              className="h-full w-auto object-contain" 
+            />
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <a href="tel:0721530120" className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
