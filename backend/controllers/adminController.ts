@@ -5,6 +5,7 @@ import {
   sendBookingConfirmedToCustomer,
   sendBookingCancelledToCustomer,
 } from '../services/emailService';
+import { sendPushToPhone } from '../services/pushService';
 
 /**
  * GET /api/admin/bookings
@@ -55,8 +56,18 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
 
     if (status === 'confirmed') {
       void sendBookingConfirmedToCustomer(booking, service as any);
+      void sendPushToPhone(booking.phone, {
+        title: '✅ Appointment Confirmed!',
+        body: `See you on ${booking.date} at ${booking.startTime}. Please arrive 5–10 mins early.`,
+        url: '/',
+      });
     } else if (status === 'cancelled') {
       void sendBookingCancelledToCustomer(booking, service as any);
+      void sendPushToPhone(booking.phone, {
+        title: '❌ Booking Cancelled',
+        body: `Your booking on ${booking.date} has been cancelled. Call 0721 530 120 to rebook.`,
+        url: '/',
+      });
     }
 
     res.json(booking);

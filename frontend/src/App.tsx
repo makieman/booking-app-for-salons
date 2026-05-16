@@ -5,6 +5,7 @@ import { Service, Booking, BookingStep } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
 import { InstallPrompt } from './components/InstallPrompt';
+import { NotificationPrompt } from './components/NotificationPrompt';
 
 export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -28,6 +29,7 @@ export default function App() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [clientInfo, setClientInfo] = useState({ name: '', phone: '', email: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   const dateCtaRef = useRef<HTMLButtonElement>(null);
 
@@ -115,6 +117,7 @@ export default function App() {
         
         setBookings(prev => [...prev, newBooking]);
         setActiveStep('confirmation');
+        setTimeout(() => setShowNotificationPrompt(true), 800);
     } catch (err: any) {
         alert(err.message || 'Failed to create booking. Please try again.');
     }
@@ -126,6 +129,7 @@ export default function App() {
     setSelectedTime(null);
     setSelectedDate(new Date().toISOString().split('T')[0]);
     setClientInfo({ name: '', phone: '', email: '' });
+    setShowNotificationPrompt(false);
   };
 
   const handleStepBack = () => {
@@ -165,6 +169,13 @@ export default function App() {
       </AnimatePresence>
 
       <InstallPrompt />
+
+      {showNotificationPrompt && (
+        <NotificationPrompt
+          customerPhone={clientInfo.phone}
+          onDismiss={() => setShowNotificationPrompt(false)}
+        />
+      )}
 
       {/* ── PIN Gate Modal ─────────────────────────────── */}
       <AnimatePresence>

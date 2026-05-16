@@ -16,6 +16,7 @@ import serviceRoutes from './routes/serviceRoutes';
 import bookingRoutes from './routes/bookingRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
 import adminRoutes from './routes/adminRoutes';
+import pushRoutes from './routes/pushRoutes';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -101,6 +102,7 @@ async function startServer(): Promise<void> {
   app.use('/api/bookings', bookingRoutes);
   app.use('/api/availability', availabilityRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/push', pushRoutes);
 
   // ── Health Check ─────────────────────────────────────────
   app.get('/api/health', (_req, res) => {

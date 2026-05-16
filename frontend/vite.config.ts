@@ -10,6 +10,10 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Use our custom service worker so we can handle push events
+      strategies: 'injectManifest',
+      srcDir:     'src',
+      filename:   'sw.ts',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'Flo Sisterlocks',
@@ -37,26 +41,6 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
-        // Exclude /api/bookings from caching (must be network only)
-        navigateFallbackDenylist: [/^\/api/],
-        runtimeCaching: [
-          {
-            urlPattern: /^\/api\/services/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'services-api-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
-      }
     })
   ],
   resolve: {

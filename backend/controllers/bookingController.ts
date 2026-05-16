@@ -6,6 +6,7 @@ import {
   sendBookingRequestReceived,
   sendAdminNewBookingAlert,
 } from '../services/emailService';
+import { sendPushToPhone } from '../services/pushService';
 
 /**
  * POST /api/bookings
@@ -55,10 +56,15 @@ export const createBooking = async (req: Request, res: Response) => {
 
     await newBooking.save();
 
-    // ── Fire-and-forget email notifications (non-blocking) ─────────────────
-    // We intentionally do NOT await these — a failed email must never fail the booking.
+    // ── Fire-and-forget notifications (non-blocking) ──────────────────────
+    // We intentionally do NOT await these — a failed notification must never fail the booking.
     void sendBookingRequestReceived(newBooking, service);
     void sendAdminNewBookingAlert(newBooking, service);
+    void sendPushToPhone(newBooking.phone, {
+      title: '📋 Booking Request Received',
+      body: `${service.name} on ${newBooking.date} at ${newBooking.startTime} — pending approval.`,
+      url: '/',
+    });
 
     res.status(201).json(newBooking);
   } catch (error) {
