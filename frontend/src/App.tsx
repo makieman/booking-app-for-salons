@@ -282,7 +282,7 @@ export default function App() {
       
       <header className="px-8 py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100">
         <div className="flex items-center gap-5 cursor-pointer group" onClick={resetFlow}>
-          <div className="h-16 w-16 bg-brand-black rounded-full flex items-center justify-center p-3 shadow-luxury transition-transform duration-500 group-hover:scale-105">
+          <div className="h-16 w-16 bg-brand-black rounded-full flex items-center justify-center p-3 transition-transform duration-500 group-hover:scale-105">
             <img 
               src="/logo-transparent.png" 
               alt="Flobooking Logo" 
