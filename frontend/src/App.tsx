@@ -1,11 +1,12 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Settings, LayoutDashboard, Search, X, WifiOff } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Settings, LayoutDashboard, Search, X, WifiOff, Bell, BellOff } from 'lucide-react';
 import { Service, Booking, BookingStep } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
 import { InstallPrompt } from './components/InstallPrompt';
 import { NotificationPrompt } from './components/NotificationPrompt';
+import { useAdminPushNotifications } from './hooks/useAdminPushNotifications';
 
 export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -770,6 +771,9 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
   const [loadingServices, setLoadingServices] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Admin push notifications
+  const adminPush = useAdminPushNotifications();
+
   // Add service form state
   const [addForm, setAddForm] = useState({ name: '', duration: '', price: '', description: '' });
   const [addLoading, setAddLoading] = useState(false);
@@ -865,8 +869,8 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* Tab Navigation */}
-      <nav className="px-8 border-b border-brand-gray-100 flex gap-8">
+      {/* Tab Navigation + Admin Notification Toggle */}
+      <nav className="px-8 border-b border-brand-gray-100 flex items-center gap-8">
         {tabs.map(tab => (
           <button
             key={tab.key}
@@ -886,6 +890,25 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
             )}
           </button>
         ))}
+
+        {/* Admin push notification toggle — sits at far right of the tab bar */}
+        {adminPush.permission !== 'unsupported' && adminPush.permission !== 'denied' && (
+          <button
+            onClick={() => adminPush.isSubscribed ? adminPush.unsubscribe() : adminPush.subscribe()}
+            disabled={adminPush.isLoading}
+            title={adminPush.isSubscribed ? 'Disable booking notifications' : 'Enable booking notifications'}
+            className={`ml-auto flex items-center gap-2 py-2 px-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all border ${
+              adminPush.isSubscribed
+                ? 'bg-brand-black text-white border-brand-black'
+                : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
+            } disabled:opacity-40`}
+          >
+            {adminPush.isSubscribed
+              ? <><Bell size={13} /> Notifs On</>
+              : <><BellOff size={13} /> Notifs Off</>
+            }
+          </button>
+        )}
       </nav>
 
       <div className="flex-1 overflow-y-auto px-8 py-10 space-y-12 scrollbar-hide">

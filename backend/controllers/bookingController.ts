@@ -6,7 +6,7 @@ import {
   sendBookingRequestReceived,
   sendAdminNewBookingAlert,
 } from '../services/emailService';
-import { sendPushToPhone } from '../services/pushService';
+import { sendPushToPhone, sendPushToAdmins } from '../services/pushService';
 
 /**
  * POST /api/bookings
@@ -60,9 +60,16 @@ export const createBooking = async (req: Request, res: Response) => {
     // We intentionally do NOT await these — a failed notification must never fail the booking.
     void sendBookingRequestReceived(newBooking, service);
     void sendAdminNewBookingAlert(newBooking, service);
+    // Customer push: confirms their request was received
     void sendPushToPhone(newBooking.phone, {
       title: '📋 Booking Request Received',
       body: `${service.name} on ${newBooking.date} at ${newBooking.startTime} — pending approval.`,
+      url: '/',
+    });
+    // Admin push: alert all admin devices about the new booking
+    void sendPushToAdmins({
+      title: '🔔 New Booking Request',
+      body: `${newBooking.customerName} — ${service.name} on ${newBooking.date} at ${newBooking.startTime}`,
       url: '/',
     });
 

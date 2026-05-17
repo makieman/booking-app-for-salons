@@ -1,10 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 /**
- * PushSubscription — stores a browser Web Push subscription for a customer.
+ * PushSubscription — stores a browser Web Push subscription.
  *
- * Each browser/device gets a unique endpoint. We link it to the customer
- * by phone number so we can target them when their booking status changes.
+ * role: 'customer' subscriptions are linked to a phone number and receive
+ *       booking status updates (confirmed / cancelled).
+ * role: 'admin'    subscriptions receive new-booking alerts and are not
+ *       tied to a phone number.
  */
 export interface IPushSubscription extends Document {
   endpoint: string;
@@ -12,19 +14,21 @@ export interface IPushSubscription extends Document {
     p256dh: string;
     auth: string;
   };
-  customerPhone: string;
+  role: 'customer' | 'admin';
+  customerPhone?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const PushSubscriptionSchema: Schema = new Schema(
   {
-    endpoint: { type: String, required: true, unique: true },
+    endpoint:      { type: String, required: true, unique: true },
     keys: {
-      p256dh: { type: String, required: true },
-      auth:   { type: String, required: true },
+      p256dh:      { type: String, required: true },
+      auth:        { type: String, required: true },
     },
-    customerPhone: { type: String, required: true, index: true },
+    role:          { type: String, enum: ['customer', 'admin'], default: 'customer', index: true },
+    customerPhone: { type: String, index: true },   // required for role:'customer', omitted for role:'admin'
   },
   { timestamps: true }
 );

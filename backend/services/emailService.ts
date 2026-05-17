@@ -143,7 +143,7 @@ async function sendEmail(opts: {
   try {
     const resend = getResend();
     const { error } = await resend.emails.send({
-      from: `Flo Sisterlocks <${FROM}>`,
+      from: FROM,
       to: opts.to,
       subject: opts.subject,
       html: opts.html,

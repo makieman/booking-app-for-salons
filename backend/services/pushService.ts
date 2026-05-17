@@ -27,58 +27,24 @@ interface PushPayload {
   url?:  string;
 }
 
-// ── Public helper ─────────────────────────────────────────────────────────────
-/**
- * Send a push notification to every subscribed device for a given customer phone.
- * Expired subscriptions (410 / 404) are automatically cleaned up.
- * Follows the same non-throwing, fire-and-forget pattern as emailService.ts.
- */
-export async function sendPushToPhone(
-  phone:   string,
+// ── Shared push sender ────────────────────────────────────────────────────────
+async function sendToSubscriptions(
+  subscriptions: Awaited<ReturnType<typeof PushSubscription.find>>,
   payload: PushPayload,
 ): Promise<void> {
-  if (!phone) {
-    console.warn('[pushService] Skipping push — no phone number provided');
-    return;
-  }
-
-  try {
-    ensureVapid();
-  } catch (err) {
-    console.error('[pushService] VAPID init failed:', err);
-    return;
-  }
-
-  let subscriptions;
-  try {
-    subscriptions = await PushSubscription.find({ customerPhone: phone });
-  } catch (err) {
-    console.error('[pushService] Failed to query subscriptions:', err);
-    return;
-  }
-
-  if (subscriptions.length === 0) {
-    console.log(`[pushService] No push subscriptions found for phone ${phone}`);
-    return;
-  }
-
   const staleEndpoints: string[] = [];
 
   await Promise.all(
     subscriptions.map(async (sub) => {
       try {
         await webpush.sendNotification(
-          {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
-          },
+          { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } },
           JSON.stringify(payload),
         );
         console.log(`[pushService] ✅ Push sent → ${sub.endpoint.slice(0, 60)}…`);
       } catch (err: any) {
         const status: number = err?.statusCode ?? err?.status ?? 0;
         if (status === 410 || status === 404) {
-          // Subscription has expired or been revoked — remove it
           staleEndpoints.push(sub.endpoint);
           console.log(`[pushService] Removing stale subscription (${status}): ${sub.endpoint.slice(0, 60)}…`);
         } else {
@@ -96,3 +62,66 @@ export async function sendPushToPhone(
     }
   }
 }
+
+// ── Public helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Send a push notification to every subscribed device for a given customer phone.
+ * Expired subscriptions (410 / 404) are automatically cleaned up.
+ */
+export async function sendPushToPhone(
+  phone:   string,
+  payload: PushPayload,
+): Promise<void> {
+  if (!phone) {
+    console.warn('[pushService] Skipping push — no phone number provided');
+    return;
+  }
+
+  try { ensureVapid(); } catch (err) {
+    console.error('[pushService] VAPID init failed:', err);
+    return;
+  }
+
+  let subscriptions;
+  try {
+    subscriptions = await PushSubscription.find({ customerPhone: phone, role: 'customer' });
+  } catch (err) {
+    console.error('[pushService] Failed to query subscriptions:', err);
+    return;
+  }
+
+  if (subscriptions.length === 0) {
+    console.log(`[pushService] No push subscriptions found for phone ${phone}`);
+    return;
+  }
+
+  await sendToSubscriptions(subscriptions, payload);
+}
+
+/**
+ * Send a push notification to ALL subscribed admin devices.
+ * Used to alert the admin when a new booking comes in.
+ */
+export async function sendPushToAdmins(payload: PushPayload): Promise<void> {
+  try { ensureVapid(); } catch (err) {
+    console.error('[pushService] VAPID init failed:', err);
+    return;
+  }
+
+  let subscriptions;
+  try {
+    subscriptions = await PushSubscription.find({ role: 'admin' });
+  } catch (err) {
+    console.error('[pushService] Failed to query admin subscriptions:', err);
+    return;
+  }
+
+  if (subscriptions.length === 0) {
+    console.log('[pushService] No admin push subscriptions registered');
+    return;
+  }
+
+  await sendToSubscriptions(subscriptions, payload);
+}
+
