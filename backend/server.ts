@@ -112,7 +112,32 @@ async function startServer(): Promise<void> {
   // ── Static Files (Production) ────────────────────────────
   if (process.env.NODE_ENV === 'production') {
     const frontendDist = path.join(__dirname, '../frontend/dist');
-    app.use(express.static(frontendDist));
+
+    // Serve sw.js and manifest with no-cache so browsers always get the
+    // latest version. Stale service workers are the #1 cause of PWA bugs.
+    app.use((req, res, next) => {
+      if (
+        req.path === '/sw.js' ||
+        req.path === '/manifest.webmanifest' ||
+        req.path.endsWith('.webmanifest')
+      ) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+      }
+      next();
+    });
+
+    // Serve hashed assets with long-lived immutable caching for performance.
+    app.use(
+      '/assets',
+      express.static(path.join(frontendDist, 'assets'), {
+        maxAge: '1y',
+        immutable: true,
+      }),
+    );
+
+    // Serve remaining static files (icons, favicon, etc.) with a short cache.
+    app.use(express.static(frontendDist, { maxAge: '1h' }));
 
     // Handle SPA routing: serve index.html for any unknown routes
     app.get('*', (req, res, next) => {

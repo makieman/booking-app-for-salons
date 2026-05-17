@@ -14,32 +14,43 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir:     'src',
       filename:   'sw.ts',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
+      // Reference the actual files present in public/
+      includeAssets: [
+        'favicon.ico',
+        'favicon-16x16.png',
+        'favicon-32x32.png',
+        'apple-touch-icon.png',
+        'android-chrome-192x192.png',
+        'android-chrome-512x512.png',
+        'logo-transparent.png',
+      ],
       manifest: {
         name: 'Flo Sisterlocks',
         short_name: 'Flobooking',
         description: 'Flo Sisterlocks — Certified Sisterlocks studio in Eldoret',
+        start_url: '/',
         theme_color: '#f5f5f5',
         background_color: '#f5f5f5',
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'android-chrome-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
           },
           {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
+            src: 'android-chrome-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ]
+          },
+          {
+            // maskable icon — browser uses this for adaptive icon shapes
+            src: 'android-chrome-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
       },
     })
   ],
