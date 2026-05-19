@@ -1,13 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose';
-
-/**
- * PushSubscription — stores a browser Web Push subscription.
- *
- * role: 'customer' subscriptions are linked to a phone number and receive
- *       booking status updates (confirmed / cancelled).
- * role: 'admin'    subscriptions receive new-booking alerts and are not
- *       tied to a phone number.
- */
 export interface IPushSubscription extends Document {
   endpoint: string;
   keys: {
