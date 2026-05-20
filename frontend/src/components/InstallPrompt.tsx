@@ -11,37 +11,51 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    const handler = (e: Event) => {
-      // Prevent Chrome 67 and earlier from automatically showing the prompt
+    // If already running as installed standalone app, do nothing
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+
+    const handleBeforeInstall = (e: Event) => {
+      // Prevent Chrome from showing its own mini-infobar
       e.preventDefault();
-      // Stash the event so it can be triggered later.
+      // Store the event so we can trigger it on button click
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
-    window.addEventListener('beforeinstallprompt', handler);
+    const handleInstalled = () => {
+      // Hide the button immediately after successful install
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleInstalled);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleInstalled);
     };
   }, []);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
-    
-    // Show the install prompt
     deferredPrompt.prompt();
-    
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
-    
-    // We've used the prompt, and can't use it again, throw it away
+    if (outcome === 'accepted') {
+      console.log('[InstallPrompt] User accepted install');
+    }
+    // Whether accepted or dismissed, clear the prompt — it cannot be reused
     setDeferredPrompt(null);
   };
 
-  if (!deferredPrompt) return null;
+  // Do not render if already installed or event never fired
+  const isStandalone =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(display-mode: standalone)').matches;
+
+  if (isStandalone || !deferredPrompt) return null;
 
   return (
     <button

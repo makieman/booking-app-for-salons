@@ -8,6 +8,14 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
+// Convert an ArrayBuffer to URL-safe base64 (no padding, - instead of +, _ instead of /)
+function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
@@ -75,9 +83,9 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
 
-      // 4. Extract keys
-      const p256dh = btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')!)));
-      const auth   = btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth')!)));
+      // 4. Extract keys as URL-safe base64
+      const p256dh = arrayBufferToBase64Url(sub.getKey('p256dh')!);
+      const auth   = arrayBufferToBase64Url(sub.getKey('auth')!);
 
       // 5. Save to server as admin subscription
       const saveRes = await fetch('/api/push/subscribe-admin', {

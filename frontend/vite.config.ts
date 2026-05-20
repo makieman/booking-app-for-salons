@@ -14,6 +14,10 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir:     'src',
       filename:   'sw.ts',
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
       // Reference the actual files present in public/
       includeAssets: [
         'favicon.ico',
