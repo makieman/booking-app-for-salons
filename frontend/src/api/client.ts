@@ -6,7 +6,20 @@
  * configure your reverse proxy (nginx, etc.) to handle this.
  */
 
+import type { Attendant, Booking } from '../types';
+
 const API_BASE = '/api';
+
+// ── Helper ─────────────────────────────────────────────────────────────────
+
+/** Adds Authorization Bearer header when a token is provided */
+function authHeaders(token?: string): HeadersInit {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
+// ── Services ───────────────────────────────────────────────────────────────
 
 /**
  * Fetches all available services from the backend.
@@ -35,6 +48,8 @@ export async function createService(data: { name: string; duration: number; pric
   return res.json();
 }
 
+// ── Bookings ───────────────────────────────────────────────────────────────
+
 /**
  * Fetches bookings, optionally filtered by date.
  * Endpoint: GET /api/bookings?date=YYYY-MM-DD
@@ -55,10 +70,11 @@ export async function getBookings(date?: string) {
 export async function createBooking(data: {
   customerName: string;
   phone: string;
-  email?: string;     // Optional — used for email notifications
+  email?: string;
   serviceId: string;
   date: string;
   startTime: string;
+  attendantId?: string | null;
 }) {
   const res = await fetch(`${API_BASE}/bookings`, {
     method: 'POST',
@@ -72,26 +88,46 @@ export async function createBooking(data: {
   return res.json();
 }
 
+// ── Availability ───────────────────────────────────────────────────────────
+
 /**
- * Fetches available time slots for a given date and service.
- * Endpoint: GET /api/availability?date=YYYY-MM-DD&serviceId=xxx
+ * Fetches available time slots for a given date, service, and optional attendant.
+ * Endpoint: GET /api/availability?date=YYYY-MM-DD&serviceId=xxx[&attendantId=yyy]
  * Returns an array of time strings like ["09:00", "09:30", "10:00"]
  */
-export async function getAvailability(date: string, serviceId: string) {
-  const res = await fetch(
-    `${API_BASE}/availability?date=${date}&serviceId=${serviceId}`
-  );
+export async function getAvailability(date: string, serviceId: string, attendantId?: string | null) {
+  let url = `${API_BASE}/availability?date=${date}&serviceId=${serviceId}`;
+  if (attendantId) url += `&attendantId=${attendantId}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error('Failed to fetch availability');
   return res.json();
 }
 
 /**
- * Admin: Fetches all bookings, optionally filtered by status.
- * Endpoint: GET /api/admin/bookings?status=pending
+ * Fetches slots across ALL active attendants for the "Any Available" option.
+ * Endpoint: GET /api/availability/any?date=YYYY-MM-DD&serviceId=xxx
  */
-export async function getAdminBookings(status?: string) {
-  const url = status
-    ? `${API_BASE}/admin/bookings?status=${status}`
+export async function getAnyAvailability(date: string, serviceId: string): Promise<{
+  slots: string[];
+  attendantSlots: { attendantId: string; name: string; slots: string[] }[];
+}> {
+  const res = await fetch(`${API_BASE}/availability/any?date=${date}&serviceId=${serviceId}`);
+  if (!res.ok) throw new Error('Failed to fetch availability');
+  return res.json();
+}
+
+// ── Admin: Bookings ────────────────────────────────────────────────────────
+
+/**
+ * Admin: Fetches all bookings, optionally filtered by status and/or attendant.
+ * Endpoint: GET /api/admin/bookings?status=pending&attendantId=xxx
+ */
+export async function getAdminBookings(status?: string, attendantId?: string) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (attendantId) params.set('attendantId', attendantId);
+  const url = params.toString()
+    ? `${API_BASE}/admin/bookings?${params}`
     : `${API_BASE}/admin/bookings`;
   const res = await fetch(url);
   if (!res.ok) throw new Error('Failed to fetch admin bookings');
@@ -132,3 +168,127 @@ export async function updateService(id: string, data: Partial<{ name: string; du
   return res.json();
 }
 
+// ── Admin: Attendants ──────────────────────────────────────────────────────
+
+/**
+ * Customer-facing: fetch active attendants for a service (no auth).
+ * Endpoint: GET /api/admin/attendants/public?serviceId=xxx
+ */
+export async function getAttendantsForService(serviceId: string): Promise<Pick<Attendant, '_id' | 'name' | 'serviceIds'>[]> {
+  const res = await fetch(`${API_BASE}/admin/attendants/public?serviceId=${serviceId}`);
+  if (!res.ok) throw new Error('Failed to fetch attendants');
+  return res.json();
+}
+
+/**
+ * Owner: Fetch all staff accounts.
+ * Endpoint: GET /api/admin/attendants
+ * Requires X-Owner-Pin header.
+ */
+export async function getAttendants(ownerPin: string): Promise<Attendant[]> {
+  const res = await fetch(`${API_BASE}/admin/attendants`, {
+    headers: { 'Content-Type': 'application/json', 'X-Owner-Pin': ownerPin },
+  });
+  if (!res.ok) throw new Error('Failed to fetch attendants');
+  return res.json();
+}
+
+/**
+ * Owner: Create a new staff account.
+ * Endpoint: POST /api/admin/attendants
+ */
+export async function createAttendant(
+  ownerPin: string,
+  data: { name: string; username: string; pin: string; serviceIds: string[] }
+): Promise<Attendant> {
+  const res = await fetch(`${API_BASE}/admin/attendants`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Owner-Pin': ownerPin },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to create attendant');
+  }
+  return res.json();
+}
+
+/**
+ * Owner: Update a staff account (name, serviceIds, isActive, pin reset).
+ * Endpoint: PATCH /api/admin/attendants/:id
+ */
+export async function updateAttendant(
+  ownerPin: string,
+  id: string,
+  data: Partial<{ name: string; pin: string; serviceIds: string[]; isActive: boolean }>
+): Promise<Attendant> {
+  const res = await fetch(`${API_BASE}/admin/attendants/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-Owner-Pin': ownerPin },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update attendant');
+  }
+  return res.json();
+}
+
+// ── Auth: Attendant Login ──────────────────────────────────────────────────
+
+/**
+ * Log in as an attendant. Returns JWT + attendant info.
+ * Endpoint: POST /api/auth/attendant/login
+ */
+export async function loginAttendant(
+  username: string,
+  pin: string
+): Promise<{ token: string; attendant: { _id: string; name: string; serviceIds: string[] } }> {
+  const res = await fetch(`${API_BASE}/auth/attendant/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, pin }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Login failed');
+  }
+  return res.json();
+}
+
+// ── Attendant: Own Dashboard ───────────────────────────────────────────────
+
+/**
+ * Fetch the authenticated attendant's own bookings.
+ * Endpoint: GET /api/attendant/bookings?date=&status=
+ */
+export async function getAttendantBookings(
+  token: string,
+  params?: { date?: string; status?: string }
+): Promise<Booking[]> {
+  const query = new URLSearchParams();
+  if (params?.date) query.set('date', params.date);
+  if (params?.status) query.set('status', params.status);
+  const url = query.toString()
+    ? `${API_BASE}/attendant/bookings?${query}`
+    : `${API_BASE}/attendant/bookings`;
+  const res = await fetch(url, { headers: authHeaders(token) });
+  if (!res.ok) throw new Error('Failed to fetch bookings');
+  return res.json();
+}
+
+/**
+ * Mark a booking as completed (attendant only).
+ * Endpoint: PATCH /api/attendant/bookings/:id/complete
+ */
+export async function markBookingCompleted(token: string, bookingId: string): Promise<Booking> {
+  const res = await fetch(`${API_BASE}/attendant/bookings/${bookingId}/complete`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to mark booking complete');
+  }
+  return res.json();
+}

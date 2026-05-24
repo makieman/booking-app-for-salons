@@ -17,6 +17,8 @@ import bookingRoutes from './routes/bookingRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
 import adminRoutes from './routes/adminRoutes';
 import pushRoutes from './routes/pushRoutes';
+import authRoutes from './routes/authRoutes';
+import attendantRoutes from './routes/attendantRoutes';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -61,6 +63,32 @@ async function seedServices(): Promise<void> {
 }
 
 /**
+ * Seeds one example attendant in development if no attendants exist.
+ * Only runs when SEED_ATTENDANTS=true env var is set (never in production by default).
+ */
+async function seedAttendants(): Promise<void> {
+  if (process.env.SEED_ATTENDANTS !== 'true') return;
+  if (mongoose.connection.readyState !== 1) return;
+
+  const { default: Attendant } = await import('./models/Attendant.js');
+  const { default: bcrypt }    = await import('bcrypt');
+
+  const count = await Attendant.countDocuments();
+  if (count === 0) {
+    // Seed services to get their IDs first
+    const services = await Service.find({});
+    await Attendant.create({
+      name: 'Florence',
+      username: 'flo',
+      pinHash: await bcrypt.hash('1234', 10),
+      isActive: true,
+      serviceIds: services.map(s => s._id),
+    });
+    console.log('👤 Seeded example attendant: flo / PIN 1234');
+  }
+}
+
+/**
  * Starts the Express server.
  * - Connects to MongoDB
  * - Seeds initial data
@@ -96,6 +124,7 @@ async function startServer(): Promise<void> {
   });
 
   await seedServices();
+  await seedAttendants();
 
   // ── API Routes ───────────────────────────────────────────
   app.use('/api/services', serviceRoutes);
@@ -103,6 +132,8 @@ async function startServer(): Promise<void> {
   app.use('/api/availability', availabilityRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/push', pushRoutes);
+  app.use('/api/auth', authRoutes);
+  app.use('/api/attendant', attendantRoutes);
 
   // ── Health Check ─────────────────────────────────────────
   app.get('/api/health', (_req, res) => {

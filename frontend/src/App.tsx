@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Settings, LayoutDashboard, Search, X, WifiOff, Bell, BellOff } from 'lucide-react';
-import { Service, Booking, BookingStep } from './types';
+import { Phone, CheckCircle2, ArrowLeft, Settings, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User } from 'lucide-react';
+import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
 import { InstallPrompt } from './components/InstallPrompt';
@@ -9,11 +9,27 @@ import { NotificationPrompt } from './components/NotificationPrompt';
 import { useAdminPushNotifications } from './hooks/useAdminPushNotifications';
 
 export default function App() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  // ── User mode: 'customer' | 'attendant' | 'owner' ─────────────────────────
+  const [userMode, setUserMode] = useState<UserMode>('customer');
+  // Backward-compat alias used by AdminView
+  const isAdmin = userMode === 'owner';
+
+  // ── Attendant session ─────────────────────────────────────────────────────
+  const [attendantSession, setAttendantSession] = useState<AttendantSession | null>(null);
+
+  // ── Login modal state ─────────────────────────────────────────────────────
   const [showPinModal, setShowPinModal] = useState(false);
+  const [loginTab, setLoginTab] = useState<'owner' | 'staff'>('owner');
+  // Owner PIN
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
-  const ADMIN_PIN = '1234'; // Change this to your preferred PIN
+  const ADMIN_PIN = process.env.OWNER_PIN ?? '1234'; // Keep for client-side gate
+  // Staff login
+  const [staffUsername, setStaffUsername] = useState('');
+  const [staffPin, setStaffPin] = useState('');
+  const [staffPinError, setStaffPinError] = useState(false);
+  const [staffLoginLoading, setStaffLoginLoading] = useState(false);
+
   const [activeStep, setActiveStep] = useState<BookingStep>('service');
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   
@@ -27,12 +43,32 @@ export default function App() {
   // Booking State
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedAttendant, setSelectedAttendant] = useState<Attendant | null>(null); // null = "Any Available"
+  const [attendants, setAttendants] = useState<Attendant[]>([]);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [clientInfo, setClientInfo] = useState({ name: '', phone: '', email: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   const dateCtaRef = useRef<HTMLButtonElement>(null);
+
+  // ── Session restore on mount ───────────────────────────────────────────────
+  useEffect(() => {
+    const token = localStorage.getItem('attendantToken');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.exp * 1000 > Date.now()) {
+          setUserMode('attendant');
+          setAttendantSession({ _id: payload.sub, name: payload.name, token });
+        } else {
+          localStorage.removeItem('attendantToken');
+        }
+      } catch {
+        localStorage.removeItem('attendantToken');
+      }
+    }
+  }, []);
 
   // Initial Data Fetch & Offline Listeners
   useEffect(() => {
@@ -69,13 +105,19 @@ export default function App() {
     };
   }, [isAdmin]);
 
-  // Fetch slots when date or service changes
+  // Fetch slots when date, service, or attendant changes
   useEffect(() => {
     const fetchSlots = async () => {
       if (!selectedService || !selectedDate) return;
       
       try {
-        const slots = await api.getAvailability(selectedDate, selectedService._id);
+        // Use per-attendant availability when a specific attendant is chosen;
+        // fall back to global availability for "Any Available" (selectedAttendant === null)
+        const slots = await api.getAvailability(
+          selectedDate,
+          selectedService._id,
+          selectedAttendant?._id ?? null
+        );
         setTimeSlots(slots);
       } catch (err) {
         console.error('Failed to fetch slots', err);
@@ -86,7 +128,24 @@ export default function App() {
     if (activeStep === 'time') {
         fetchSlots();
     }
-  }, [selectedDate, selectedService, activeStep]);
+  }, [selectedDate, selectedService, selectedAttendant, activeStep]);
+
+  // Fetch attendants when entering the attendant step
+  useEffect(() => {
+    const fetchAttendants = async () => {
+      if (!selectedService) return;
+      try {
+        const data = await api.getAttendantsForService(selectedService._id);
+        setAttendants(data);
+      } catch (err) {
+        console.error('Failed to fetch attendants', err);
+        setAttendants([]);
+      }
+    };
+    if (activeStep === 'attendant') {
+      fetchAttendants();
+    }
+  }, [activeStep, selectedService]);
 
 
   const handleDateSelect = (date: string) => {
@@ -114,6 +173,7 @@ export default function App() {
             serviceId: selectedService._id,
             date: selectedDate,
             startTime: selectedTime,
+            attendantId: selectedAttendant?._id ?? null,
         });
         
         setBookings(prev => [...prev, newBooking]);
@@ -127,6 +187,7 @@ export default function App() {
   const resetFlow = () => {
     setActiveStep('service');
     setSelectedService(null);
+    setSelectedAttendant(null);
     setSelectedTime(null);
     setSelectedDate(new Date().toISOString().split('T')[0]);
     setClientInfo({ name: '', phone: '', email: '' });
@@ -135,7 +196,8 @@ export default function App() {
 
   const handleStepBack = () => {
     if (activeStep === 'date') setActiveStep('service');
-    if (activeStep === 'time') setActiveStep('date');
+    if (activeStep === 'attendant') setActiveStep('date');
+    if (activeStep === 'time') setActiveStep('attendant');
     if (activeStep === 'contact') setActiveStep('time');
   };
 
@@ -178,7 +240,7 @@ export default function App() {
         />
       )}
 
-      {/* ── PIN Gate Modal ─────────────────────────────── */}
+      {/* ── Login Modal (Owner + Staff tabs) ───────────────── */}
       <AnimatePresence>
         {showPinModal && (
           <motion.div
@@ -193,99 +255,179 @@ export default function App() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.96 }}
               onClick={e => e.stopPropagation()}
-              className="bg-brand-white w-[88%] max-w-xs p-8 space-y-8 border-2 border-brand-black"
+              className="bg-brand-white w-[88%] max-w-xs border-2 border-brand-black overflow-hidden"
             >
-              {/* Header */}
-              <div className="space-y-1">
+              {/* Modal Header */}
+              <div className="px-8 pt-8 pb-4 space-y-1">
                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-brand-gray-400">Studio Access</p>
-                <h2 className="text-3xl font-serif italic tracking-tight leading-none">Admin Panel</h2>
+                <h2 className="text-3xl font-serif italic tracking-tight leading-none">Sign In</h2>
               </div>
 
-              {/* PIN dots */}
-              <motion.div
-                animate={pinError ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
-                transition={{ duration: 0.4 }}
-                className="flex justify-center gap-4"
-              >
-                {[0, 1, 2, 3].map(i => (
-                  <div
-                    key={i}
-                    className={`w-4 h-4 border-2 transition-all duration-200 ${
-                      i < pin.length ? 'bg-brand-black border-brand-black' : 'bg-transparent border-brand-gray-300'
-                    }`}
-                  />
-                ))}
-              </motion.div>
-
-              {pinError && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center text-[11px] font-black uppercase tracking-widest text-red-500 -mt-4"
-                >
-                  Incorrect PIN
-                </motion.p>
-              )}
-
-              {/* Number pad */}
-              <div className="grid grid-cols-3 gap-2">
-                {[1,2,3,4,5,6,7,8,9].map(n => (
+              {/* Tab Switcher */}
+              <div className="flex border-b border-brand-gray-100 mx-8">
+                {(['owner', 'staff'] as const).map(tab => (
                   <button
-                    key={n}
-                    onClick={() => {
-                      if (pin.length >= 4) return;
-                      const next = pin + String(n);
-                      setPin(next);
-                      setPinError(false);
-                      if (next.length === 4) {
-                        if (next === ADMIN_PIN) {
-                          setIsAdmin(true);
-                          setShowPinModal(false);
-                          setPin('');
-                        } else {
-                          setPinError(true);
-                          setTimeout(() => setPin(''), 600);
-                        }
-                      }
-                    }}
-                    className="py-4 text-xl font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
+                    key={tab}
+                    onClick={() => { setLoginTab(tab); setPin(''); setPinError(false); setStaffPin(''); setStaffPinError(false); }}
+                    className={`py-3 flex-1 text-[11px] font-black uppercase tracking-[0.2em] relative transition-colors ${
+                      loginTab === tab ? 'text-brand-black' : 'text-brand-gray-400'
+                    }`}
                   >
-                    {n}
+                    {tab === 'owner' ? 'Owner' : 'Staff'}
+                    {loginTab === tab && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-black" />}
                   </button>
                 ))}
-                <button
-                  onClick={() => { setPin(''); setPinError(false); }}
-                  className="py-4 text-[11px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all text-brand-gray-500"
-                >
-                  Clear
-                </button>
-                <button
-                  onClick={() => {
-                    if (pin.length >= 4) return;
-                    const next = pin + '0';
-                    setPin(next);
-                    setPinError(false);
-                    if (next.length === 4) {
-                      if (next === ADMIN_PIN) {
-                        setIsAdmin(true);
-                        setShowPinModal(false);
-                        setPin('');
-                      } else {
-                        setPinError(true);
-                        setTimeout(() => setPin(''), 600);
-                      }
-                    }
-                  }}
-                  className="py-4 text-xl font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
-                >
-                  0
-                </button>
-                <button
-                  onClick={() => { setPin(p => p.slice(0, -1)); setPinError(false); }}
-                  className="py-4 text-[11px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all text-brand-gray-500"
-                >
-                  ⌫
-                </button>
+              </div>
+
+              <div className="px-8 py-6 space-y-6">
+                {loginTab === 'owner' ? (
+                  <>
+                    {/* PIN dots */}
+                    <motion.div
+                      animate={pinError ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
+                      transition={{ duration: 0.4 }}
+                      className="flex justify-center gap-4 pt-2"
+                    >
+                      {[0, 1, 2, 3].map(i => (
+                        <div
+                          key={i}
+                          className={`w-4 h-4 border-2 transition-all duration-200 ${
+                            i < pin.length ? 'bg-brand-black border-brand-black' : 'bg-transparent border-brand-gray-300'
+                          }`}
+                        />
+                      ))}
+                    </motion.div>
+                    {pinError && (
+                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                        className="text-center text-[11px] font-black uppercase tracking-widest text-red-500">
+                        Incorrect PIN
+                      </motion.p>
+                    )}
+                    {/* Number pad */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {[1,2,3,4,5,6,7,8,9].map(n => (
+                        <button key={n}
+                          onClick={() => {
+                            if (pin.length >= 4) return;
+                            const next = pin + String(n);
+                            setPin(next); setPinError(false);
+                            if (next.length === 4) {
+                              if (next === ADMIN_PIN) {
+                                setUserMode('owner'); setShowPinModal(false); setPin('');
+                              } else { setPinError(true); setTimeout(() => setPin(''), 600); }
+                            }
+                          }}
+                          className="py-4 text-xl font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
+                        >{n}</button>
+                      ))}
+                      <button onClick={() => { setPin(''); setPinError(false); }}
+                        className="py-4 text-[11px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all text-brand-gray-500"
+                      >Clear</button>
+                      <button
+                        onClick={() => {
+                          if (pin.length >= 4) return;
+                          const next = pin + '0';
+                          setPin(next); setPinError(false);
+                          if (next.length === 4) {
+                            if (next === ADMIN_PIN) {
+                              setUserMode('owner'); setShowPinModal(false); setPin('');
+                            } else { setPinError(true); setTimeout(() => setPin(''), 600); }
+                          }
+                        }}
+                        className="py-4 text-xl font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
+                      >0</button>
+                      <button onClick={() => { setPin(p => p.slice(0, -1)); setPinError(false); }}
+                        className="py-4 text-[11px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all text-brand-gray-500"
+                      >⌫</button>
+                    </div>
+                  </>
+                ) : (
+                  /* ── Staff Login ── */
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Username</label>
+                      <input
+                        type="text"
+                        value={staffUsername}
+                        onChange={e => setStaffUsername(e.target.value)}
+                        placeholder="your username"
+                        autoCapitalize="none"
+                        className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-black text-sm bg-transparent transition-colors tracking-wider"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">PIN</label>
+                      {/* Mini PIN dot display */}
+                      <motion.div
+                        animate={staffPinError ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
+                        transition={{ duration: 0.4 }}
+                        className="flex gap-3"
+                      >
+                        {[0,1,2,3,4,5].map(i => (
+                          <div key={i} className={`w-3 h-3 border-2 transition-all duration-200 ${
+                            i < staffPin.length ? 'bg-brand-black border-brand-black' : 'bg-transparent border-brand-gray-200'
+                          }`} />
+                        ))}
+                      </motion.div>
+                      {staffPinError && (
+                        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                          className="text-[11px] font-black uppercase tracking-widest text-red-500">
+                          Invalid credentials
+                        </motion.p>
+                      )}
+                      {/* Number pad */}
+                      <div className="grid grid-cols-3 gap-2 pt-1">
+                        {[1,2,3,4,5,6,7,8,9].map(n => (
+                          <button key={n}
+                            onClick={() => {
+                              if (staffPin.length >= 6) return;
+                              setStaffPin(p => p + String(n));
+                              setStaffPinError(false);
+                            }}
+                            className="py-3 text-lg font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
+                          >{n}</button>
+                        ))}
+                        <button onClick={() => { setStaffPin(''); setStaffPinError(false); }}
+                          className="py-3 text-[10px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black transition-all text-brand-gray-500"
+                        >Clear</button>
+                        <button onClick={() => {
+                            if (staffPin.length >= 6) return;
+                            setStaffPin(p => p + '0');
+                            setStaffPinError(false);
+                          }}
+                          className="py-3 text-lg font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
+                        >0</button>
+                        <button onClick={() => { setStaffPin(p => p.slice(0, -1)); setStaffPinError(false); }}
+                          className="py-3 text-[10px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black transition-all text-brand-gray-500"
+                        >⌫</button>
+                      </div>
+                    </div>
+                    <button
+                      disabled={staffLoginLoading || !staffUsername || staffPin.length < 4}
+                      onClick={async () => {
+                        setStaffLoginLoading(true);
+                        setStaffPinError(false);
+                        try {
+                          const result = await api.loginAttendant(staffUsername, staffPin);
+                          localStorage.setItem('attendantToken', result.token);
+                          setAttendantSession({ _id: result.attendant._id, name: result.attendant.name, token: result.token });
+                          setUserMode('attendant');
+                          setShowPinModal(false);
+                          setStaffUsername('');
+                          setStaffPin('');
+                        } catch {
+                          setStaffPinError(true);
+                          setStaffPin('');
+                        } finally {
+                          setStaffLoginLoading(false);
+                        }
+                      }}
+                      className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30"
+                    >
+                      {staffLoginLoading ? 'Signing in...' : 'Sign In'}
+                    </button>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -301,6 +443,13 @@ export default function App() {
               className="h-full w-auto object-contain" 
             />
           </div>
+          {/* Show attendant name badge when in staff mode */}
+          {userMode === 'attendant' && attendantSession && (
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-brand-black" />
+              <span className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-gray-600">{attendantSession.name}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <a href="tel:0721530120" className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
@@ -308,24 +457,36 @@ export default function App() {
           </a>
           <button 
             onClick={() => {
-              if (isAdmin) {
-                setIsAdmin(false);
+              if (userMode === 'owner') {
+                setUserMode('customer');
+              } else if (userMode === 'attendant') {
+                // Attendant logout — clear token
+                localStorage.removeItem('attendantToken');
+                setAttendantSession(null);
+                setUserMode('customer');
               } else {
+                // Customer — open login modal
                 setPin('');
                 setPinError(false);
+                setStaffPin('');
+                setStaffPinError(false);
+                setStaffUsername('');
+                setLoginTab('owner');
                 setShowPinModal(true);
               }
             }}
             className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500"
           >
-            {isAdmin ? <LayoutDashboard size={18} /> : <Settings size={18} />}
+            {userMode === 'owner' ? <LayoutDashboard size={18} /> : userMode === 'attendant' ? <User size={18} /> : <Settings size={18} />}
           </button>
         </div>
       </header>
 
       <main className="flex-1 flex flex-col">
-        {isAdmin ? (
+        {userMode === 'owner' ? (
           <AdminView bookings={bookings} />
+        ) : userMode === 'attendant' && attendantSession ? (
+          <AttendantView session={attendantSession} />
         ) : (
           <div className="flex-1 flex flex-col">
             {activeStep !== 'confirmation' && (
@@ -423,10 +584,109 @@ export default function App() {
                     </div>
                     <button 
                       ref={dateCtaRef}
-                      onClick={() => setActiveStep('time')}
+                      onClick={() => setActiveStep('attendant')}
                       className="w-full bg-brand-black text-brand-white py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all hover:tracking-[0.4em] active:scale-[0.98]"
                     >
                       Continue
+                    </button>
+                  </motion.div>
+                )}
+
+                {activeStep === 'attendant' && (
+                  <motion.div 
+                    key="attendant"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-12"
+                  >
+                    <button onClick={handleStepBack} className="flex items-center gap-3 text-brand-black hover:translate-x-[-4px] transition-all duration-300">
+                      <ArrowLeft size={16} strokeWidth={3} />
+                      <span className="text-sm font-black uppercase tracking-[0.2em]">Previous</span>
+                    </button>
+                    <div className="space-y-8">
+                      <div className="space-y-2">
+                        <h2 className="text-4xl font-serif font-black tracking-tight leading-none">Choose<br/>Artist</h2>
+                        <div className="w-12 h-1 bg-brand-black"></div>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        {/* "Any Available" option */}
+                        <button
+                          onClick={() => setSelectedAttendant(null)}
+                          className={`flex items-center justify-between p-6 border-2 transition-all duration-300 ${
+                            selectedAttendant === null
+                              ? 'bg-brand-black text-white border-brand-black'
+                              : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm font-serif italic border-2 ${
+                              selectedAttendant === null ? 'border-white/40 bg-white/10 text-white' : 'border-brand-gray-200 text-brand-gray-400'
+                            }`}>
+                              ✦
+                            </div>
+                            <div className="text-left">
+                              <p className="font-serif italic text-xl leading-none">Any Available</p>
+                              <p className={`text-[11px] font-black uppercase tracking-widest mt-1 ${
+                                selectedAttendant === null ? 'text-white/70' : 'text-brand-gray-400'
+                              }`}>First available slot</p>
+                            </div>
+                          </div>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                            selectedAttendant === null ? 'border-white bg-white' : 'border-brand-gray-200'
+                          }`}>
+                            {selectedAttendant === null && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
+                          </div>
+                        </button>
+
+                        {/* Per-attendant cards */}
+                        {attendants.map(attendant => {
+                          const isSelected = selectedAttendant?._id === attendant._id;
+                          const initials = attendant.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+                          return (
+                            <button
+                              key={attendant._id}
+                              onClick={() => setSelectedAttendant(attendant)}
+                              className={`flex items-center justify-between p-6 border-2 transition-all duration-300 ${
+                                isSelected
+                                  ? 'bg-brand-black text-white border-brand-black'
+                                  : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
+                              }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm font-serif italic border-2 ${
+                                  isSelected ? 'border-white/40 bg-white/10 text-white' : 'border-brand-gray-200 text-brand-black'
+                                }`}>
+                                  {initials}
+                                </div>
+                                <div className="text-left">
+                                  <p className="font-serif italic text-xl leading-none">{attendant.name}</p>
+                                  <p className={`text-[11px] font-black uppercase tracking-widest mt-1 ${
+                                    isSelected ? 'text-white/70' : 'text-brand-gray-400'
+                                  }`}>Certified Artist</p>
+                                </div>
+                              </div>
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                                isSelected ? 'border-white bg-white' : 'border-brand-gray-200 group-hover:border-brand-black'
+                              }`}>
+                                {isSelected && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+
+                        {attendants.length === 0 && (
+                          <div className="py-8 text-center border border-brand-gray-100 font-serif italic text-brand-gray-300">
+                            Loading artists...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setActiveStep('time')}
+                      className="w-full bg-brand-black text-brand-white py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all hover:tracking-[0.4em] active:scale-[0.98]"
+                    >
+                      {selectedAttendant ? `Continue with ${selectedAttendant.name}` : 'Continue — Any Artist'}
                     </button>
                   </motion.div>
                 )}
@@ -449,6 +709,13 @@ export default function App() {
                           <p className="text-[13px] text-brand-gray-600 uppercase font-bold tracking-widest mb-1">Date</p>
                           <p className="font-serif text-2xl font-black">
                             {new Date(selectedDate).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                          </p>
+                        </div>
+                        {/* Show chosen attendant in time step header */}
+                        <div className="text-right">
+                          <p className="text-[13px] text-brand-gray-600 uppercase font-bold tracking-widest mb-1">Artist</p>
+                          <p className="font-serif italic text-xl leading-none">
+                            {selectedAttendant ? selectedAttendant.name : 'Any'}
                           </p>
                         </div>
                       </div>
@@ -596,7 +863,9 @@ export default function App() {
                       <div className="space-y-6">
                         <div className="flex justify-between items-center">
                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Artist</span>
-                          <span className="font-serif italic text-lg leading-none">Studio Lead</span>
+                          <span className="font-serif italic text-lg leading-none">
+                            {selectedAttendant ? selectedAttendant.name : 'Any Available'}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center">
                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Service</span>
@@ -656,6 +925,7 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
   const steps: { key: BookingStep, label: string }[] = [
     { key: 'service', label: 'Service' },
     { key: 'date', label: 'Date' },
+    { key: 'attendant', label: 'Artist' },
     { key: 'time', label: 'Time' },
     { key: 'contact', label: 'Identity' },
     { key: 'confirmation', label: 'Confirm' }
@@ -763,12 +1033,14 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
 }
 
 function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
-  const [activeTab, setActiveTab] = useState<'ledger' | 'pending' | 'services'>('ledger');
+  const [activeTab, setActiveTab] = useState<'ledger' | 'pending' | 'services' | 'staff'>('ledger');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   const [confirmedBookings, setConfirmedBookings] = useState<Booking[]>(initialBookings);
   const [services, setServices] = useState<Service[]>([]);
+  const [attendants, setAttendants] = useState<Attendant[]>([]);
   const [loadingPending, setLoadingPending] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
+  const [loadingStaff, setLoadingStaff] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Admin push notifications
@@ -782,10 +1054,30 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
   const [editPrices, setEditPrices] = useState<Record<string, string>>({});
   const [savingPrice, setSavingPrice] = useState<string | null>(null);
 
+  // Staff management form state
+  const [ownerPin, setOwnerPin] = useState('');
+  const [ownerPinInput, setOwnerPinInput] = useState('');
+  const [ownerPinConfirmed, setOwnerPinConfirmed] = useState(false);
+  const [staffForm, setStaffForm] = useState({ name: '', username: '', pin: '', serviceIds: [] as string[] });
+  const [staffAddLoading, setStaffAddLoading] = useState(false);
+  const [staffError, setStaffError] = useState<string | null>(null);
+
   const todayStr = new Date().toISOString().split('T')[0];
   const todaysConfirmed = confirmedBookings.filter(b => b.date === todayStr && b.status === 'confirmed');
   const sortedToday = [...todaysConfirmed].sort((a, b) => a.startTime.localeCompare(b.startTime));
   const currentTime = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  // Always load services on mount so they're available in the Staff tab's service picker
+  useEffect(() => {
+    api.getServices()
+      .then(data => {
+        setServices(data);
+        const prices: Record<string, string> = {};
+        data.forEach((s: Service) => { prices[s._id] = String(s.price); });
+        setEditPrices(prices);
+      })
+      .catch(console.error);
+  }, []);
 
   // Fetch pending bookings when tab opens
   useEffect(() => {
@@ -808,7 +1100,14 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
         .catch(console.error)
         .finally(() => setLoadingServices(false));
     }
-  }, [activeTab]);
+    if (activeTab === 'staff' && ownerPinConfirmed) {
+      setLoadingStaff(true);
+      api.getAttendants(ownerPin)
+        .then(data => setAttendants(data))
+        .catch(console.error)
+        .finally(() => setLoadingStaff(false));
+    }
+  }, [activeTab, ownerPinConfirmed]);
 
   const handleStatusUpdate = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
     setActionLoading(bookingId);
@@ -861,10 +1160,11 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
     }
   };
 
-  const tabs: { key: 'ledger' | 'pending' | 'services'; label: string }[] = [
-    { key: 'ledger', label: 'Daily Ledger' },
+  const tabs: { key: 'ledger' | 'pending' | 'services' | 'staff'; label: string }[] = [
+    { key: 'ledger', label: 'Ledger' },
     { key: 'pending', label: 'Pending' },
     { key: 'services', label: 'Services' },
+    { key: 'staff', label: 'Staff' },
   ];
 
   return (
@@ -975,6 +1275,12 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
                           <p className="text-[13px] font-bold text-brand-gray-600 uppercase tracking-widest">
                             {typeof booking.serviceId === 'object' ? booking.serviceId.name : 'Unknown'}
                           </p>
+                          <span className="opacity-10 font-bold">—</span>
+                          <p className="text-[12px] font-bold text-brand-gray-400 italic">
+                            {booking.attendantId && typeof booking.attendantId === 'object'
+                              ? (booking.attendantId as Attendant).name
+                              : 'Unassigned'}
+                          </p>
                         </div>
                       </div>
                     </motion.div>
@@ -1039,7 +1345,7 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
                         </div>
 
                         {/* Booking details */}
-                        <div className="px-6 py-4 grid grid-cols-3 gap-4 border-b border-brand-gray-50">
+                        <div className="px-6 py-4 grid grid-cols-4 gap-4 border-b border-brand-gray-50">
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Service</p>
                             <p className="text-[13px] font-black uppercase">{serviceName}</p>
@@ -1053,6 +1359,14 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Time</p>
                             <p className="text-[13px] font-black">{booking.startTime}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Artist</p>
+                            <p className="text-[13px] font-black italic">
+                              {booking.attendantId && typeof booking.attendantId === 'object'
+                                ? (booking.attendantId as Attendant).name
+                                : 'Any'}
+                            </p>
                           </div>
                         </div>
 
@@ -1199,8 +1513,319 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
           </>
         )}
 
+        {/* ── TAB 4: Staff Management ──────────────────────────────── */}
+        {activeTab === 'staff' && (
+          <>
+            <header className="space-y-1">
+              <h2 className="text-4xl font-serif font-black tracking-tight leading-none uppercase">Staff<br/>Management</h2>
+              <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[12px] pt-2">
+                Attendant accounts // login credentials
+              </p>
+            </header>
+
+            {/* Owner PIN gate for staff management */}
+            {!ownerPinConfirmed ? (
+              <div className="border-2 border-brand-black p-6 space-y-5">
+                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Confirm Owner PIN to manage staff</p>
+                <input
+                  type="password"
+                  maxLength={6}
+                  placeholder="PIN"
+                  value={ownerPinInput}
+                  onChange={e => setOwnerPinInput(e.target.value)}
+                  className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-black text-center text-xl tracking-[1em] bg-transparent"
+                />
+                <button
+                  onClick={() => {
+                    setOwnerPin(ownerPinInput);
+                    setOwnerPinConfirmed(true);
+                  }}
+                  disabled={!ownerPinInput}
+                  className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs disabled:opacity-30"
+                >
+                  Confirm
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {/* Staff list */}
+                <div className="space-y-3">
+                  {loadingStaff ? (
+                    <div className="p-16 text-center border border-brand-gray-100 font-serif italic text-brand-gray-300">Loading...</div>
+                  ) : attendants.length === 0 ? (
+                    <div className="p-16 text-center border border-brand-gray-100 font-serif italic text-brand-gray-300">No staff accounts yet.</div>
+                  ) : attendants.map(a => (
+                    <div key={a._id} className={`border p-5 flex items-center justify-between gap-4 transition-all ${
+                      a.isActive !== false ? 'border-brand-gray-100' : 'border-brand-gray-50 opacity-40'
+                    }`}>
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-brand-black flex items-center justify-center text-white font-black text-xs font-serif italic">
+                          {a.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-serif italic text-lg leading-none">{a.name}</p>
+                          <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mt-0.5">@{a.username}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          api.updateAttendant(ownerPin, a._id, { isActive: !a.isActive })
+                            .then(updated => setAttendants(prev => prev.map(x => x._id === a._id ? updated : x)))
+                            .catch(console.error);
+                        }}
+                        className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border transition-all ${
+                          a.isActive !== false
+                            ? 'border-brand-gray-200 text-brand-gray-600 hover:border-brand-black hover:text-brand-black'
+                            : 'border-brand-black bg-brand-black text-white'
+                        }`}
+                      >
+                        {a.isActive !== false ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add staff form */}
+                <div className="border-2 border-brand-black p-6 space-y-5">
+                  <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4">New Staff Account</p>
+                  {staffError && (
+                    <p className="text-red-500 text-[11px] font-black uppercase tracking-widest">{staffError}</p>
+                  )}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Display Name</label>
+                        <input
+                          type="text" placeholder="Florence"
+                          value={staffForm.name}
+                          onChange={e => setStaffForm(p => ({ ...p, name: e.target.value }))}
+                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-2 font-black text-sm bg-transparent"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Username</label>
+                        <input
+                          type="text" placeholder="flo" autoCapitalize="none"
+                          value={staffForm.username}
+                          onChange={e => setStaffForm(p => ({ ...p, username: e.target.value }))}
+                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-2 font-black text-sm bg-transparent"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">PIN (4–6 digits)</label>
+                      <input
+                        type="password" maxLength={6} placeholder="••••"
+                        value={staffForm.pin}
+                        onChange={e => setStaffForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, '') }))}
+                        className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-2 font-black text-sm bg-transparent tracking-[0.5em]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Services</label>
+                      <div className="flex flex-wrap gap-2">
+                        {services.map(s => (
+                          <button
+                            key={s._id}
+                            onClick={() => setStaffForm(p => ({
+                              ...p,
+                              serviceIds: p.serviceIds.includes(s._id)
+                                ? p.serviceIds.filter(id => id !== s._id)
+                                : [...p.serviceIds, s._id]
+                            }))}
+                            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border transition-all ${
+                              staffForm.serviceIds.includes(s._id)
+                                ? 'bg-brand-black text-white border-brand-black'
+                                : 'border-brand-gray-200 text-brand-gray-600 hover:border-brand-black'
+                            }`}
+                          >
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    disabled={!staffForm.name || !staffForm.username || staffForm.pin.length < 4 || staffAddLoading}
+                    onClick={async () => {
+                      setStaffAddLoading(true);
+                      setStaffError(null);
+                      try {
+                        const created = await api.createAttendant(ownerPin, staffForm);
+                        setAttendants(prev => [...prev, created]);
+                        setStaffForm({ name: '', username: '', pin: '', serviceIds: [] });
+                      } catch (err: any) {
+                        setStaffError(err.message || 'Failed to create staff account');
+                      } finally {
+                        setStaffAddLoading(false);
+                      }
+                    }}
+                    className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30"
+                  >
+                    {staffAddLoading ? 'Creating...' : '+ Add Staff Member'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
       </div>
     </div>
   );
 }
 
+// ── AttendantView ────────────────────────────────────────────────────────────
+
+function AttendantView({ session }: { session: { _id: string; name: string; token: string } }) {
+  const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'completed'>('today');
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [markingId, setMarkingId] = useState<string | null>(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        let data: Booking[] = [];
+        if (activeTab === 'today') {
+          data = await api.getAttendantBookings(session.token, { date: todayStr, status: 'confirmed' });
+        } else if (activeTab === 'upcoming') {
+          data = await api.getAttendantBookings(session.token, { status: 'confirmed' });
+          data = data.filter(b => b.date > todayStr);
+        } else {
+          data = await api.getAttendantBookings(session.token, { status: 'completed' });
+        }
+        setBookings(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [activeTab, session.token]);
+
+  const handleMarkComplete = async (bookingId: string) => {
+    setMarkingId(bookingId);
+    try {
+      await api.markBookingCompleted(session.token, bookingId);
+      setBookings(prev => prev.filter(b => b._id !== bookingId));
+    } catch (err: any) {
+      alert(err.message || 'Failed to mark complete');
+    } finally {
+      setMarkingId(null);
+    }
+  };
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Tab Navigation */}
+      <nav className="px-8 border-b border-brand-gray-100 flex items-center gap-6">
+        {(['today', 'upcoming', 'completed'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`py-4 text-[13px] font-black uppercase tracking-[0.2em] relative transition-all ${
+              activeTab === tab ? 'text-brand-black' : 'text-brand-gray-400 hover:text-brand-black'
+            }`}
+          >
+            {tab}
+            {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-black" />}
+          </button>
+        ))}
+      </nav>
+
+      <div className="flex-1 overflow-y-auto px-8 py-10 space-y-8 scrollbar-hide">
+        <header className="space-y-2">
+          <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-400">Signed in as</p>
+          <h2 className="text-4xl font-serif font-black tracking-tight leading-none">{session.name}</h2>
+          <p className="text-brand-gray-600 font-bold uppercase tracking-[0.2em] text-[12px]">
+            {activeTab === 'today' && `Today's Appointments — ${new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}`}
+            {activeTab === 'upcoming' && 'Upcoming Appointments'}
+            {activeTab === 'completed' && 'Completed Appointments'}
+          </p>
+        </header>
+
+        <div className="space-y-4">
+          {loading ? (
+            <div className="p-20 text-center border border-brand-gray-100 font-serif italic text-brand-gray-300">Loading...</div>
+          ) : bookings.length === 0 ? (
+            <div className="p-20 text-center border-2 border-dashed border-brand-gray-100 italic font-serif text-brand-gray-300">
+              {activeTab === 'today' ? 'No appointments today.' :
+               activeTab === 'upcoming' ? 'No upcoming appointments.' :
+               'No completed appointments yet.'}
+            </div>
+          ) : bookings.map((booking, idx) => {
+            const serviceName = typeof booking.serviceId === 'object' ? booking.serviceId.name : 'Unknown';
+            const servicePrice = typeof booking.serviceId === 'object' ? (booking.serviceId as Service).price : null;
+            const isMarking = markingId === booking._id;
+            return (
+              <motion.div
+                key={booking._id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="border border-brand-gray-100 hover:border-brand-black transition-all"
+              >
+                {/* Booking header */}
+                <div className="p-6 border-b border-brand-gray-50">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-brand-black flex items-center justify-center font-black text-white text-sm italic font-serif">
+                        {booking.customerName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </div>
+                      <div>
+                        <p className="font-serif italic text-xl leading-none">{booking.customerName}</p>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mt-1">{booking.phone}</p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-3xl font-black tracking-tight leading-none">{booking.startTime}</p>
+                      <p className="text-[11px] font-bold text-brand-gray-400 uppercase tracking-widest mt-1">
+                        {new Date(booking.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Booking details + actions */}
+                <div className="px-6 py-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-serif italic text-base leading-none">{serviceName}</p>
+                    {servicePrice && (
+                      <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mt-1">
+                        KES {servicePrice.toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                  {activeTab !== 'completed' && (
+                    <button
+                      disabled={isMarking}
+                      onClick={() => handleMarkComplete(booking._id)}
+                      className="flex items-center gap-2 px-5 py-3 text-[11px] font-black uppercase tracking-[0.2em] bg-brand-black text-white hover:bg-brand-gray-800 transition-all disabled:opacity-40"
+                    >
+                      {isMarking ? (
+                        <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <CheckCircle2 size={13} />
+                      )}
+                      Done
+                    </button>
+                  )}
+                  {activeTab === 'completed' && (
+                    <span className="text-[11px] font-black uppercase tracking-widest text-brand-gray-400 flex items-center gap-1.5">
+                      <CheckCircle2 size={13} className="text-brand-gray-400" /> Completed
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

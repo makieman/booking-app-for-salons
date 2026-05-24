@@ -125,3 +125,36 @@ export async function sendPushToAdmins(payload: PushPayload): Promise<void> {
   await sendToSubscriptions(subscriptions, payload);
 }
 
+/**
+ * Send a push notification to a specific attendant's subscribed devices.
+ * Used to notify an attendant when a booking assigned to them is confirmed/cancelled.
+ */
+export async function sendPushToAttendant(
+  attendantId: string,
+  payload: PushPayload,
+): Promise<void> {
+  if (!attendantId) {
+    console.warn('[pushService] Skipping push — no attendantId provided');
+    return;
+  }
+
+  try { ensureVapid(); } catch (err) {
+    console.error('[pushService] VAPID init failed:', err);
+    return;
+  }
+
+  let subscriptions;
+  try {
+    subscriptions = await PushSubscription.find({ attendantId, role: 'attendant' });
+  } catch (err) {
+    console.error('[pushService] Failed to query attendant subscriptions:', err);
+    return;
+  }
+
+  if (subscriptions.length === 0) {
+    console.log(`[pushService] No push subscriptions found for attendant ${attendantId}`);
+    return;
+  }
+
+  await sendToSubscriptions(subscriptions, payload);
+}

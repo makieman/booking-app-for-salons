@@ -80,11 +80,21 @@ function baseTemplate(bodyContent: string): string {
 </html>`;
 }
 
-function bookingDetailsTable(booking: IBooking, service: IService): string {
+function bookingDetailsTable(booking: IBooking, service: IService, attendantName?: string): string {
   const formattedDate = new Date(booking.date).toLocaleDateString('en-KE', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
   const formattedPrice = `KES ${service.price.toLocaleString('en-KE')}`;
+
+  const artistRow = attendantName ? `
+            <tr>
+              <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+                <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:${BRAND.gray};">Artist</span>
+              </td>
+              <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+                <span style="font-size:13px;font-weight:900;color:${BRAND.black};">${attendantName}</span>
+              </td>
+            </tr>` : '';
 
   return `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
@@ -92,6 +102,7 @@ function bookingDetailsTable(booking: IBooking, service: IService): string {
       <tr>
         <td style="padding:24px 28px;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            ${artistRow}
             <tr>
               <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
                 <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:${BRAND.gray};">Service</span>
@@ -169,6 +180,7 @@ async function sendEmail(opts: {
 export async function sendBookingRequestReceived(
   booking: IBooking,
   service: IService,
+  attendantName?: string,
 ): Promise<void> {
   if (!booking.email) return;
 
@@ -184,7 +196,7 @@ export async function sendBookingRequestReceived(
       We've received your appointment request and it is currently <strong style="color:${BRAND.black};">pending review</strong>.
       You'll receive a confirmation email once it's approved. Please do not pay until you receive confirmation.
     </p>
-    ${bookingDetailsTable(booking, service)}
+    ${bookingDetailsTable(booking, service, attendantName)}
     <p style="margin:24px 0 0;font-size:12px;color:${BRAND.gray};line-height:1.6;">
       Questions? Call or WhatsApp us at <strong>0721 530 120</strong>.
     </p>
@@ -203,6 +215,7 @@ export async function sendBookingRequestReceived(
 export async function sendBookingConfirmedToCustomer(
   booking: IBooking,
   service: IService,
+  attendantName?: string,
 ): Promise<void> {
   if (!booking.email) return;
 
@@ -218,7 +231,7 @@ export async function sendBookingConfirmedToCustomer(
       Great news — your appointment has been <strong style="color:${BRAND.black};">confirmed</strong>!
       We look forward to seeing you at the studio.
     </p>
-    ${bookingDetailsTable(booking, service)}
+    ${bookingDetailsTable(booking, service, attendantName)}
     <p style="margin:24px 0 0;font-size:12px;color:${BRAND.gray};line-height:1.6;">
       Please arrive 5–10 minutes before your appointment time. 
       Need to reschedule? Call us at <strong>0721 530 120</strong>.
@@ -238,6 +251,7 @@ export async function sendBookingConfirmedToCustomer(
 export async function sendBookingCancelledToCustomer(
   booking: IBooking,
   service: IService,
+  attendantName?: string,
 ): Promise<void> {
   if (!booking.email) return;
 
@@ -253,7 +267,7 @@ export async function sendBookingCancelledToCustomer(
       Unfortunately your booking has been <strong style="color:${BRAND.black};">cancelled</strong>.
       We apologise for any inconvenience. Please book a new slot or get in touch with us directly.
     </p>
-    ${bookingDetailsTable(booking, service)}
+    ${bookingDetailsTable(booking, service, attendantName)}
     <p style="margin:24px 0 0;font-size:12px;color:${BRAND.gray};line-height:1.6;">
       To rebook, visit our website or call/WhatsApp <strong>0721 530 120</strong>.
     </p>
@@ -272,6 +286,7 @@ export async function sendBookingCancelledToCustomer(
 export async function sendAdminNewBookingAlert(
   booking: IBooking,
   service: IService,
+  attendantName?: string,
 ): Promise<void> {
   if (ADMIN_EMAILS.length === 0) {
     console.warn('[emailService] ADMIN_EMAIL not set — skipping admin alert');
@@ -286,7 +301,7 @@ export async function sendAdminNewBookingAlert(
     <p style="margin:0 0 20px;font-size:14px;color:${BRAND.gray};line-height:1.6;">
       A new booking request has arrived and is <strong style="color:${BRAND.black};">awaiting your approval</strong>.
     </p>
-    ${bookingDetailsTable(booking, service)}
+    ${bookingDetailsTable(booking, service, attendantName)}
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;">
       <tr>
         <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
