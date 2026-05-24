@@ -20,11 +20,13 @@ function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
 type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
 interface UseAdminPushNotifications {
-  permission:   PermissionState;
-  isSubscribed: boolean;
-  isLoading:    boolean;
-  subscribe:    () => Promise<boolean>;
-  unsubscribe:  () => Promise<void>;
+  permission:      PermissionState;
+  isSubscribed:    boolean;
+  isLoading:       boolean;
+  soundPreference: string;
+  subscribe:       () => Promise<boolean>;
+  unsubscribe:     () => Promise<void>;
+  updateSound:     (sound: string) => Promise<void>;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -44,6 +46,9 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
   );
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading]       = useState(false);
+  const [soundPreference, setSoundPreference] = useState<string>(
+    () => (typeof window !== 'undefined' ? localStorage.getItem('soundPreference') || 'default' : 'default')
+  );
 
   // Check existing admin subscription on mount
   useEffect(() => {
@@ -54,7 +59,6 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
       .then(async (sub) => {
         if (!sub) { setIsSubscribed(false); return; }
         // Verify this endpoint is saved as admin on the server
-        // (simple check: if a subscription exists in the browser, assume it's active)
         setIsSubscribed(true);
       })
       .catch((err) => console.error('[useAdminPush] getSubscription error:', err));
@@ -88,14 +92,23 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
       const auth   = arrayBufferToBase64Url(sub.getKey('auth')!);
 
       // 5. Save to server as admin subscription
+      const employeeId = localStorage.getItem('employeeId') ?? 'admin';
+      const currentSound = localStorage.getItem('soundPreference') ?? 'default';
+
       const saveRes = await fetch('/api/push/subscribe-admin', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ endpoint: sub.endpoint, keys: { p256dh, auth } }),
+        body:    JSON.stringify({
+          endpoint: sub.endpoint,
+          keys: { p256dh, auth },
+          employeeId,
+          soundPreference: currentSound,
+        }),
       });
       if (!saveRes.ok) throw new Error('Failed to save admin subscription on server');
 
       setIsSubscribed(true);
+      setSoundPreference(currentSound);
       return true;
     } catch (err) {
       console.error('[useAdminPush] subscribe error:', err);
@@ -130,5 +143,26 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
     }
   };
 
-  return { permission, isSubscribed, isLoading, subscribe, unsubscribe };
+  // ── updateSound ─────────────────────────────────────────────────────────────
+  const updateSound = async (sound: string): Promise<void> => {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) return;
+
+      const res = await fetch('/api/push/preferences', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ endpoint: sub.endpoint, soundPreference: sound }),
+      });
+      if (!res.ok) throw new Error('Failed to update sound preference on server');
+
+      localStorage.setItem('soundPreference', sound);
+      setSoundPreference(sound);
+    } catch (err) {
+      console.error('[useAdminPush] updateSound error:', err);
+    }
+  };
+
+  return { permission, isSubscribed, isLoading, soundPreference, subscribe, unsubscribe, updateSound };
 }

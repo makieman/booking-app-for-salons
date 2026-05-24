@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getVapidKey, subscribe, unsubscribe, subscribeAdmin, unsubscribeAdmin } from '../controllers/pushController';
+import { getVapidKey, subscribe, unsubscribe, subscribeAdmin, unsubscribeAdmin, updatePreferences } from '../controllers/pushController';
 
 const router = Router();
 
@@ -17,6 +17,9 @@ router.post('/subscribe-admin', subscribeAdmin);
 
 // DELETE /api/push/unsubscribe-admin — removes an admin push subscription
 router.delete('/unsubscribe-admin', unsubscribeAdmin);
+
+// PATCH  /api/push/preferences      — updates the sound preference of an existing subscription
+router.patch('/preferences', updatePreferences);
 
 export default router;
 

@@ -9,6 +9,8 @@ export interface IPushSubscription extends Document {
   customerPhone?: string;
   /** For role='attendant': the attendant's MongoDB ObjectId as a string */
   attendantId?: string;
+  employeeId?: string;
+  soundPreference?: 'default' | 'chime' | 'bell' | 'ding' | 'silent';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +25,8 @@ const PushSubscriptionSchema: Schema = new Schema(
     role:          { type: String, enum: ['customer', 'admin', 'attendant'], default: 'customer', index: true },
     customerPhone: { type: String, index: true },   // required for role:'customer', omitted for role:'admin'/'attendant'
     attendantId:   { type: String, index: true },   // required for role:'attendant'
+    employeeId:    { type: String, index: true },
+    soundPreference: { type: String, enum: ['default', 'chime', 'bell', 'ding', 'silent'], default: 'default' },
   },
   { timestamps: true }
 );

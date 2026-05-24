@@ -7,8 +7,12 @@ import * as api from './api/client';
 import { InstallPrompt } from './components/InstallPrompt';
 import { NotificationPrompt } from './components/NotificationPrompt';
 import { useAdminPushNotifications } from './hooks/useAdminPushNotifications';
+import { useNotificationSound } from './hooks/useNotificationSound';
 
 export default function App() {
+  // Play custom push notification sound in active app windows
+  useNotificationSound();
+
   // ── User mode: 'customer' | 'attendant' | 'owner' ─────────────────────────
   const [userMode, setUserMode] = useState<UserMode>('customer');
   // Backward-compat alias used by AdminView
@@ -1193,21 +1197,36 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
 
         {/* Admin push notification toggle — sits at far right of the tab bar */}
         {adminPush.permission !== 'unsupported' && adminPush.permission !== 'denied' && (
-          <button
-            onClick={() => adminPush.isSubscribed ? adminPush.unsubscribe() : adminPush.subscribe()}
-            disabled={adminPush.isLoading}
-            title={adminPush.isSubscribed ? 'Disable booking notifications' : 'Enable booking notifications'}
-            className={`ml-auto flex items-center gap-2 py-2 px-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all border ${
-              adminPush.isSubscribed
-                ? 'bg-brand-black text-white border-brand-black'
-                : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
-            } disabled:opacity-40`}
-          >
-            {adminPush.isSubscribed
-              ? <><Bell size={13} /> Notifs On</>
-              : <><BellOff size={13} /> Notifs Off</>
-            }
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => adminPush.isSubscribed ? adminPush.unsubscribe() : adminPush.subscribe()}
+              disabled={adminPush.isLoading}
+              title={adminPush.isSubscribed ? 'Disable booking notifications' : 'Enable booking notifications'}
+              className={`flex items-center gap-2 py-2 px-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all border ${
+                adminPush.isSubscribed
+                  ? 'bg-brand-black text-white border-brand-black'
+                  : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
+              } disabled:opacity-40`}
+            >
+              {adminPush.isSubscribed
+                ? <><Bell size={13} /> Notifs On</>
+                : <><BellOff size={13} /> Notifs Off</>
+              }
+            </button>
+            {adminPush.isSubscribed && (
+              <select
+                value={adminPush.soundPreference}
+                onChange={e => adminPush.updateSound(e.target.value)}
+                className="text-[11px] font-black uppercase tracking-widest border border-brand-gray-200 bg-white text-brand-black py-2 px-2 focus:border-brand-black focus:outline-none cursor-pointer"
+              >
+                <option value="default">Default</option>
+                <option value="chime">Chime</option>
+                <option value="bell">Bell</option>
+                <option value="ding">Ding</option>
+                <option value="silent">Silent</option>
+              </select>
+            )}
+          </div>
         )}
       </nav>
 

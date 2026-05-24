@@ -25,6 +25,7 @@ interface PushPayload {
   title: string;
   body:  string;
   url?:  string;
+  sound?: 'default' | 'chime' | 'bell' | 'ding' | 'silent';
 }
 
 // ── Shared push sender ────────────────────────────────────────────────────────
@@ -37,9 +38,13 @@ async function sendToSubscriptions(
   await Promise.all(
     subscriptions.map(async (sub) => {
       try {
+        const subscriptionPayload = {
+          ...payload,
+          sound: sub.soundPreference || 'default',
+        };
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } },
-          JSON.stringify(payload),
+          JSON.stringify(subscriptionPayload),
         );
         console.log(`[pushService] ✅ Push sent → ${sub.endpoint.slice(0, 60)}…`);
       } catch (err: any) {
@@ -100,10 +105,13 @@ export async function sendPushToPhone(
 }
 
 /**
- * Send a push notification to ALL subscribed admin devices.
+ * Send a push notification to ALL subscribed admin devices (or filtered by employeeId).
  * Used to alert the admin when a new booking comes in.
  */
-export async function sendPushToAdmins(payload: PushPayload): Promise<void> {
+export async function sendPushToAdmins(
+  payload: PushPayload,
+  employeeId?: string
+): Promise<void> {
   try { ensureVapid(); } catch (err) {
     console.error('[pushService] VAPID init failed:', err);
     return;
@@ -111,14 +119,18 @@ export async function sendPushToAdmins(payload: PushPayload): Promise<void> {
 
   let subscriptions;
   try {
-    subscriptions = await PushSubscription.find({ role: 'admin' });
+    const query: any = { role: 'admin' };
+    if (employeeId) {
+      query.employeeId = employeeId;
+    }
+    subscriptions = await PushSubscription.find(query);
   } catch (err) {
     console.error('[pushService] Failed to query admin subscriptions:', err);
     return;
   }
 
   if (subscriptions.length === 0) {
-    console.log('[pushService] No admin push subscriptions registered');
+    console.log('[pushService] No matching admin push subscriptions registered');
     return;
   }
 

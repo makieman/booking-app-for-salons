@@ -60,22 +60,34 @@ registerRoute(
 self.addEventListener('push', (event: PushEvent) => {
   if (!event.data) return;
 
-  const { title, body, url = '/' } = event.data.json() as {
+  const { title, body, url = '/', sound = 'default' } = event.data.json() as {
     title: string;
     body: string;
     url?: string;
+    sound?: 'default' | 'chime' | 'bell' | 'ding' | 'silent';
   };
 
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon:     '/android-chrome-192x192.png',
-      badge:    '/favicon-32x32.png',
-      vibrate:  [100, 50, 100],
-      tag:      'flo-booking',
-      renotify: true,
-      data:     { url },
-    }),
+    (async () => {
+      // Show the notification
+      await self.registration.showNotification(title, {
+        body,
+        icon:     '/android-chrome-192x192.png',
+        badge:    '/favicon-32x32.png',
+        vibrate:  sound === 'silent' ? [] : [100, 50, 100],
+        tag:      `flo-booking-${Date.now()}`,   // unique tag — prevents silent replacement
+        renotify: true,
+        data:     { url, sound },
+      } as any);
+
+      // Tell any open app window to play the sound
+      if (sound !== 'silent') {
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of clients) {
+          client.postMessage({ type: 'PLAY_NOTIFICATION_SOUND', sound });
+        }
+      }
+    })()
   );
 });
 

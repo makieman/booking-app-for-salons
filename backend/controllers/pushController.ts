@@ -66,20 +66,24 @@ export const unsubscribe = async (req: Request, res: Response): Promise<void> =>
 /**
  * POST /api/push/subscribe-admin
  * Upserts a push subscription for an admin device.
- * Body: { endpoint, keys: { p256dh, auth } }
+ * Body: { endpoint, keys: { p256dh, auth }, employeeId?, soundPreference? }
  */
 export const subscribeAdmin = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { endpoint, keys } = req.body;
+    const { endpoint, keys, employeeId, soundPreference } = req.body;
 
     if (!endpoint || !keys?.p256dh || !keys?.auth) {
       res.status(400).json({ error: 'endpoint, keys.p256dh, and keys.auth are required' });
       return;
     }
 
+    const updateObj: any = { endpoint, keys, role: 'admin' };
+    if (employeeId !== undefined) updateObj.employeeId = employeeId;
+    if (soundPreference !== undefined) updateObj.soundPreference = soundPreference;
+
     await PushSubscription.findOneAndUpdate(
       { endpoint },
-      { endpoint, keys, role: 'admin' },
+      updateObj,
       { upsert: true, new: true, runValidators: true },
     );
 
@@ -109,6 +113,37 @@ export const unsubscribeAdmin = async (req: Request, res: Response): Promise<voi
   } catch (error) {
     console.error('[pushController] unsubscribeAdmin error:', error);
     res.status(500).json({ error: 'Failed to remove admin push subscription' });
+  }
+};
+
+/**
+ * PATCH /api/push/preferences
+ * Body: { endpoint, soundPreference }
+ */
+export const updatePreferences = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { endpoint, soundPreference } = req.body;
+
+    if (!endpoint || !soundPreference) {
+      res.status(400).json({ error: 'endpoint and soundPreference are required' });
+      return;
+    }
+
+    const sub = await PushSubscription.findOneAndUpdate(
+      { endpoint },
+      { soundPreference },
+      { new: true, runValidators: true }
+    );
+
+    if (!sub) {
+      res.status(404).json({ error: 'Push subscription not found' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[pushController] updatePreferences error:', error);
+    res.status(500).json({ error: 'Failed to update push subscription preferences' });
   }
 };
 
