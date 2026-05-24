@@ -1,16 +1,5 @@
 # Salon Booking System
 
-> A full-stack, production-deployed PWA for a real Sisterlocks salon in Eldoret, Kenya. Customers book appointments in a 6-step guided flow; the salon owner manages everything from a PIN-protected admin dashboard, and staff members have their own dashboard — no third-party booking platform needed.
-
-**Live:** [flo-sisterlocks.onrender.com](https://flo-sisterlocks.onrender.com) &nbsp;·&nbsp; **Stack:** React · Express · MongoDB · TypeScript
-
----
-
-## Screenshots
-
-> _Replace the placeholders below with actual screenshots once the app is running.  
-> See the **[Image Generation Prompt](#image-generation-prompt)** section at the bottom for exact prompts to generate high-quality mockup images._
-
 | Customer booking flow | Admin dashboard |
 |---|---|
 | ![Booking flow](./docs/screenshot-booking.png) | ![Admin dashboard](./docs/screenshot-admin.png) |
