@@ -14,6 +14,7 @@ import type { IAttendant } from './Attendant';
  * - status: The booking lifecycle state (pending → confirmed | cancelled)
  */
 export interface IBooking extends Document {
+  reference: string;
   customerName: string;
   phone: string;
   email?: string;     // Customer email for notifications (optional — not all legacy bookings have it)
@@ -31,6 +32,7 @@ export interface IBooking extends Document {
 
 const BookingSchema: Schema = new Schema(
   {
+    reference: { type: String, required: true, unique: true, index: true },
     customerName: { type: String, required: true },
     phone: { type: String, required: true },
     email: { type: String, required: false },  // Optional — used for email notifications

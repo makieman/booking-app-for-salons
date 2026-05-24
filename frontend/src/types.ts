@@ -36,6 +36,7 @@ export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
 export interface Booking {
   _id: string;                    // MongoDB ObjectId
+  reference?: string;             // Unique booking reference (LMN-XXXXX)
   serviceId: string | Service;    // Can be populated or just an ID
   /** Populated attendant or ObjectId string. null = unassigned / "any" */
   attendantId?: string | Attendant | null;
@@ -49,8 +50,8 @@ export interface Booking {
   createdAt?: string;
 }
 
-/** Booking steps — 'attendant' is inserted between 'date' and 'time' */
-export type BookingStep = 'service' | 'date' | 'attendant' | 'time' | 'contact' | 'confirmation';
+/** Booking steps — 'attendant' is inserted between 'date' and 'time', 'lookup' is standalone */
+export type BookingStep = 'service' | 'date' | 'attendant' | 'time' | 'contact' | 'confirmation' | 'lookup';
 
 /** The three modes the app can be in */
 export type UserMode = 'customer' | 'attendant' | 'owner';

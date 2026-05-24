@@ -292,3 +292,52 @@ export async function markBookingCompleted(token: string, bookingId: string): Pr
   }
   return res.json();
 }
+
+/**
+ * Looks up bookings by reference or phone.
+ * Endpoint: GET /api/bookings/lookup?reference=xxx or ?phone=yyy
+ */
+export async function lookupBookings(params: { reference?: string; phone?: string }): Promise<Booking[]> {
+  const query = new URLSearchParams();
+  if (params.reference) query.set('reference', params.reference);
+  if (params.phone) query.set('phone', params.phone);
+  const res = await fetch(`${API_BASE}/bookings/lookup?${query}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to find bookings');
+  }
+  return res.json();
+}
+
+/**
+ * Customers can cancel their booking.
+ * Endpoint: PATCH /api/bookings/:id/cancel-customer
+ */
+export async function cancelBookingCustomer(id: string): Promise<Booking> {
+  const res = await fetch(`${API_BASE}/bookings/${id}/cancel-customer`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to cancel booking');
+  }
+  return res.json();
+}
+
+/**
+ * Customers can reschedule their booking.
+ * Endpoint: PATCH /api/bookings/:id/reschedule-customer
+ */
+export async function rescheduleBookingCustomer(id: string, data: { date: string; startTime: string }): Promise<Booking> {
+  const res = await fetch(`${API_BASE}/bookings/${id}/reschedule-customer`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to reschedule booking');
+  }
+  return res.json();
+}

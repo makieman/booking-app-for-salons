@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Phone, CheckCircle2, ArrowLeft, Settings, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession } from './types';
@@ -53,6 +53,28 @@ export default function App() {
   const [clientInfo, setClientInfo] = useState({ name: '', phone: '', email: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+
+  // Created booking (for real reference rendering on confirmation screen)
+  const [createdBooking, setCreatedBooking] = useState<Booking | null>(null);
+
+  // Lookup Booking State
+  const [lookupQuery, setLookupQuery] = useState('');
+  const [lookupType, setLookupType] = useState<'reference' | 'phone'>('reference');
+  const [lookupResults, setLookupResults] = useState<Booking[]>([]);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+
+  // Customer Cancellation
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+
+  // Customer Rescheduling
+  const [reschedulingBooking, setReschedulingBooking] = useState<Booking | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [rescheduleTime, setRescheduleTime] = useState<string | null>(null);
+  const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
 
   const dateCtaRef = useRef<HTMLButtonElement>(null);
 
@@ -180,6 +202,7 @@ export default function App() {
             attendantId: selectedAttendant?._id ?? null,
         });
         
+        setCreatedBooking(newBooking);
         setBookings(prev => [...prev, newBooking]);
         setActiveStep('confirmation');
         setTimeout(() => setShowNotificationPrompt(true), 800);
@@ -196,6 +219,12 @@ export default function App() {
     setSelectedDate(new Date().toISOString().split('T')[0]);
     setClientInfo({ name: '', phone: '', email: '' });
     setShowNotificationPrompt(false);
+    setCreatedBooking(null);
+    setLookupQuery('');
+    setLookupResults([]);
+    setLookupError(null);
+    setReschedulingBooking(null);
+    setCancellingBookingId(null);
   };
 
   const handleStepBack = () => {
@@ -203,6 +232,116 @@ export default function App() {
     if (activeStep === 'attendant') setActiveStep('date');
     if (activeStep === 'time') setActiveStep('attendant');
     if (activeStep === 'contact') setActiveStep('time');
+  };
+
+  // ── Lookup Handlers ────────────────────────────────────────────────────────
+  const handleLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lookupQuery.trim()) return;
+
+    setLookupLoading(true);
+    setLookupError(null);
+    setLookupResults([]);
+
+    try {
+      const results = await api.lookupBookings(
+        lookupType === 'reference' 
+          ? { reference: lookupQuery } 
+          : { phone: lookupQuery }
+      );
+      setLookupResults(results);
+      if (results.length === 0) {
+        setLookupError('No bookings found matching your search.');
+      }
+    } catch (err: any) {
+      setLookupError(err.message || 'Failed to search bookings.');
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  const handleCancelBooking = async (id: string) => {
+    const confirmCancel = window.confirm('Are you sure you want to cancel this booking? This action cannot be undone.');
+    if (!confirmCancel) return;
+
+    setCancelLoading(true);
+    try {
+      await api.cancelBookingCustomer(id);
+      setLookupResults(prev => prev.map(b => b._id === id ? { ...b, status: 'cancelled' as const } : b));
+      alert('Your appointment has been successfully cancelled.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to cancel booking.');
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  const handleStartReschedule = async (booking: Booking) => {
+    setReschedulingBooking(booking);
+    setRescheduleTime(null);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = tomorrow.toISOString().split('T')[0];
+    setRescheduleDate(dateStr);
+    await fetchRescheduleSlots(dateStr, booking);
+  };
+
+  const fetchRescheduleSlots = async (dateStr: string, booking: Booking) => {
+    setRescheduleSlotsLoading(true);
+    setRescheduleSlots([]);
+    try {
+      const serviceId = typeof booking.serviceId === 'object' ? booking.serviceId._id : booking.serviceId;
+      const attendantId = typeof booking.attendantId === 'object' ? booking.attendantId?._id : booking.attendantId;
+      
+      let slots: string[] = [];
+      if (attendantId) {
+        slots = await api.getAvailability(dateStr, serviceId, attendantId);
+      } else {
+        const data = await api.getAnyAvailability(dateStr, serviceId);
+        slots = data.slots;
+      }
+      setRescheduleSlots(slots);
+    } catch (err) {
+      console.error('Failed to fetch slots for reschedule:', err);
+    } finally {
+      setRescheduleSlotsLoading(false);
+    }
+  };
+
+  const handleRescheduleDateChange = async (dateStr: string) => {
+    setRescheduleDate(dateStr);
+    setRescheduleTime(null);
+    if (reschedulingBooking) {
+      await fetchRescheduleSlots(dateStr, reschedulingBooking);
+    }
+  };
+
+  const handleConfirmReschedule = async () => {
+    if (!reschedulingBooking || !rescheduleTime) return;
+
+    setRescheduleSubmitting(true);
+    try {
+      const updated = await api.rescheduleBookingCustomer(reschedulingBooking._id, {
+        date: rescheduleDate,
+        startTime: rescheduleTime
+      });
+
+      // Update in lookup results list
+      setLookupResults(prev => prev.map(b => b._id === reschedulingBooking._id ? {
+        ...b,
+        date: rescheduleDate,
+        startTime: rescheduleTime,
+        endTime: updated.endTime,
+        status: 'pending' as const
+      } : b));
+
+      alert('Appointment successfully rescheduled! It has been set to pending for review.');
+      setReschedulingBooking(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to reschedule appointment.');
+    } finally {
+      setRescheduleSubmitting(false);
+    }
   };
 
   if (isLoading) {
@@ -456,6 +595,15 @@ export default function App() {
           )}
         </div>
         <div className="flex items-center gap-3">
+          {userMode === 'customer' && activeStep !== 'lookup' && (
+            <button 
+              onClick={() => setActiveStep('lookup')}
+              title="Lookup your bookings"
+              className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500"
+            >
+              <Search size={18} />
+            </button>
+          )}
           <a href="tel:0721530120" className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
             <Phone size={18} />
           </a>
@@ -493,7 +641,7 @@ export default function App() {
           <AttendantView session={attendantSession} />
         ) : (
           <div className="flex-1 flex flex-col">
-            {activeStep !== 'confirmation' && (
+            {activeStep !== 'confirmation' && activeStep !== 'lookup' && (
               <div className="bg-brand-white px-8 pt-6 pb-12">
                 <StepIndicator activeStep={activeStep} />
               </div>
@@ -862,7 +1010,7 @@ export default function App() {
                     <div className="bg-brand-gray-50 w-full p-10 text-left space-y-8 border-2 border-brand-black">
                       <div className="flex justify-between items-baseline border-b border-brand-black/10 pb-6">
                          <p className="text-[13px] uppercase tracking-[0.4em] font-black text-brand-gray-600">Service Ref</p>
-                        <p className="font-black text-xs uppercase italic">#LMN-{Math.random().toString(36).substr(2, 5).toUpperCase()}</p>
+                        <p className="font-black text-xs uppercase italic">#{createdBooking?.reference || 'LMN-PENDING'}</p>
                       </div>
                       <div className="space-y-6">
                         <div className="flex justify-between items-center">
@@ -898,6 +1046,224 @@ export default function App() {
                     >
                       Return to Menu
                     </button>
+                  </motion.div>
+                )}
+
+                {activeStep === 'lookup' && (
+                  <motion.div
+                    key="lookup"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="space-y-8"
+                  >
+                    <div className="flex justify-between items-center border-b border-brand-black pb-4">
+                      <h2 className="text-3xl font-serif font-black uppercase tracking-tight">Lookup Booking</h2>
+                      <button 
+                        onClick={resetFlow}
+                        className="text-xs font-black uppercase tracking-widest bg-brand-gray-50 border border-brand-gray-200 py-2 px-3 hover:bg-brand-black hover:text-white transition-all"
+                      >
+                        Back
+                      </button>
+                    </div>
+
+                    {/* Reschedule Overlay Panel */}
+                    {reschedulingBooking && (
+                      <div className="border-2 border-brand-black bg-brand-white p-6 space-y-6">
+                        <div className="border-b border-brand-black/10 pb-3 flex justify-between items-center">
+                          <h3 className="text-sm font-black uppercase tracking-[0.2em]">Reschedule Slot</h3>
+                          <span className="text-xs font-serif italic">#{reschedulingBooking.reference}</span>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">New Date</label>
+                            <input
+                              type="date"
+                              value={rescheduleDate}
+                              min={new Date(Date.now() + 86400000).toISOString().split('T')[0]} // from tomorrow
+                              onChange={e => handleRescheduleDateChange(e.target.value)}
+                              className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">New Time Slot</label>
+                            {rescheduleSlotsLoading ? (
+                              <div className="text-center py-6 text-xs font-serif italic text-brand-gray-400">Checking availability...</div>
+                            ) : rescheduleSlots.length > 0 ? (
+                              <div className="grid grid-cols-3 gap-2">
+                                {rescheduleSlots.map(slot => (
+                                  <button
+                                    key={slot}
+                                    type="button"
+                                    onClick={() => setRescheduleTime(slot)}
+                                    className={`py-3 text-xs font-black tracking-widest border transition-all ${
+                                      rescheduleTime === slot
+                                        ? 'bg-brand-black text-white border-brand-black'
+                                        : 'bg-transparent text-brand-black border-brand-gray-200 hover:border-brand-black'
+                                    }`}
+                                  >
+                                    {slot}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-6 text-xs font-serif italic text-brand-gray-400 border border-dashed border-brand-gray-200">
+                                No available slots for this date.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                          <button
+                            type="button"
+                            disabled={!rescheduleTime || rescheduleSubmitting}
+                            onClick={handleConfirmReschedule}
+                            className="flex-1 bg-brand-black text-white py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            {rescheduleSubmitting ? 'Updating...' : 'Confirm Reschedule'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReschedulingBooking(null)}
+                            className="flex-1 bg-transparent border-2 border-brand-black text-brand-black py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-black hover:text-white"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!reschedulingBooking && (
+                      <>
+                        {/* Search Forms */}
+                        <form onSubmit={handleLookup} className="space-y-6">
+                          <div className="flex border-2 border-brand-black">
+                            <button
+                              type="button"
+                              onClick={() => { setLookupType('reference'); setLookupResults([]); setLookupError(null); }}
+                              className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest border-r-2 border-brand-black transition-all ${
+                                lookupType === 'reference' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
+                              }`}
+                            >
+                              Search Reference
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setLookupType('phone'); setLookupResults([]); setLookupError(null); }}
+                              className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${
+                                lookupType === 'phone' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
+                              }`}
+                            >
+                              Search Phone
+                            </button>
+                          </div>
+
+                          <div className="space-y-4">
+                            <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">
+                              {lookupType === 'reference' ? 'Service Reference Number' : 'Customer Phone Number'}
+                            </label>
+                            <input
+                              type="text"
+                              value={lookupQuery}
+                              onChange={e => setLookupQuery(e.target.value)}
+                              placeholder={lookupType === 'reference' ? 'e.g. LMN-XXXXX' : 'e.g. 07XXXXXXXX'}
+                              className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none placeholder:text-brand-gray-300 animate-none"
+                            />
+                            <button
+                              type="submit"
+                              disabled={lookupLoading || !lookupQuery.trim()}
+                              className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              {lookupLoading ? 'Searching...' : 'Find Booking'}
+                            </button>
+                          </div>
+                        </form>
+
+                        {/* Lookup Errors */}
+                        {lookupError && (
+                          <div className="p-5 border-2 border-dashed border-red-500 bg-red-50/50 text-center">
+                            <p className="font-serif italic text-sm text-red-600">{lookupError}</p>
+                          </div>
+                        )}
+
+                        {/* Results Listing */}
+                        {lookupResults.length > 0 && (
+                          <div className="space-y-6 pt-4">
+                            <h3 className="text-xs font-black uppercase tracking-[0.3em] text-brand-gray-500 border-b border-brand-black/5 pb-2">
+                              Appointments Found ({lookupResults.length})
+                            </h3>
+                            <div className="space-y-4">
+                              {lookupResults.map(booking => {
+                                const svc = typeof booking.serviceId === 'object' ? booking.serviceId : null;
+                                const attendant = typeof booking.attendantId === 'object' ? booking.attendantId : null;
+                                
+                                return (
+                                  <div key={booking._id} className="border-2 border-brand-black p-6 space-y-4 bg-brand-gray-50">
+                                    <div className="flex justify-between items-center border-b border-brand-black/10 pb-3">
+                                      <span className="font-black text-xs uppercase italic">#{booking.reference || 'LMN-LEGACY'}</span>
+                                      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 border ${
+                                        booking.status === 'confirmed' 
+                                          ? 'bg-green-500 text-white border-green-500' 
+                                          : booking.status === 'cancelled' 
+                                          ? 'bg-red-500 text-white border-red-500' 
+                                          : booking.status === 'completed'
+                                          ? 'bg-brand-gray-400 text-white border-brand-gray-400'
+                                          : 'bg-yellow-500 text-white border-yellow-500'
+                                      }`}>
+                                        {booking.status}
+                                      </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-y-3 text-xs">
+                                      <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Service</p>
+                                        <p className="font-bold uppercase">{svc ? svc.name : 'Unknown Service'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Cost</p>
+                                        <p className="font-bold">KES {svc ? svc.price.toLocaleString() : '0'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Stylist / Artist</p>
+                                        <p className="font-serif italic text-sm">{attendant ? attendant.name : 'Any Available'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Schedule</p>
+                                        <p className="font-bold">{booking.date} @ {booking.startTime}</p>
+                                      </div>
+                                    </div>
+
+                                    {/* Action items for active bookings */}
+                                    {booking.status !== 'cancelled' && booking.status !== 'completed' && (
+                                      <div className="flex gap-2 pt-2 border-t border-brand-black/5">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleStartReschedule(booking)}
+                                          className="flex-1 bg-brand-white border border-brand-black text-brand-black py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-brand-black hover:text-white"
+                                        >
+                                          Reschedule
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={cancelLoading}
+                                          onClick={() => handleCancelBooking(booking._id)}
+                                          className="flex-1 bg-transparent border border-red-500 text-red-500 py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-red-500 hover:text-white disabled:opacity-55"
+                                        >
+                                          Cancel Appt
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
