@@ -21,7 +21,7 @@ import authRoutes from './routes/authRoutes';
 import attendantRoutes from './routes/attendantRoutes';
 
 // Load environment variables from .env file
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 /**
  * Seeds the database with initial services if none exist.

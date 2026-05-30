@@ -36,6 +36,7 @@ export default function App() {
   const [loginTab, setLoginTab] = useState<'owner' | 'staff'>('owner');
   // Owner PIN
   const [pin, setPin] = useState('');
+  const [ownerSessionPin, setOwnerSessionPin] = useState('');
   const [pinError, setPinError] = useState(false);
   const ADMIN_PIN = import.meta.env.VITE_OWNER_PIN ?? '1234'; // Keep for client-side gate
   // Staff login
@@ -105,6 +106,66 @@ export default function App() {
       }
     }
   }, []);
+
+  // ── Keyboard support for PIN Modal ─────────────────────────────────────────
+  useEffect(() => {
+    if (!showPinModal) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If user is focusing on username input, let them type normally
+      if (document.activeElement?.tagName === 'INPUT') {
+        if (e.key === 'Enter') {
+          (document.activeElement as HTMLElement).blur();
+        }
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setShowPinModal(false);
+        return;
+      }
+
+      if (loginTab === 'owner') {
+        if (/^[0-9]$/.test(e.key)) {
+          setPin(prev => {
+            if (prev.length >= 4) return prev;
+            const next = prev + e.key;
+            if (next.length === 4) {
+              if (next === ADMIN_PIN) {
+                setUserMode('owner');
+                setOwnerSessionPin(next);
+                setShowPinModal(false);
+                return '';
+              } else {
+                setPinError(true);
+                setTimeout(() => setPin(''), 600);
+              }
+            }
+            return next;
+          });
+          setPinError(false);
+        } else if (e.key === 'Backspace') {
+          setPin(prev => prev.slice(0, -1));
+          setPinError(false);
+        }
+      } else {
+        if (/^[0-9]$/.test(e.key)) {
+          setStaffPin(prev => {
+            if (prev.length >= 6) return prev;
+            return prev + e.key;
+          });
+          setStaffPinError(false);
+        } else if (e.key === 'Backspace') {
+          setStaffPin(prev => prev.slice(0, -1));
+          setStaffPinError(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPinModal, loginTab, ADMIN_PIN]);
+
 
   // Initial Data Fetch & Offline Listeners
   useEffect(() => {
@@ -477,7 +538,7 @@ export default function App() {
                             setPin(next); setPinError(false);
                             if (next.length === 4) {
                               if (next === ADMIN_PIN) {
-                                setUserMode('owner'); setShowPinModal(false); setPin('');
+                                setUserMode('owner'); setOwnerSessionPin(next); setShowPinModal(false); setPin('');
                               } else { setPinError(true); setTimeout(() => setPin(''), 600); }
                             }
                           }}
@@ -494,7 +555,7 @@ export default function App() {
                           setPin(next); setPinError(false);
                           if (next.length === 4) {
                             if (next === ADMIN_PIN) {
-                              setUserMode('owner'); setShowPinModal(false); setPin('');
+                              setUserMode('owner'); setOwnerSessionPin(next); setShowPinModal(false); setPin('');
                             } else { setPinError(true); setTimeout(() => setPin(''), 600); }
                           }
                         }}
@@ -579,9 +640,13 @@ export default function App() {
                           setShowPinModal(false);
                           setStaffUsername('');
                           setStaffPin('');
-                        } catch {
+                        } catch (err: any) {
                           setStaffPinError(true);
                           setStaffPin('');
+                          const errMsg = err.message || '';
+                          if (errMsg.includes('Failed to fetch') || errMsg.includes('fetch') || errMsg.includes('Network') || errMsg.includes('503') || errMsg.includes('Service')) {
+                            alert(`Connection Error: Could not connect to the backend server. Make sure the server is running on http://localhost:5000.\n\nDetails: ${errMsg}`);
+                          }
                         } finally {
                           setStaffLoginLoading(false);
                         }
@@ -632,6 +697,7 @@ export default function App() {
             onClick={() => {
               if (userMode === 'owner') {
                 setUserMode('customer');
+                setOwnerSessionPin('');
               } else if (userMode === 'attendant') {
                 // Attendant logout — clear token
                 localStorage.removeItem('attendantToken');
@@ -657,7 +723,7 @@ export default function App() {
 
       <main className="flex-1 flex flex-col">
         {userMode === 'owner' ? (
-          <AdminView bookings={bookings} />
+          <AdminView bookings={bookings} ownerPin={ownerSessionPin} />
         ) : userMode === 'attendant' && attendantSession ? (
           <AttendantView session={attendantSession} />
         ) : (
@@ -1356,7 +1422,7 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
   );
 }
 
-function ServiceSelectionCard({ service, isSelected, onSelect }: { service: Service, isSelected: boolean, onSelect: () => void }) {
+function ServiceSelectionCard({ service, isSelected, onSelect }: { service: Service, isSelected: boolean, onSelect: () => void, key?: React.Key }) {
   return (
     <motion.div 
       whileTap={{ scale: 0.98 }}
@@ -1432,7 +1498,7 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
   );
 }
 
-function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
+function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { bookings: Booking[], ownerPin?: string }) {
   const [activeTab, setActiveTab] = useState<'ledger' | 'pending' | 'services' | 'staff'>('ledger');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   const [confirmedBookings, setConfirmedBookings] = useState<Booking[]>(initialBookings);
@@ -1455,9 +1521,9 @@ function AdminView({ bookings: initialBookings }: { bookings: Booking[] }) {
   const [savingPrice, setSavingPrice] = useState<string | null>(null);
 
   // Staff management form state
-  const [ownerPin, setOwnerPin] = useState('');
+  const [ownerPin, setOwnerPin] = useState(initialOwnerPin || '');
   const [ownerPinInput, setOwnerPinInput] = useState('');
-  const [ownerPinConfirmed, setOwnerPinConfirmed] = useState(false);
+  const [ownerPinConfirmed, setOwnerPinConfirmed] = useState(!!initialOwnerPin);
   const [staffForm, setStaffForm] = useState({ name: '', username: '', pin: '', serviceIds: [] as string[] });
   const [staffAddLoading, setStaffAddLoading] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
