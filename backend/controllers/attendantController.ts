@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Booking from '../models/Booking';
+import { sendPushToAdmins } from '../services/pushService';
 
 /**
  * GET /api/attendant/bookings
@@ -65,6 +66,13 @@ export const markBookingCompleted = async (req: Request, res: Response) => {
 
     booking.status = 'completed';
     await booking.save();
+
+    // Notify Admins
+    void sendPushToAdmins({
+      title: '✔️ Booking Completed',
+      body: `${req.attendant!.name} completed the appointment for ${booking.customerName}.`,
+      url: '/admin',
+    });
 
     res.json(booking);
   } catch (error) {

@@ -7,6 +7,7 @@ import * as api from './api/client';
 import { InstallPrompt } from './components/InstallPrompt';
 import { NotificationPrompt } from './components/NotificationPrompt';
 import { useAdminPushNotifications } from './hooks/useAdminPushNotifications';
+import { useAttendantPushNotifications } from './hooks/useAttendantPushNotifications';
 import { useNotificationSound } from './hooks/useNotificationSound';
 
 export default function App() {
@@ -2287,6 +2288,8 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
   const [loading, setLoading] = useState(true);
   const [markingId, setMarkingId] = useState<string | null>(null);
 
+  const attendantPush = useAttendantPushNotifications(session.token);
+
   const todayStr = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
@@ -2347,6 +2350,27 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
             </button>
           ))}
         </div>
+
+        {/* Attendant push notification toggle */}
+        {attendantPush.permission !== 'unsupported' && attendantPush.permission !== 'denied' && (
+          <div className="ml-auto flex items-center justify-end gap-2 py-2 sm:py-0 px-4 sm:px-8 border-l border-brand-gray-50">
+            <button
+              onClick={() => attendantPush.isSubscribed ? attendantPush.unsubscribe(session.token) : attendantPush.subscribe(session.token)}
+              disabled={attendantPush.isLoading}
+              title={attendantPush.isSubscribed ? 'Disable notifications' : 'Enable notifications'}
+              className={`flex items-center gap-1.5 py-2 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.15em] transition-all border ${
+                attendantPush.isSubscribed
+                  ? 'bg-brand-black text-white border-brand-black shadow-sm'
+                  : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
+              } disabled:opacity-40 active:scale-95`}
+            >
+              {attendantPush.isSubscribed
+                ? <><Bell size={12} className="text-white animate-bounce" /> <span className="hidden sm:inline">Notifs On</span></>
+                : <><BellOff size={12} /> <span className="hidden sm:inline">Notifs Off</span></>
+              }
+            </button>
+          </div>
+        )}
       </nav>
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-8 sm:py-10 space-y-8 scrollbar-hide">

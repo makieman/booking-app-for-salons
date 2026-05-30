@@ -147,3 +147,65 @@ export const updatePreferences = async (req: Request, res: Response): Promise<vo
   }
 };
 
+/**
+ * POST /api/push/subscribe-attendant
+ * Upserts a push subscription for an attendant.
+ * Body: { endpoint, keys: { p256dh, auth } }
+ * Requires req.attendant to be set by authMiddleware.
+ */
+export const subscribeAttendant = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { endpoint, keys } = req.body;
+    const attendantId = req.attendant?.id;
+
+    if (!attendantId) {
+      res.status(401).json({ error: 'Attendant authentication required' });
+      return;
+    }
+
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      res.status(400).json({ error: 'endpoint, keys.p256dh, and keys.auth are required' });
+      return;
+    }
+
+    await PushSubscription.findOneAndUpdate(
+      { endpoint },
+      { endpoint, keys, role: 'attendant', attendantId },
+      { upsert: true, new: true, runValidators: true },
+    );
+
+    res.status(201).json({ success: true });
+  } catch (error) {
+    console.error('[pushController] subscribeAttendant error:', error);
+    res.status(500).json({ error: 'Failed to save attendant push subscription' });
+  }
+};
+
+/**
+ * DELETE /api/push/unsubscribe-attendant
+ * Removes an attendant push subscription by endpoint.
+ * Body: { endpoint }
+ * Requires req.attendant to be set by authMiddleware.
+ */
+export const unsubscribeAttendant = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { endpoint } = req.body;
+    const attendantId = req.attendant?.id;
+
+    if (!attendantId) {
+      res.status(401).json({ error: 'Attendant authentication required' });
+      return;
+    }
+
+    if (!endpoint) {
+      res.status(400).json({ error: 'endpoint is required' });
+      return;
+    }
+
+    await PushSubscription.deleteOne({ endpoint, role: 'attendant', attendantId });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[pushController] unsubscribeAttendant error:', error);
+    res.status(500).json({ error: 'Failed to remove attendant push subscription' });
+  }
+};

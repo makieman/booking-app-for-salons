@@ -5,7 +5,7 @@ import {
   sendBookingConfirmedToCustomer,
   sendBookingCancelledToCustomer,
 } from '../services/emailService';
-import { sendPushToPhone } from '../services/pushService';
+import { sendPushToPhone, sendPushToAttendant } from '../services/pushService';
 import type { IAttendant } from '../models/Attendant';
 
 /**
@@ -77,6 +77,13 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
         body: `See you on ${booking.date} at ${booking.startTime}${attendantName ? ` with ${attendantName}` : ''}. Please arrive 5–10 mins early.`,
         url: '/',
       });
+      if (booking.attendantId) {
+        void sendPushToAttendant((booking.attendantId as any)._id?.toString() || booking.attendantId.toString(), {
+          title: '✅ Booking Confirmed',
+          body: `You have a confirmed appointment with ${booking.customerName} on ${booking.date} at ${booking.startTime}.`,
+          url: '/attendant',
+        });
+      }
     } else if (status === 'cancelled') {
       void sendBookingCancelledToCustomer(booking, service as any, attendantName);
       void sendPushToPhone(booking.phone, {
@@ -84,6 +91,13 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
         body: `Your booking on ${booking.date} has been cancelled. Call 0721 530 120 to rebook.`,
         url: '/',
       });
+      if (booking.attendantId) {
+        void sendPushToAttendant((booking.attendantId as any)._id?.toString() || booking.attendantId.toString(), {
+          title: '❌ Booking Cancelled',
+          body: `The appointment for ${booking.customerName} on ${booking.date} has been cancelled.`,
+          url: '/attendant',
+        });
+      }
     }
 
     res.json(booking);
