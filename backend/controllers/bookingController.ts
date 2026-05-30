@@ -9,7 +9,7 @@ import {
   sendBookingConfirmedToCustomer,
   sendBookingCancelledToCustomer,
 } from '../services/emailService';
-import { sendPushToPhone, sendPushToAdmins } from '../services/pushService';
+import { sendPushToPhone, sendPushToAdmins, sendPushToAttendant } from '../services/pushService';
 
 /**
  * POST /api/bookings
@@ -112,6 +112,14 @@ export const createBooking = async (req: Request, res: Response) => {
       body: `${newBooking.customerName} — ${service.name}${attendantName ? ` (${attendantName})` : ''} on ${newBooking.date} at ${newBooking.startTime}`,
       url: '/',
     });
+    // Attendant push: notify the assigned attendant
+    if (attendantId) {
+      void sendPushToAttendant(attendantId, {
+        title: '📋 New Booking Assigned',
+        body: `${newBooking.customerName} booked ${service.name} with you on ${newBooking.date} at ${newBooking.startTime} (pending confirmation).`,
+        url: '/attendant',
+      });
+    }
 
     res.status(201).json(newBooking);
   } catch (error) {

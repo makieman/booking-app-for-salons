@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { getVapidKey, subscribe, unsubscribe, subscribeAdmin, unsubscribeAdmin, updatePreferences } from '../controllers/pushController';
+import { getVapidKey, subscribe, unsubscribe, subscribeAdmin, unsubscribeAdmin, updatePreferences, subscribeAttendant, unsubscribeAttendant } from '../controllers/pushController';
+import { requireAttendantAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -21,5 +22,10 @@ router.delete('/unsubscribe-admin', unsubscribeAdmin);
 // PATCH  /api/push/preferences      — updates the sound preference of an existing subscription
 router.patch('/preferences', updatePreferences);
 
-export default router;
+// POST   /api/push/subscribe-attendant  — saves an attendant push subscription
+router.post('/subscribe-attendant', requireAttendantAuth, subscribeAttendant);
 
+// DELETE /api/push/unsubscribe-attendant — removes an attendant push subscription
+router.delete('/unsubscribe-attendant', requireAttendantAuth, unsubscribeAttendant);
+
+export default router;

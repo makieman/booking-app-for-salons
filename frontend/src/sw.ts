@@ -102,8 +102,9 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
         // Focus an existing window if available
+        const absoluteTargetUrl = new URL(targetUrl, self.location.origin).href;
         for (const client of clientList) {
-          if (client.url === targetUrl && 'focus' in client) {
+          if (client.url === absoluteTargetUrl && 'focus' in client) {
             return client.focus();
           }
         }
