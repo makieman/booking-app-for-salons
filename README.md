@@ -1,7 +1,7 @@
 # Salon Booking System
 
 | Customer booking flow | Admin dashboard |
-|---|---|
+
 | ![Booking flow](./docs/screenshot-booking.png) | ![Admin dashboard](./docs/screenshot-admin.png) |
 
 ---
