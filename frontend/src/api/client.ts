@@ -10,8 +10,6 @@ import type { Attendant, Booking } from '../types';
 
 const API_BASE = '/api';
 
-// ── Helper ─────────────────────────────────────────────────────────────────
-
 /** Adds Authorization Bearer header when a token is provided */
 function authHeaders(token?: string): HeadersInit {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -19,7 +17,6 @@ function authHeaders(token?: string): HeadersInit {
   return headers;
 }
 
-// ── Services ───────────────────────────────────────────────────────────────
 
 /**
  * Fetches all available services from the backend.
