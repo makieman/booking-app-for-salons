@@ -58,12 +58,25 @@ export function InstallPrompt() {
   if (isStandalone || !deferredPrompt) return null;
 
   return (
-    <button
-      onClick={handleInstallClick}
-      className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-brand-black text-brand-white px-4 py-3 rounded-full text-[11px] font-black tracking-[0.2em] uppercase shadow-xl hover:scale-105 active:scale-95 transition-all"
-    >
-      <Download size={14} />
-      Install App
-    </button>
+    <div className="fixed bottom-0 left-0 w-full bg-brand-black text-white p-4 flex items-center justify-between z-[100] shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+      <p className="text-sm font-black uppercase tracking-widest">Install this app</p>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleInstallClick}
+          className="bg-white text-brand-black px-5 py-2 text-xs font-black uppercase tracking-[0.2em] hover:bg-brand-gray-100 transition-colors"
+        >
+          Install
+        </button>
+        <button
+          onClick={() => setDeferredPrompt(null)}
+          className="text-brand-gray-400 hover:text-white p-2 transition-colors"
+          aria-label="Dismiss"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
   );
 }

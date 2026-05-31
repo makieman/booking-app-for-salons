@@ -8,7 +8,7 @@
 
 import type { Attendant, Booking } from '../types';
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 /** Adds Authorization Bearer header when a token is provided */
 function authHeaders(token?: string): HeadersInit {
