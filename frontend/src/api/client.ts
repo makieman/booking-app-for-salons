@@ -231,6 +231,22 @@ export async function updateAttendant(
   return res.json();
 }
 
+/**
+ * Owner: Delete a staff account.
+ * Endpoint: DELETE /api/admin/attendants/:id
+ */
+export async function deleteAttendant(ownerPin: string, id: string): Promise<{ message: string, _id: string }> {
+  const res = await fetch(`${API_BASE}/admin/attendants/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'X-Owner-Pin': ownerPin },
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to delete attendant');
+  }
+  return res.json();
+}
+
 // ── Auth: Attendant Login ──────────────────────────────────────────────────
 
 /**
