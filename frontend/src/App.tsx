@@ -1802,14 +1802,16 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
         {/* ── TAB 2: Pending Requests ─────────────────────── */}
         {activeTab === 'pending' && (
           <>
-            <header className="space-y-2 px-4 sm:px-0">
-              <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-none uppercase">Pending<br />Requests</h2>
-              <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[11px] sm:text-[12px] pt-1 sm:pt-2">
-                Awaiting confirmation — {pendingBookings.length} request{pendingBookings.length !== 1 ? 's' : ''}
-              </p>
+            <header className="px-4 sm:px-0 flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+              <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-none">Requests</h2>
+              {pendingBookings.length > 0 && (
+                <div className="bg-brand-gray-100 text-brand-gray-800 px-3 py-1.5 rounded-full text-[13px] font-medium self-start sm:self-auto border border-brand-gray-200">
+                  {pendingBookings.length} awaiting confirmation
+                </div>
+              )}
             </header>
 
-            <div className="space-y-5">
+            <div className="space-y-5 px-4 sm:px-0">
               {loadingPending ? (
                 <div className="p-16 sm:p-20 text-center border border-brand-gray-100 bg-white font-serif italic text-brand-gray-300 shadow-sm">
                   Loading requests...
@@ -1824,6 +1826,40 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                     const serviceName = typeof booking.serviceId === 'object' ? booking.serviceId.name : 'Unknown';
                     const servicePrice = typeof booking.serviceId === 'object' ? (booking.serviceId as Service).price : null;
                     const isActing = actionLoading === booking._id;
+                    
+                    // Avatar color coding based on name
+                    const avatarColors = [
+                      'bg-blue-100 text-blue-700',
+                      'bg-emerald-100 text-emerald-700',
+                      'bg-purple-100 text-purple-700',
+                      'bg-rose-100 text-rose-700',
+                      'bg-amber-100 text-amber-700',
+                    ];
+                    const charCode = booking.customerName.charCodeAt(0) || 0;
+                    const avatarColor = avatarColors[charCode % avatarColors.length];
+                    
+                    // Phone formatting
+                    const formattedPhone = booking.phone.length === 10 ? `${booking.phone.slice(0,4)} ${booking.phone.slice(4,7)} ${booking.phone.slice(7)}` : booking.phone;
+
+                    // Date formatting
+                    const formatRequestedDate = (dateString?: string) => {
+                      if (!dateString) return '—';
+                      return new Date(dateString).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      });
+                    };
+
+                    const formatBookingDate = (dateString: string) => {
+                      return new Date(dateString + 'T00:00:00').toLocaleDateString('en-GB', {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      });
+                    };
+
                     return (
                       <motion.div
                         key={booking._id}
@@ -1831,78 +1867,80 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, x: -40, height: 0, marginBottom: 0 }}
                         transition={{ delay: idx * 0.04, exit: { duration: 0.25 } }}
-                        className="border border-brand-gray-100 bg-white shadow-soft relative overflow-hidden"
+                        className="border border-brand-gray-100 bg-white rounded-md shadow-sm overflow-hidden"
                       >
-                        {/* Request header */}
-                        <div className="p-5 sm:p-6 border-b border-brand-gray-50 bg-brand-white/20">
-                          <div className="flex items-center gap-4 sm:gap-5">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-black flex-shrink-0 flex items-center justify-center font-black text-white text-xs sm:text-sm italic font-serif shadow-sm">
+                        {/* Request header: Client info & Requested Date */}
+                        <div className="px-5 sm:px-6 py-4 border-b border-brand-gray-100 flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 sm:gap-4">
+                            <div className={`w-10 h-10 sm:w-11 sm:h-11 flex-shrink-0 flex items-center justify-center font-bold text-sm sm:text-base rounded-full ${avatarColor}`}>
                               {booking.customerName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-serif italic text-xl sm:text-2xl leading-none truncate text-brand-black">{booking.customerName}</p>
-                              <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mt-1.5 flex items-center gap-1.5">
-                                <a href={`tel:${booking.phone}`} className="hover:text-brand-black transition-colors flex items-center gap-1">
-                                  <Phone size={10} />
-                                  {booking.phone}
+                              <p className="font-medium text-[15px] sm:text-base text-brand-black truncate">{booking.customerName}</p>
+                              <p className="text-[13px] text-brand-gray-500 mt-0.5 flex items-center gap-1.5">
+                                <Phone size={12} className="text-brand-gray-400" />
+                                <a href={`tel:${booking.phone}`} className="hover:text-brand-black transition-colors">
+                                  {formattedPhone}
                                 </a>
                               </p>
                             </div>
-                            <div className="text-right flex-shrink-0 pl-2">
-                              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-brand-gray-400">Requested</p>
-                              <p className="text-[11px] sm:text-[12px] font-black mt-0.5 text-brand-gray-800">
-                                {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'}
-                              </p>
-                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-[11px] font-medium text-brand-gray-400 uppercase tracking-wider mb-0.5">Requested</p>
+                            <p className="text-[13px] font-medium text-brand-gray-800">
+                              {formatRequestedDate(booking.createdAt)}
+                            </p>
                           </div>
                         </div>
 
-                        {/* Booking details: Responsive Grid (2 columns on mobile, 4 columns on desktop) */}
-                        <div className="px-5 sm:px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-5 border-b border-brand-gray-50">
-                          <div>
-                            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Service</p>
-                            <p className="text-[12px] sm:text-[13px] font-black uppercase text-brand-gray-800 leading-tight">{serviceName}</p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Date</p>
-                            <p className="text-[12px] sm:text-[13px] font-black text-brand-gray-800">
-                              {new Date(booking.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' })}
+                        {/* Booking details: 4-Column Grid */}
+                        <div className="px-5 sm:px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5 border-b border-brand-gray-100">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-brand-gray-500 mb-1.5">Service</p>
+                            <p className="text-[14px] font-medium text-brand-gray-900 leading-snug break-words">
+                              {serviceName.charAt(0).toUpperCase() + serviceName.slice(1).toLowerCase()}
                             </p>
                           </div>
-                          <div>
-                            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Time Slot</p>
-                            <p className="text-[12px] sm:text-[13px] font-black text-brand-gray-800">{booking.startTime}</p>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-brand-gray-500 mb-1.5">Date</p>
+                            <p className="text-[14px] font-medium text-brand-gray-900 truncate">
+                              {formatBookingDate(booking.date)}
+                            </p>
                           </div>
-                          <div>
-                            <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-brand-gray-400 mb-1">Stylist / Artist</p>
-                            <p className="text-[12px] sm:text-[13px] font-black italic text-brand-gray-600">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-brand-gray-500 mb-1.5">Time Slot</p>
+                            <p className="text-[14px] font-medium text-brand-gray-900 truncate">{booking.startTime}</p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-brand-gray-500 mb-1.5">Stylist / Artist</p>
+                            <p className="text-[14px] font-medium text-brand-gray-900 truncate">
                               {booking.attendantId && typeof booking.attendantId === 'object'
                                 ? (booking.attendantId as Attendant).name
-                                : 'Any Available'}
+                                : 'Any available'}
                             </p>
                           </div>
                         </div>
 
-                        {/* Price + Actions: Stacks beautifully on mobile and spans full width */}
-                        <div className="px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-brand-gray-50/20">
-                          <div className="flex items-center justify-between sm:justify-start gap-2 border-b border-brand-gray-50 pb-2 sm:border-0 sm:pb-0">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 sm:hidden">Cost</span>
-                            <p className="font-black text-lg sm:text-xl tracking-tight text-brand-black">
+                        {/* Price + Actions Footer */}
+                        <div className="px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-brand-gray-50/30">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-medium uppercase tracking-wider text-brand-gray-500 sm:hidden">Cost</span>
+                            <p className="font-semibold text-base sm:text-lg text-brand-black">
                               {servicePrice ? `KES ${servicePrice.toLocaleString()}` : '—'}
                             </p>
                           </div>
-                          <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
+                          <div className="flex items-center gap-3 w-full sm:w-auto">
                             <button
                               disabled={isActing}
                               onClick={() => handleStatusUpdate(booking._id, 'cancelled')}
-                              className="flex-1 sm:flex-initial px-5 py-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] border border-brand-gray-200 hover:border-brand-black transition-all bg-white hover:bg-brand-gray-50 disabled:opacity-40 active:scale-95 text-center min-h-[44px]"
+                              className="flex-1 sm:flex-none px-6 py-2.5 text-[13px] font-medium border border-brand-gray-300 text-brand-gray-700 hover:border-brand-gray-400 hover:bg-brand-gray-50 transition-all rounded disabled:opacity-50 min-h-[40px]"
                             >
                               Decline
                             </button>
                             <button
                               disabled={isActing}
                               onClick={() => handleStatusUpdate(booking._id, 'confirmed')}
-                              className="flex-1 sm:flex-initial px-5 py-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] bg-brand-black text-white hover:bg-brand-gray-800 transition-all disabled:opacity-40 flex items-center justify-center gap-2 active:scale-95 min-h-[44px]"
+                              className="flex-1 sm:flex-none px-6 py-2.5 text-[13px] font-medium bg-brand-black text-white hover:bg-brand-gray-800 transition-all rounded disabled:opacity-50 flex items-center justify-center gap-2 min-h-[40px]"
                             >
                               {isActing ? (
                                 <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
