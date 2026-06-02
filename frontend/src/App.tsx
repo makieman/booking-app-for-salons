@@ -2146,19 +2146,33 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                           <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-500 mt-1">@{a.username}</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => {
-                          api.updateAttendant(ownerPin, a._id, { isActive: !a.isActive })
-                            .then(updated => setAttendants(prev => prev.map(x => x._id === a._id ? updated : x)))
-                            .catch(console.error);
-                        }}
-                        className={`w-full sm:w-auto px-4 py-2 text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95 text-center min-h-[38px] ${a.isActive !== false
-                            ? 'border-brand-gray-200 text-brand-gray-600 hover:border-brand-black hover:text-brand-black bg-transparent'
-                            : 'border-brand-black bg-brand-black text-white hover:bg-brand-gray-800'
-                          }`}
-                      >
-                        {a.isActive !== false ? 'Deactivate' : 'Activate'}
-                      </button>
+                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <button
+                          onClick={() => {
+                            api.updateAttendant(ownerPin, a._id, { isActive: !a.isActive })
+                              .then(updated => setAttendants(prev => prev.map(x => x._id === a._id ? updated : x)))
+                              .catch(console.error);
+                          }}
+                          className={`flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95 text-center min-h-[38px] ${a.isActive !== false
+                              ? 'border-brand-gray-200 text-brand-gray-600 hover:border-brand-black hover:text-brand-black bg-transparent'
+                              : 'border-brand-black bg-brand-black text-white hover:bg-brand-gray-800'
+                            }`}
+                        >
+                          {a.isActive !== false ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to delete ${a.name}? This cannot be undone.`)) {
+                              api.deleteAttendant(ownerPin, a._id)
+                                .then(() => setAttendants(prev => prev.filter(x => x._id !== a._id)))
+                                .catch(err => alert(err.message || 'Failed to delete staff account'));
+                            }
+                          }}
+                          className="flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-500 transition-all active:scale-95 text-center min-h-[38px] bg-transparent"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

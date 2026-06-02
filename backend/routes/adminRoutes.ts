@@ -5,6 +5,7 @@ import {
   createAttendant,
   updateAttendant,
   publicListAttendants,
+  deleteAttendant,
 } from '../controllers/staffController';
 import { requireOwnerAuth } from '../middleware/authMiddleware';
 
@@ -30,5 +31,8 @@ router.post('/attendants', requireOwnerAuth, createAttendant);
 
 // PATCH /api/admin/attendants/:id — update staff (owner only)
 router.patch('/attendants/:id', requireOwnerAuth, updateAttendant);
+
+// DELETE /api/admin/attendants/:id — delete staff (owner only)
+router.delete('/attendants/:id', requireOwnerAuth, deleteAttendant);
 
 export default router;

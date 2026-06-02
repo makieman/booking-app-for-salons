@@ -150,3 +150,20 @@ export const updateAttendant = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to update attendant' });
   }
 };
+
+export const deleteAttendant = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const attendant = await Attendant.findByIdAndDelete(id);
+
+    if (!attendant) {
+      return res.status(404).json({ error: 'Attendant not found' });
+    }
+
+    res.json({ message: 'Attendant deleted successfully', _id: id });
+  } catch (error) {
+    console.error('[staffController] deleteAttendant:', error);
+    res.status(500).json({ error: 'Failed to delete attendant' });
+  }
+};
+
