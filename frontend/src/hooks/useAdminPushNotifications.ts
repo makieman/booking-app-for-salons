@@ -57,9 +57,23 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
     navigator.serviceWorker.ready
       .then((reg) => reg.pushManager.getSubscription())
       .then(async (sub) => {
-        if (!sub) { setIsSubscribed(false); return; }
-        // Verify this endpoint is saved as admin on the server
+        const wantsPush = localStorage.getItem('adminPushEnabled') === 'true';
+
+        if (!sub) {
+          setIsSubscribed(false);
+          // Auto-recover subscription if they previously enabled it and browser still allows it
+          if (wantsPush && Notification.permission === 'granted') {
+            console.log('[useAdminPush] Auto-recovering missing subscription...');
+            subscribe();
+          }
+          return;
+        }
+
+        // We have a subscription
         setIsSubscribed(true);
+        if (!wantsPush) {
+          localStorage.setItem('adminPushEnabled', 'true');
+        }
       })
       .catch((err) => console.error('[useAdminPush] getSubscription error:', err));
   }, [isSupported]);
@@ -109,6 +123,7 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
 
       setIsSubscribed(true);
       setSoundPreference(currentSound);
+      localStorage.setItem('adminPushEnabled', 'true');
       return true;
     } catch (err) {
       console.error('[useAdminPush] subscribe error:', err);
@@ -136,6 +151,7 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
 
       await sub.unsubscribe();
       setIsSubscribed(false);
+      localStorage.setItem('adminPushEnabled', 'false');
     } catch (err) {
       console.error('[useAdminPush] unsubscribe error:', err);
     } finally {
