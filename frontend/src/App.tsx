@@ -744,23 +744,43 @@ export default function App() {
                     >
                       <div className="space-y-4">
                         <div className="relative group">
-                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-gray-300 group-focus-within:text-brand-black transition-colors" size={16} />
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B6B6B]" size={16} />
                           <input
                             type="text"
-                            placeholder="SEARCH SERVICE"
+                            placeholder="Search services..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-brand-gray-50 border-b border-brand-gray-100 py-4 pl-12 pr-10 focus:outline-none focus:border-brand-black transition-all font-black text-[16px] tracking-[0.2em] uppercase placeholder:text-brand-gray-400"
+                            className="w-full bg-[#FAF7F3] border border-[#E6D3C3] rounded-full py-3.5 pl-12 pr-10 focus:outline-none focus:border-[#B08968] focus:bg-white transition-all font-medium text-[15px] text-[#1F1F1F] placeholder:text-[#6B6B6B]/60"
                           />
                           {searchQuery && (
                             <button
                               onClick={() => setSearchQuery('')}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-gray-300 hover:text-brand-black"
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B6B6B] hover:text-[#1F1F1F]"
                             >
                               <X size={14} />
                             </button>
                           )}
                         </div>
+                      </div>
+
+                      {/* Category Chips */}
+                      <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+                        {['All Services', 'Hair Care', 'Sisterlocks', 'Treatments'].map((cat, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              if (cat === 'All Services') setSearchQuery('');
+                              else setSearchQuery(cat.split(' ')[0]);
+                            }}
+                            className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-300 border ${
+                              (cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()))
+                                ? 'bg-[#B08968] text-white border-[#B08968]'
+                                : 'bg-white text-[#6B6B6B] border-[#E6D3C3] hover:border-[#B08968]'
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
                       </div>
 
                       <div className="flex flex-col gap-3">
@@ -774,18 +794,18 @@ export default function App() {
                             />
                           ))
                         ) : (
-                          <div className="col-span-3 py-12 text-center border-2 border-dashed border-brand-gray-100">
-                            <p className="font-serif italic text-brand-gray-300">No services found matching your criteria.</p>
+                          <div className="py-12 text-center border border-dashed border-[#E6D3C3] rounded-2xl bg-white">
+                            <p className="text-[#6B6B6B] text-sm">No services found matching your criteria.</p>
                           </div>
                         )}
                       </div>
-                      <div className="pt-4">
+                      <div className="pt-4 sticky bottom-4 z-10 bg-gradient-to-t from-[#FAF7F3] via-[#FAF7F3] to-transparent pb-4">
                         <button
                           disabled={!selectedService}
                           onClick={() => setActiveStep('date')}
-                          className="w-full bg-brand-black text-brand-white py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98]"
+                          className="w-full bg-[#B08968] text-white py-4.5 rounded-full font-semibold uppercase tracking-wider text-sm transition-all disabled:opacity-40 hover:bg-[#9c7554] active:scale-[0.98] shadow-md hover:shadow-lg"
                         >
-                          Next
+                          Continue
                         </button>
                       </div>
                     </motion.div>
@@ -1377,28 +1397,27 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
   const steps: { key: BookingStep, label: string }[] = [
     { key: 'service', label: 'Service' },
     { key: 'date', label: 'Date' },
-    { key: 'attendant', label: 'Artist' },
     { key: 'time', label: 'Time' },
-    { key: 'contact', label: 'Identity' },
+    { key: 'attendant', label: 'Stylist' },
     { key: 'confirmation', label: 'Confirm' }
   ];
   const activeIndex = steps.findIndex(s => s.key === activeStep);
 
   return (
-    <div className="flex items-center justify-between relative max-w-[320px] mx-auto">
-      <div className="absolute top-[8px] left-0 right-0 h-[1px] bg-brand-gray-100 -z-10">
+    <div className="flex items-center justify-between relative max-w-[340px] mx-auto px-2">
+      <div className="absolute top-[8px] left-4 right-4 h-[2px] bg-[#E6D3C3] -z-10">
         <div
-          className="h-full bg-brand-black transition-all duration-1000 ease-out"
-          style={{ width: `${(Math.min(activeIndex, 4) / (steps.length - 1)) * 100}%` }}
+          className="h-full bg-[#B08968] transition-all duration-700 ease-out"
+          style={{ width: `${(Math.max(0, Math.min(activeIndex, steps.length - 1)) / (steps.length - 1)) * 100}%` }}
         />
       </div>
       {steps.map((step, idx) => {
         const isCompleted = idx < activeIndex;
         const isActive = idx === activeIndex;
         return (
-          <div key={idx} className="flex flex-col items-center gap-3">
-            <div className={`w-4 h-4 transition-all duration-700 ${isCompleted || isActive ? 'bg-brand-black scale-110 shadow-lg' : 'bg-brand-gray-100'}`}></div>
-            <span className={`text-[11px] uppercase tracking-widest transition-colors duration-500 font-black ${isActive ? 'text-brand-black' : isCompleted ? 'text-brand-black/40' : 'text-brand-gray-400'}`}>
+          <div key={idx} className="flex flex-col items-center gap-2">
+            <div className={`w-[14px] h-[14px] rounded-full transition-all duration-500 ${isCompleted || isActive ? 'bg-[#B08968] scale-110 shadow-sm' : 'bg-[#E6D3C3]'}`}></div>
+            <span className={`text-[10px] tracking-tight transition-colors duration-500 font-medium ${isActive ? 'text-[#1F1F1F] font-semibold' : 'text-[#6B6B6B]'}`}>
               {step.label}
             </span>
           </div>
@@ -1411,24 +1430,27 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
 function ServiceSelectionCard({ service, isSelected, onSelect }: { service: Service, isSelected: boolean, onSelect: () => void, key?: React.Key }) {
   return (
     <motion.div
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: 0.99 }}
       className={`
-        flex flex-row items-center justify-between p-6 gap-4 cursor-pointer transition-all duration-500 border relative group
-        ${isSelected ? 'bg-brand-black text-brand-white border-brand-black shadow-luxury' : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'}
+        flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden
+        ${isSelected ? 'bg-[#FAF7F3] border-[#B08968] shadow-sm' : 'bg-white border-[#E6D3C3] hover:border-[#B08968]'}
       `}
       onClick={onSelect}
     >
+      {isSelected && (
+        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#B08968]" />
+      )}
       <div className="flex-1">
-        <h3 className="font-serif italic text-lg leading-tight uppercase group-hover:translate-x-1 transition-transform duration-500 break-words">{service.name}</h3>
-        <p className={`mt-2 text-[11px] font-black tracking-widest uppercase ${isSelected ? 'text-white/80' : 'text-brand-gray-600'}`}>
-          {service.duration > 60 ? `${Math.round(service.duration / 60)} HR` : `${service.duration} MIN`}
+        <h3 className="font-sans font-medium text-[16px] text-[#1F1F1F] leading-tight transition-transform duration-300">{service.name}</h3>
+        <p className="mt-1.5 text-xs text-[#6B6B6B]">
+          {service.duration > 60 ? `${Math.round(service.duration / 60)} hrs` : `${service.duration} min`}
         </p>
       </div>
       <div className="flex flex-col items-end gap-3">
-        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-brand-white bg-brand-white' : 'border-brand-gray-200 group-hover:border-brand-black'}`}>
-          {isSelected && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
+        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-[#B08968] bg-[#B08968]' : 'border-[#E6D3C3] group-hover:border-[#B08968]'}`}>
+          {isSelected && <CheckCircle2 size={12} strokeWidth={3} className="text-white" />}
         </div>
-        <p className="font-black text-xs tracking-tighter whitespace-nowrap">KES {service.price.toLocaleString()}</p>
+        <p className="font-semibold text-sm text-[#1F1F1F] tracking-tight">KES {service.price.toLocaleString()}</p>
       </div>
     </motion.div>
   );
