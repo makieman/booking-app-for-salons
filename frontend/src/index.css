@@ -1,30 +1,35 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Jost:wght@300;400;500;600;700&family=Inter:wght@100..900&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-serif: "Playfair Display", serif;
-  --font-sans: "Inter", sans-serif;
+  --font-sans: "Jost", "Inter", sans-serif;
   
-  --color-brand-black: #000000;
-  --color-brand-white: #FAF9F6;
-  --color-brand-gray-50: #F3F2F0;
-  --color-brand-gray-100: #EBEAE7;
-  --color-brand-gray-200: #E0DFDB;
-  --color-brand-gray-300: #D1CFCA;
-  --color-brand-gray-400: #A3A19D;
-  --color-brand-gray-500: #73716E;
-  --color-brand-gray-600: #52514F;
-  --color-brand-gray-700: #403F3E;
-  --color-brand-gray-800: #262524;
-  --color-brand-gray-900: #171616;
+  --color-primary: #B08968;
+  --color-accent: #E6D3C3;
+  --color-bg-salon: #FAF7F3;
+  --color-text-dark: #1F1F1F;
+  --color-text-sub: #6B6B6B;
 
+  --color-brand-black: #1F1F1F;
+  --color-brand-white: #FAF7F3;
+  --color-brand-gray-50: #FAF7F3;
+  --color-brand-gray-100: #E6D3C3;
+  --color-brand-gray-200: #E6D3C3;
+  --color-brand-gray-300: #B08968;
+  --color-brand-gray-400: #6B6B6B;
+  --color-brand-gray-500: #6B6B6B;
+  --color-brand-gray-600: #6B6B6B;
+  --color-brand-gray-700: #1F1F1F;
+  --color-brand-gray-800: #1F1F1F;
+  --color-brand-gray-900: #1F1F1F;
   /* Aliasing for easier replacement */
-  --color-brand-cream: #FAF9F6;
-  --color-brand-sage: #000000;
-  --color-brand-charcoal: #000000;
-  --color-brand-surface: #FAF9F6;
-  --color-brand-border: #EBEAE7;
-  --color-brand-muted: #73716E;
+  --color-brand-cream: #FAF7F3;
+  --color-brand-sage: #B08968;
+  --color-brand-charcoal: #1F1F1F;
+  --color-brand-surface: #FAF7F3;
+  --color-brand-muted: #6B6B6B;
+  --color-brand-border: #E6D3C3;
 
   --shadow-luxury: 0 20px 40px -15px rgba(0, 0, 0, 0.04);
 }
