@@ -32,6 +32,12 @@
   --color-brand-border: #E6D3C3;
 
   --shadow-luxury: 0 20px 40px -15px rgba(0, 0, 0, 0.04);
+
+  --radius-btn: 0.625rem;
+  --radius-card: 0.75rem;
+  --radius-modal: 1rem;
+  --radius-chip: 9999px;
+  --radius-input: 0.375rem;
 }
 
 @layer base {
