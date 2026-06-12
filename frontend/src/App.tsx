@@ -441,7 +441,7 @@ export default function App() {
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-[85%] max-w-sm"
             >
-              <div className="bg-brand-black/95 backdrop-blur-xl text-white px-4 py-3 flex items-center gap-3 shadow-2xl border border-white/10">
+              <div className="bg-brand-black/95 backdrop-blur-xl text-white px-4 py-3 flex items-center gap-3 shadow-2xl border border-white/10 rounded-xl">
                 <button
                   onClick={() => setApiError(null)}
                   className="w-8 h-8 bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center rounded-full shrink-0"
@@ -481,7 +481,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.96 }}
                 onClick={e => e.stopPropagation()}
-                className="bg-brand-white w-[88%] max-w-xs border-2 border-brand-black overflow-hidden"
+                className="bg-brand-white w-[88%] max-w-xs border-2 border-brand-black overflow-hidden rounded-2xl"
               >
                 {/* Modal Header */}
                 <div className="px-8 pt-8 pb-4 space-y-1">
@@ -649,7 +649,7 @@ export default function App() {
                             setStaffLoginLoading(false);
                           }
                         }}
-                        className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30"
+                        className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 rounded-[10px]"
                       >
                         {staffLoginLoading ? 'Signing in...' : 'Sign In'}
                       </button>
@@ -842,7 +842,7 @@ export default function App() {
                       <button
                         ref={dateCtaRef}
                         onClick={() => setActiveStep('attendant')}
-                        className="w-full bg-brand-black text-brand-white py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all hover:tracking-[0.4em] active:scale-[0.98]"
+                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all hover:tracking-[0.4em] active:scale-[0.98]"
                       >
                         Continue
                       </button>
@@ -870,7 +870,7 @@ export default function App() {
                           {/* "Any Available" option */}
                           <button
                             onClick={() => setSelectedAttendant(null)}
-                            className={`flex items-center justify-between p-6 border-2 transition-all duration-300 ${selectedAttendant === null
+                            className={`flex items-center justify-between p-6 border-2 transition-all duration-300 rounded-xl ${selectedAttendant === null
                                 ? 'bg-brand-black text-white border-brand-black'
                                 : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
                               }`}
@@ -900,7 +900,7 @@ export default function App() {
                               <button
                                 key={attendant._id}
                                 onClick={() => setSelectedAttendant(attendant)}
-                                className={`flex items-center justify-between p-6 border-2 transition-all duration-300 ${isSelected
+                                className={`flex items-center justify-between p-6 border-2 transition-all duration-300 rounded-xl ${isSelected
                                     ? 'bg-brand-black text-white border-brand-black'
                                     : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
                                   }`}
@@ -933,7 +933,7 @@ export default function App() {
                       </div>
                       <button
                         onClick={() => setActiveStep('time')}
-                        className="w-full bg-brand-black text-brand-white py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all hover:tracking-[0.4em] active:scale-[0.98]"
+                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all hover:tracking-[0.4em] active:scale-[0.98]"
                       >
                         {selectedAttendant ? `Continue with ${selectedAttendant.name}` : 'Continue — Any Artist'}
                       </button>
@@ -979,7 +979,7 @@ export default function App() {
                                   key={time}
                                   onClick={() => setSelectedTime(time)}
                                   className={`
-                                  py-5 text-xs font-black tracking-[0.2em] transition-all duration-500 rounded-none border-2
+                                  py-5 text-xs font-black tracking-[0.2em] transition-all duration-500 rounded-lg border-2
                                   ${isSelected ? 'bg-brand-black text-brand-white border-brand-black shadow-xl ring-4 ring-brand-black/5' : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'}
                                 `}
                                 >
@@ -997,7 +997,7 @@ export default function App() {
                       <button
                         disabled={!selectedTime}
                         onClick={() => setActiveStep('contact')}
-                        className="w-full bg-brand-black text-brand-white py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98]"
+                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98]"
                       >
                         Confirm Selection
                       </button>
@@ -1082,7 +1082,7 @@ export default function App() {
                       <button
                         disabled={!clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline}
                         onClick={handleConfirmBooking}
-                        className="w-full bg-brand-black text-brand-white py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98]"
+                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98]"
                       >
                         {isOffline ? 'Offline - Booking Disabled' : 'Finalize Booking'}
                       </button>
@@ -1104,7 +1104,7 @@ export default function App() {
                         </p>
                       </div>
 
-                      <div className="bg-brand-gray-50 w-full p-10 text-left space-y-8 border-2 border-brand-black">
+                      <div className="bg-brand-gray-50 w-full p-10 text-left space-y-8 border-2 border-brand-black rounded-xl">
                         <div className="flex justify-between items-baseline border-b border-brand-black/10 pb-6">
                           <p className="text-[13px] uppercase tracking-[0.4em] font-black text-brand-gray-600">Service Ref</p>
                           <p className="font-black text-xs uppercase italic">#{createdBooking?.reference || 'LMN-PENDING'}</p>
@@ -1139,7 +1139,7 @@ export default function App() {
 
                       <button
                         onClick={resetFlow}
-                        className="w-full bg-transparent border-2 border-brand-black text-brand-black py-6 rounded-none font-bold uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-black hover:text-white"
+                        className="w-full bg-transparent border-2 border-brand-black text-brand-black py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-black hover:text-white"
                       >
                         Return to Menu
                       </button>
@@ -1166,7 +1166,7 @@ export default function App() {
 
                       {/* Reschedule Overlay Panel */}
                       {reschedulingBooking && (
-                        <div className="border-2 border-brand-black bg-brand-white p-6 space-y-6">
+                        <div className="border-2 border-brand-black bg-brand-white p-6 space-y-6 rounded-xl">
                           <div className="border-b border-brand-black/10 pb-3 flex justify-between items-center">
                             <h3 className="text-sm font-black uppercase tracking-[0.2em]">Reschedule Slot</h3>
                             <span className="text-xs font-serif italic">#{reschedulingBooking.reference}</span>
@@ -1195,7 +1195,7 @@ export default function App() {
                                       key={slot}
                                       type="button"
                                       onClick={() => setRescheduleTime(slot)}
-                                      className={`py-3 text-xs font-black tracking-widest border transition-all ${rescheduleTime === slot
+                                      className={`py-3 text-xs font-black tracking-widest border transition-all rounded-lg ${rescheduleTime === slot
                                           ? 'bg-brand-black text-white border-brand-black'
                                           : 'bg-transparent text-brand-black border-brand-gray-200 hover:border-brand-black'
                                         }`}
@@ -1217,14 +1217,14 @@ export default function App() {
                               type="button"
                               disabled={!rescheduleTime || rescheduleSubmitting}
                               onClick={handleConfirmReschedule}
-                              className="flex-1 bg-brand-black text-white py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                              className="flex-1 bg-brand-black text-white py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
                             >
                               {rescheduleSubmitting ? 'Updating...' : 'Confirm Reschedule'}
                             </button>
                             <button
                               type="button"
                               onClick={() => setReschedulingBooking(null)}
-                              className="flex-1 bg-transparent border-2 border-brand-black text-brand-black py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-black hover:text-white"
+                              className="flex-1 bg-transparent border-2 border-brand-black text-brand-black py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-black hover:text-white rounded-[10px]"
                             >
                               Cancel
                             </button>
@@ -1236,7 +1236,7 @@ export default function App() {
                         <>
                           {/* Search Forms */}
                           <form onSubmit={handleLookup} className="space-y-6">
-                            <div className="flex border-2 border-brand-black">
+                            <div className="flex border-2 border-brand-black rounded-[10px] overflow-hidden">
                               <button
                                 type="button"
                                 onClick={() => { setLookupType('reference'); setLookupResults([]); setLookupError(null); }}
@@ -1269,7 +1269,7 @@ export default function App() {
                               <button
                                 type="submit"
                                 disabled={lookupLoading || !lookupQuery.trim()}
-                                className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                                className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
                               >
                                 {lookupLoading ? 'Searching...' : 'Find Booking'}
                               </button>
@@ -1295,7 +1295,7 @@ export default function App() {
                                   const attendant = typeof booking.attendantId === 'object' ? booking.attendantId : null;
 
                                   return (
-                                    <div key={booking._id} className="border-2 border-brand-black p-6 space-y-4 bg-brand-gray-50">
+                                    <div key={booking._id} className="border-2 border-brand-black p-6 space-y-4 bg-brand-gray-50 rounded-xl">
                                       <div className="flex justify-between items-center border-b border-brand-black/10 pb-3">
                                         <span className="font-black text-xs uppercase italic">#{booking.reference || 'LMN-LEGACY'}</span>
                                         <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 border ${booking.status === 'confirmed'
@@ -1335,7 +1335,7 @@ export default function App() {
                                           <button
                                             type="button"
                                             onClick={() => handleStartReschedule(booking)}
-                                            className="flex-1 bg-brand-white border border-brand-black text-brand-black py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-brand-black hover:text-white"
+                                            className="flex-1 bg-brand-white border border-brand-black text-brand-black py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-brand-black hover:text-white rounded-[10px]"
                                           >
                                             Reschedule
                                           </button>
@@ -1343,7 +1343,7 @@ export default function App() {
                                             type="button"
                                             disabled={cancelLoading}
                                             onClick={() => handleCancelBooking(booking._id)}
-                                            className="flex-1 bg-transparent border border-red-500 text-red-500 py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-red-500 hover:text-white disabled:opacity-55"
+                                            className="flex-1 bg-transparent border border-red-500 text-red-500 py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-red-500 hover:text-white disabled:opacity-55 rounded-[10px]"
                                           >
                                             Cancel Appt
                                           </button>
@@ -1492,7 +1492,7 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
                 <button
                   key={j}
                   onClick={() => onDateSelect(dateStr)}
-                  className={`flex flex-col items-center justify-center p-4 transition-all duration-500 border ${isSelected ? 'bg-brand-black text-brand-white scale-105 border-brand-black shadow-xl z-10' : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'}`}
+                  className={`flex flex-col items-center justify-center p-4 transition-all duration-500 border rounded-xl ${isSelected ? 'bg-brand-black text-brand-white scale-105 border-brand-black shadow-xl z-10' : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'}`}
                 >
                   <span className={`text-[11px] uppercase font-black tracking-tighter leading-none mb-1 ${isSelected ? 'opacity-80' : 'text-brand-gray-600'}`}>{dayName}</span>
                   <span className="text-xl font-black italic font-serif leading-none">{dayNum}</span>
@@ -1679,7 +1679,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                 onClick={() => adminPush.isSubscribed ? adminPush.unsubscribe() : adminPush.subscribe()}
                 disabled={adminPush.isLoading}
                 title={adminPush.isSubscribed ? 'Disable booking notifications' : 'Enable booking notifications'}
-                className={`flex items-center gap-1.5 py-2 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.15em] transition-all border ${adminPush.isSubscribed
+                className={`flex items-center gap-1.5 py-2 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.15em] transition-all border rounded-[10px] ${adminPush.isSubscribed
                     ? 'bg-brand-black text-white border-brand-black shadow-sm'
                     : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
                   } disabled:opacity-40 active:scale-95`}
@@ -1758,7 +1758,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.05 }}
                       key={booking._id}
-                      className={`p-5 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between border transition-all gap-4 sm:gap-6 group ${isPassed ? 'opacity-35 grayscale border-brand-gray-50 bg-brand-gray-50/50' : 'border-brand-gray-100 hover:border-brand-black hover:shadow-luxury bg-brand-white'}`}
+                      className={`p-5 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between border transition-all rounded-xl gap-4 sm:gap-6 group ${isPassed ? 'opacity-35 grayscale border-brand-gray-50 bg-brand-gray-50/50' : 'border-brand-gray-100 hover:border-brand-black hover:shadow-luxury bg-brand-white'}`}
                     >
                       <div className="flex flex-col space-y-4 sm:space-y-3">
                         <div className="flex items-center gap-4 sm:gap-6">
@@ -1889,7 +1889,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, x: -40, height: 0, marginBottom: 0 }}
                         transition={{ delay: idx * 0.04, exit: { duration: 0.25 } }}
-                        className="border border-brand-gray-100 bg-white rounded-md shadow-sm overflow-hidden"
+                        className="border border-brand-gray-100 bg-white rounded-xl shadow-sm overflow-hidden"
                       >
                         {/* Request header: Client info & Requested Date */}
                         <div className="px-5 sm:px-6 py-4 border-b border-brand-gray-100 flex items-center justify-between gap-4">
@@ -1955,14 +1955,14 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                             <button
                               disabled={isActing}
                               onClick={() => handleStatusUpdate(booking._id, 'cancelled')}
-                              className="flex-1 sm:flex-none px-6 py-2.5 text-[13px] font-medium border border-brand-gray-300 text-brand-gray-700 hover:border-brand-gray-400 hover:bg-brand-gray-50 transition-all rounded disabled:opacity-50 min-h-[40px]"
+                              className="flex-1 sm:flex-none px-6 py-2.5 text-[13px] font-medium border border-brand-gray-300 text-brand-gray-700 hover:border-brand-gray-400 hover:bg-brand-gray-50 transition-all rounded-[10px] disabled:opacity-50 min-h-[40px]"
                             >
                               Decline
                             </button>
                             <button
                               disabled={isActing}
                               onClick={() => handleStatusUpdate(booking._id, 'confirmed')}
-                              className="flex-1 sm:flex-none px-6 py-2.5 text-[13px] font-medium bg-brand-black text-white hover:bg-brand-gray-800 transition-all rounded disabled:opacity-50 flex items-center justify-center gap-2 min-h-[40px]"
+                              className="flex-1 sm:flex-none px-6 py-2.5 text-[13px] font-medium bg-brand-black text-white hover:bg-brand-gray-800 transition-all rounded-[10px] disabled:opacity-50 flex items-center justify-center gap-2 min-h-[40px]"
                             >
                               {isActing ? (
                                 <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1999,7 +1999,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                 const currentEdit = editPrices[service._id] ?? String(service.price);
                 const isDirty = currentEdit !== String(service.price);
                 return (
-                  <div key={service._id} className="border border-brand-gray-100 bg-white p-5 sm:p-6 hover:border-brand-black transition-all shadow-sm">
+                  <div key={service._id} className="border border-brand-gray-100 bg-white p-5 sm:p-6 hover:border-brand-black transition-all rounded-xl shadow-sm">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <p className="font-serif italic text-lg sm:text-xl leading-tight text-brand-black">{service.name}</p>
@@ -2021,7 +2021,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                           <button
                             disabled={isSaving}
                             onClick={() => handlePriceEdit(service._id)}
-                            className="px-3.5 py-2 bg-brand-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-brand-gray-800 transition-all disabled:opacity-40 rounded-none shadow-sm active:scale-95 flex items-center gap-1.5"
+                            className="px-3.5 py-2 bg-brand-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-brand-gray-800 transition-all disabled:opacity-40 rounded-[10px] shadow-sm active:scale-95 flex items-center gap-1.5"
                           >
                             {isSaving ? (
                               <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -2037,7 +2037,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
             </div>
 
             {/* Add Service Form */}
-            <div className="border-2 border-brand-black bg-white p-5 sm:p-6 space-y-6 shadow-sm">
+            <div className="border-2 border-brand-black bg-white p-5 sm:p-6 space-y-6 rounded-xl shadow-sm">
               <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4 flex items-center gap-1.5">
                 <Plus size={14} /> New Service
               </p>
@@ -2088,7 +2088,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
               <button
                 disabled={!addForm.name || !addForm.duration || !addForm.price || addLoading}
                 onClick={handleAddService}
-                className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed shadow active:scale-[0.99] flex items-center justify-center gap-2"
+                className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed shadow active:scale-[0.99] flex items-center justify-center gap-2 rounded-[10px]"
               >
                 {addLoading ? (
                   <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -2180,7 +2180,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                       setOwnerPinConfirmed(true);
                     }}
                     disabled={ownerPinInput.length < 4}
-                    className="w-full max-w-[280px] mx-auto bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed shadow active:scale-[0.99] flex items-center justify-center gap-2 mt-2"
+                    className="w-full max-w-[280px] mx-auto bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed shadow active:scale-[0.99] flex items-center justify-center gap-2 mt-2 rounded-[10px]"
                   >
                     <Key size={12} /> Confirm PIN
                   </button>
@@ -2195,7 +2195,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                   ) : attendants.length === 0 ? (
                     <div className="p-16 text-center border border-brand-gray-100 bg-white font-serif italic text-brand-gray-300 shadow-sm">No staff accounts yet.</div>
                   ) : attendants.map(a => (
-                    <div key={a._id} className={`border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all bg-white shadow-sm hover:border-brand-black ${a.isActive !== false ? 'border-brand-gray-100' : 'border-brand-gray-50 opacity-40'
+                    <div key={a._id} className={`border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all bg-white shadow-sm hover:border-brand-black ${a.isActive !== false ? 'border-brand-gray-100' : 'border-brand-gray-50 opacity-40'
                       }`}>
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-brand-black flex-shrink-0 flex items-center justify-center text-white font-black text-xs font-serif italic shadow-sm">
@@ -2213,7 +2213,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                               .then(updated => setAttendants(prev => prev.map(x => x._id === a._id ? updated : x)))
                               .catch(console.error);
                           }}
-                          className={`flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95 text-center min-h-[38px] ${a.isActive !== false
+                          className={`flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[10px] active:scale-95 text-center min-h-[38px] ${a.isActive !== false
                               ? 'border-brand-gray-200 text-brand-gray-600 hover:border-brand-black hover:text-brand-black bg-transparent'
                               : 'border-brand-black bg-brand-black text-white hover:bg-brand-gray-800'
                             }`}
@@ -2228,7 +2228,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                                 .catch(err => alert(err.message || 'Failed to delete staff account'));
                             }
                           }}
-                          className="flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-500 transition-all active:scale-95 text-center min-h-[38px] bg-transparent"
+                          className="flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-500 transition-all rounded-[10px] active:scale-95 text-center min-h-[38px] bg-transparent"
                         >
                           Delete
                         </button>
@@ -2238,7 +2238,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                 </div>
 
                 {/* Add staff form */}
-                <div className="border-2 border-brand-black bg-white p-5 sm:p-6 space-y-6 shadow-sm">
+                <div className="border-2 border-brand-black bg-white p-5 sm:p-6 space-y-6 rounded-xl shadow-sm">
                   <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4 flex items-center gap-1.5">
                     <Plus size={14} /> New Staff Account
                   </p>
@@ -2315,7 +2315,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                         setStaffAddLoading(false);
                       }
                     }}
-                    className="w-full bg-brand-black text-white py-4.5 sm:py-5 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed shadow active:scale-[0.99] flex items-center justify-center gap-2"
+                    className="w-full bg-brand-black text-white py-4.5 sm:py-5 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed shadow active:scale-[0.99] flex items-center justify-center gap-2 rounded-[10px]"
                   >
                     {staffAddLoading ? (
                       <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -2410,7 +2410,7 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
               onClick={() => attendantPush.isSubscribed ? attendantPush.unsubscribe(session.token) : attendantPush.subscribe(session.token)}
               disabled={attendantPush.isLoading}
               title={attendantPush.isSubscribed ? 'Disable notifications' : 'Enable notifications'}
-              className={`flex items-center gap-1.5 py-2 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.15em] transition-all border ${attendantPush.isSubscribed
+              className={`flex items-center gap-1.5 py-2 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.15em] transition-all border rounded-[10px] ${attendantPush.isSubscribed
                   ? 'bg-brand-black text-white border-brand-black shadow-sm'
                   : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
                 } disabled:opacity-40 active:scale-95`}
@@ -2454,7 +2454,7 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className="border border-brand-gray-100 bg-white hover:border-brand-black transition-all shadow-sm"
+                className="border border-brand-gray-100 bg-white hover:border-brand-black transition-all rounded-xl shadow-sm"
               >
                 {/* Booking header: Responsive Stack on mobile, row on desktop */}
                 <div className="p-5 sm:p-6 border-b border-brand-gray-50 bg-brand-white/10">
@@ -2507,7 +2507,7 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
                       <button
                         disabled={isMarking}
                         onClick={() => handleMarkComplete(booking._id)}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] bg-brand-black text-white hover:bg-brand-gray-800 transition-all disabled:opacity-40 min-h-[44px] active:scale-95 shadow-sm"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] bg-brand-black text-white hover:bg-brand-gray-800 transition-all disabled:opacity-40 min-h-[44px] active:scale-95 shadow-sm rounded-[10px]"
                       >
                         {isMarking ? (
                           <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
