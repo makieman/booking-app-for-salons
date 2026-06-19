@@ -1524,8 +1524,9 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
   const [addForm, setAddForm] = useState({ name: '', duration: '', price: '', description: '' });
   const [addLoading, setAddLoading] = useState(false);
 
-  // Edit price state: { [serviceId]: editedPrice }
+  // Edit price/duration state: { [serviceId]: editedValue }
   const [editPrices, setEditPrices] = useState<Record<string, string>>({});
+  const [editDurations, setEditDurations] = useState<Record<string, string>>({});
   const [savingPrice, setSavingPrice] = useState<string | null>(null);
 
   // Staff management form state
@@ -1547,8 +1548,13 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
       .then(data => {
         setServices(data);
         const prices: Record<string, string> = {};
-        data.forEach((s: Service) => { prices[s._id] = String(s.price); });
+        const durations: Record<string, string> = {};
+        data.forEach((s: Service) => {
+          prices[s._id] = String(s.price);
+          durations[s._id] = String(s.duration);
+        });
         setEditPrices(prices);
+        setEditDurations(durations);
       })
       .catch(console.error);
   }, []);
@@ -1568,8 +1574,13 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
         .then(data => {
           setServices(data);
           const prices: Record<string, string> = {};
-          data.forEach((s: Service) => { prices[s._id] = String(s.price); });
+          const durations: Record<string, string> = {};
+          data.forEach((s: Service) => {
+            prices[s._id] = String(s.price);
+            durations[s._id] = String(s.duration);
+          });
           setEditPrices(prices);
+          setEditDurations(durations);
         })
         .catch(console.error)
         .finally(() => setLoadingServices(false));
@@ -1600,12 +1611,14 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
     }
   };
 
-  const handlePriceEdit = async (serviceId: string) => {
+  const handleServiceEdit = async (serviceId: string) => {
     const newPrice = Number(editPrices[serviceId]);
+    const newDuration = Number(editDurations[serviceId]);
     if (isNaN(newPrice) || newPrice <= 0) return;
+    if (isNaN(newDuration) || newDuration <= 0) return;
     setSavingPrice(serviceId);
     try {
-      const updated = await api.updateService(serviceId, { price: newPrice });
+      const updated = await api.updateService(serviceId, { price: newPrice, duration: newDuration });
       setServices(prev => prev.map(s => s._id === serviceId ? updated : s));
     } catch (err) {
       console.error(err);
@@ -1986,7 +1999,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
             <header className="space-y-2 px-4 sm:px-0">
               <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-none uppercase">Service<br />Management</h2>
               <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[11px] sm:text-[12px] pt-1 sm:pt-2">
-                Edit prices // add new services
+                Edit prices & durations // add new services
               </p>
             </header>
 
@@ -1996,23 +2009,34 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                 <div className="p-16 text-center border border-brand-gray-100 bg-white font-serif italic text-brand-gray-300 shadow-sm">Loading...</div>
               ) : services.map(service => {
                 const isSaving = savingPrice === service._id;
-                const currentEdit = editPrices[service._id] ?? String(service.price);
-                const isDirty = currentEdit !== String(service.price);
+                const currentPrice = editPrices[service._id] ?? String(service.price);
+                const currentDuration = editDurations[service._id] ?? String(service.duration);
+                const isPriceDirty = currentPrice !== String(service.price);
+                const isDurationDirty = currentDuration !== String(service.duration);
+                const isDirty = isPriceDirty || isDurationDirty;
                 return (
                   <div key={service._id} className="border border-brand-gray-100 bg-white p-5 sm:p-6 hover:border-brand-black transition-all rounded-xl shadow-sm">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-serif italic text-lg sm:text-xl leading-tight text-brand-black">{service.name}</p>
-                        <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-brand-gray-500 mt-2">
-                          {service.duration > 60 ? `${Math.round(service.duration / 60)} HR` : `${service.duration} MIN`}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3 justify-between sm:justify-end border-t border-brand-gray-50/50 pt-3 sm:border-0 sm:pt-0">
+                    <div className="flex flex-col gap-4">
+                      <p className="font-serif italic text-lg sm:text-xl leading-tight text-brand-black">{service.name}</p>
+                      <div className="flex flex-wrap items-center gap-4 justify-between">
+                        {/* Duration field */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] sm:text-[11px] font-black text-brand-gray-400 uppercase tracking-widest">Duration (min)</span>
+                          <input
+                            type="number"
+                            min="15"
+                            max="720"
+                            value={currentDuration}
+                            onChange={e => setEditDurations(prev => ({ ...prev, [service._id]: e.target.value }))}
+                            className="w-20 text-right font-black text-sm sm:text-base border-b-2 border-brand-gray-200 focus:border-brand-black focus:outline-none py-1 bg-transparent transition-colors"
+                          />
+                        </div>
+                        {/* Price field */}
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] sm:text-[11px] font-black text-brand-gray-400 uppercase tracking-widest">KES</span>
                           <input
                             type="number"
-                            value={currentEdit}
+                            value={currentPrice}
                             onChange={e => setEditPrices(prev => ({ ...prev, [service._id]: e.target.value }))}
                             className="w-24 text-right font-black text-sm sm:text-base border-b-2 border-brand-gray-200 focus:border-brand-black focus:outline-none py-1 bg-transparent transition-colors"
                           />
@@ -2020,7 +2044,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                         {isDirty && (
                           <button
                             disabled={isSaving}
-                            onClick={() => handlePriceEdit(service._id)}
+                            onClick={() => handleServiceEdit(service._id)}
                             className="px-3.5 py-2 bg-brand-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-brand-gray-800 transition-all disabled:opacity-40 rounded-[10px] shadow-sm active:scale-95 flex items-center gap-1.5"
                           >
                             {isSaving ? (
@@ -2035,6 +2059,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                 );
               })}
             </div>
+
 
             {/* Add Service Form */}
             <div className="border-2 border-brand-black bg-white p-5 sm:p-6 space-y-6 rounded-xl shadow-sm">
