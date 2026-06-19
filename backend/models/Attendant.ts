@@ -16,8 +16,15 @@ export interface IAttendant extends Document {
   pinHash: string;
   isActive: boolean;
   serviceIds: mongoose.Types.ObjectId[];
+  /** Number of consecutive failed login attempts (resets on success) */
+  failedLoginAttempts: number;
+  /** Account is locked until this date (null/undefined = not locked) */
+  lockUntil?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+
+  /** Returns true if the account is currently locked out */
+  isLocked(): boolean;
 }
 
 const AttendantSchema: Schema = new Schema(
@@ -33,11 +40,18 @@ const AttendantSchema: Schema = new Schema(
     pinHash: { type: String, required: true },
     isActive: { type: Boolean, default: true, index: true },
     serviceIds: [{ type: Schema.Types.ObjectId, ref: 'Service' }],
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date, default: null },
   },
   { timestamps: true }
 );
 
 // Composite index for the customer-facing "active attendants for service" query
 AttendantSchema.index({ isActive: 1, serviceIds: 1 });
+
+// Virtual: check if account is currently locked
+AttendantSchema.methods.isLocked = function (): boolean {
+  return !!(this.lockUntil && this.lockUntil > new Date());
+};
 
 export default mongoose.model<IAttendant>('Attendant', AttendantSchema);
