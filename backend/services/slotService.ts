@@ -31,6 +31,15 @@ export function generateAvailableSlots(
   const startOfDay = DateTime.fromISO(`${date}T${WORKING_HOURS.start}`);
   const endOfDay = DateTime.fromISO(`${date}T${WORKING_HOURS.end}`);
 
+  const workingMinutes = endOfDay.diff(startOfDay, 'minutes').minutes;
+
+  // If the service takes longer than the working day, treat it as a full-day
+  // booking: offer 09:00 as the single slot (only if the day is free).
+  if (duration >= workingMinutes) {
+    const dayAlreadyBooked = existingBookings.length > 0;
+    return dayAlreadyBooked ? [] : [WORKING_HOURS.start];
+  }
+
   const slots: string[] = [];
   let currentSlot = startOfDay;
 
