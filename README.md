@@ -6,9 +6,7 @@
 
 ---
 
-## What it does
 
-A customer opens the app, picks a service, chooses a date, selects a preferred artist (attendant) or "Any Available", picks a time slot, enters their contact details, and submits — all in under two minutes. The salon owner receives an instant push notification and email alert, reviews the request, and confirms or declines from their admin panel. 
 
 Staff members can log in using their own credentials to view their personal dashboard, track their daily and upcoming schedules, and mark appointments as complete.
 
