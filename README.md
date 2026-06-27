@@ -2,10 +2,6 @@
 
 | Customer booking flow | Admin dashboard |
 
-| ![Booking flow](./docs/screenshot-booking.png) | ![Admin dashboard](./docs/screenshot-admin.png) |
-
----
-
 
 
 Staff members can log in using their own credentials to view their personal dashboard, track their daily and upcoming schedules, and mark appointments as complete.
