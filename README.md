@@ -283,11 +283,7 @@ Pushing to `main` triggers an automatic redeploy. Use `./ship.sh` to typecheck, 
 
 ---
 
-## Image generation prompt
 
-> **For developers/designers:** Paste the prompt below into any AI image generator (Midjourney, DALL·E, Firefly, Stable Diffusion) to produce a high-quality hero screenshot or mockup for this README or portfolio.
-
----
 
 ### Prompt — booking flow mockup (mobile)
 
