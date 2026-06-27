@@ -281,42 +281,6 @@ Pushing to `main` triggers an automatic redeploy. Use `./ship.sh` to typecheck, 
 
 - **Loyalty tracking** — return customer detection based on phone number to award dynamic discounts or track styling history.
 
----
-
-
-
-### Prompt — booking flow mockup (mobile)
-
-```
-A high-fidelity mobile UI mockup of a luxury salon booking app called "Flo Sisterlocks".
-Shown on a matte black iPhone 15 Pro in a 3/4 angle floating on a pure white background
-with a soft drop shadow.
-
-The screen shows a service selection step with two service cards:
-- "Sisterlocks™ Installation — 20 HR — KES 10,000"
-- "Retightening & Maintenance — 4 HR — KES 3,500"
-
-Design language: editorial luxury. Stark black-and-white palette. 
-Typography: large serif italic headings mixed with tight uppercase sans-serif labels 
-in small tracking-widest caps. Think Bottega Veneta meets a fashion editorial.
-
-The selected card is filled solid black with white text. The unselected card is white 
-with a thin black border. A search bar at the top reads "SEARCH SERVICE" in uppercase. 
-A step indicator bar shows 6 steps: SERVICE · DATE · ARTIST · TIME · IDENTITY · CONFIRM, 
-with the first step filled.
-
-A thick black CTA button at the bottom reads "NEXT" in uppercase with wide letter spacing.
-
-The overall feel is: brutalist minimalism, high contrast, no rounded corners except 
-the phone bezels, no color except black and white and pale gray.
-
-Photorealistic product shot, studio lighting, 4K quality.
-```
-
----
-
-### Prompt — admin dashboard mockup (tablet)
-
 ```
 A high-fidelity tablet UI mockup of the admin dashboard for a luxury salon booking app 
 called "Flo Sisterlocks Studio Management".
