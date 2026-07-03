@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 // ── VAPID helper — convert base64 string to Uint8Array ───────────────────────
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -62,7 +64,7 @@ export function usePushNotifications(): UsePushNotifications {
       if (perm !== 'granted') return false;
 
       // 2. Fetch VAPID public key from backend
-      const vapidRes = await fetch('/api/push/vapid-key');
+      const vapidRes = await fetch(`${API_BASE}/push/vapid-key`);
       if (!vapidRes.ok) throw new Error('Failed to fetch VAPID key');
       const { publicKey } = await vapidRes.json() as { publicKey: string };
 
@@ -78,7 +80,7 @@ export function usePushNotifications(): UsePushNotifications {
       const auth   = arrayBufferToBase64Url(sub.getKey('auth')!);
 
       // 5. Send subscription to backend
-      const saveRes = await fetch('/api/push/subscribe', {
+      const saveRes = await fetch(`${API_BASE}/push/subscribe`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
@@ -110,7 +112,7 @@ export function usePushNotifications(): UsePushNotifications {
       if (!sub) return;
 
       // Remove from backend first
-      await fetch('/api/push/unsubscribe', {
+      await fetch(`${API_BASE}/push/unsubscribe`, {
         method:  'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ endpoint: sub.endpoint }),
