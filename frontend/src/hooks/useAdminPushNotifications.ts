@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 // ── VAPID helper ──────────────────────────────────────────────────────────────
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -90,7 +92,7 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
       if (perm !== 'granted') return false;
 
       // 2. Fetch VAPID public key
-      const vapidRes = await fetch('/api/push/vapid-key');
+      const vapidRes = await fetch(`${API_BASE}/push/vapid-key`);
       if (!vapidRes.ok) throw new Error('Failed to fetch VAPID key');
       const { publicKey } = await vapidRes.json() as { publicKey: string };
 
@@ -109,7 +111,7 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
       const employeeId = localStorage.getItem('employeeId') ?? 'admin';
       const currentSound = localStorage.getItem('soundPreference') ?? 'default';
 
-      const saveRes = await fetch('/api/push/subscribe-admin', {
+      const saveRes = await fetch(`${API_BASE}/push/subscribe-admin`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
@@ -143,7 +145,7 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
       const sub = await reg.pushManager.getSubscription();
       if (!sub) return;
 
-      await fetch('/api/push/unsubscribe-admin', {
+      await fetch(`${API_BASE}/push/unsubscribe-admin`, {
         method:  'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ endpoint: sub.endpoint }),
@@ -166,7 +168,7 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
       const sub = await reg.pushManager.getSubscription();
       if (!sub) return;
 
-      const res = await fetch('/api/push/preferences', {
+      const res = await fetch(`${API_BASE}/push/preferences`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ endpoint: sub.endpoint, soundPreference: sound }),

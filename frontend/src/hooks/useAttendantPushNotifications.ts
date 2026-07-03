@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 // ── VAPID helper ──────────────────────────────────────────────────────────────
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -71,7 +73,7 @@ export function useAttendantPushNotifications(token: string): UseAttendantPushNo
       if (perm !== 'granted') return false;
 
       // 2. Fetch VAPID public key
-      const vapidRes = await fetch('/api/push/vapid-key');
+      const vapidRes = await fetch(`${API_BASE}/push/vapid-key`);
       if (!vapidRes.ok) throw new Error('Failed to fetch VAPID key');
       const { publicKey } = await vapidRes.json() as { publicKey: string };
 
@@ -87,7 +89,7 @@ export function useAttendantPushNotifications(token: string): UseAttendantPushNo
       const auth   = arrayBufferToBase64Url(sub.getKey('auth')!);
 
       // 5. Save to server as attendant subscription
-      const saveRes = await fetch('/api/push/subscribe-attendant', {
+      const saveRes = await fetch(`${API_BASE}/push/subscribe-attendant`, {
         method:  'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -120,7 +122,7 @@ export function useAttendantPushNotifications(token: string): UseAttendantPushNo
       const sub = await reg.pushManager.getSubscription();
       if (!sub) return;
 
-      await fetch('/api/push/unsubscribe-attendant', {
+      await fetch(`${API_BASE}/push/unsubscribe-attendant`, {
         method:  'DELETE',
         headers: { 
           'Content-Type': 'application/json',
