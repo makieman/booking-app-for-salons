@@ -32,7 +32,7 @@ export async function getServices() {
  * Creates a new service.
  * Endpoint: POST /api/services
  */
-export async function createService(data: { name: string; duration: number; price: number; description?: string }) {
+export async function createService(data: { name: string; duration: number; price: number; priceMax?: number; description?: string }) {
   const res = await fetch(`${API_BASE}/services`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -152,7 +152,7 @@ export async function updateBookingStatus(id: string, status: 'confirmed' | 'can
  * Admin: Update a service's details (name, duration, price, description).
  * Endpoint: PATCH /api/services/:id
  */
-export async function updateService(id: string, data: Partial<{ name: string; duration: number; price: number; description: string }>) {
+export async function updateService(id: string, data: Partial<{ name: string; duration: number; price: number; priceMax: number | null; description: string }>) {
   const res = await fetch(`${API_BASE}/services/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

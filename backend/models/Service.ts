@@ -6,7 +6,8 @@ import mongoose, { Schema, Document } from 'mongoose';
  * Fields:
  * - name: Display name of the service (e.g., "Sisterlocks™ Installation")
  * - duration: How long it takes in minutes
- * - price: Cost in KES
+ * - price: Base/minimum price in KES
+ * - priceMax: Optional maximum price in KES (used for price-range display, e.g. KES 2,000 – 5,000)
  * - description: Optional longer description
  * - image: Optional URL to a service image
  */
@@ -14,6 +15,7 @@ export interface IService extends Document {
   name: string;
   duration: number; // in minutes
   price: number;
+  priceMax?: number; // optional upper bound for price-range display
   description?: string;
   image?: string;
 }
@@ -22,6 +24,7 @@ const ServiceSchema: Schema = new Schema({
   name: { type: String, required: true },
   duration: { type: Number, required: true },
   price: { type: Number, required: true },
+  priceMax: { type: Number }, // optional — omit for fixed price, set for a range
   description: { type: String },
   image: { type: String },
 });
