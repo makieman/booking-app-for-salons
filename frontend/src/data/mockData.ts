@@ -12,6 +12,7 @@ export const FALLBACK_SERVICES: Service[] = [
     name: 'Sisterlocks™ Installation',
     duration: 1200,
     price: 10000,
+    priceMax: 20000,
     description: 'Professional installation by a certified consultant.',
     image: 'https://images.unsplash.com/photo-1582095133179-bfd08e2fc6b3?auto=format&fit=crop&q=80&w=400',
   },
@@ -20,6 +21,7 @@ export const FALLBACK_SERVICES: Service[] = [
     name: 'Retightening & Maintenance',
     duration: 240,
     price: 3500,
+    priceMax: 6000,
     description: 'Regular maintenance to keep your Sisterlocks neat and healthy.',
     image: 'https://images.unsplash.com/photo-1620331311520-246422fd82f9?auto=format&fit=crop&q=80&w=400',
   },
@@ -36,6 +38,7 @@ export const FALLBACK_SERVICES: Service[] = [
     name: 'Nails & Beauty',
     duration: 60,
     price: 1500,
+    priceMax: 4000,
     description: 'Manicure, pedicure, and other beauty treatments.',
     image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&q=80&w=400',
   },
@@ -44,10 +47,12 @@ export const FALLBACK_SERVICES: Service[] = [
     name: 'Human Hair Extensions',
     duration: 180,
     price: 15000,
+    priceMax: 35000,
     description: 'Premium human hair extension installation.',
     image: 'https://images.unsplash.com/photo-1522338140262-f46f5913618a?auto=format&fit=crop&q=80&w=400',
   },
 ];
+
 
 export const FALLBACK_TIME_SLOTS = [
   '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',

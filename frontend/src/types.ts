@@ -11,7 +11,8 @@ export interface Service {
   _id: string;        // MongoDB ObjectId (from the backend)
   name: string;
   duration: number;   // in minutes
-  price: number;
+  price: number;      // base / minimum price in KES
+  priceMax?: number;  // optional upper bound — set to show a range (e.g. KES 2,000 – 5,000)
   description: string;
   image: string;
 }

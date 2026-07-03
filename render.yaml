@@ -18,3 +18,13 @@ services:
         sync: false
       - key: FROM_EMAIL
         value: onboarding@resend.dev
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_MAILTO
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: OWNER_PIN
+        sync: false
