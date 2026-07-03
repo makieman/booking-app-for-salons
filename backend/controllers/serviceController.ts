@@ -7,11 +7,17 @@ import Service from '../models/Service';
  */
 export const createService = async (req: Request, res: Response) => {
   try {
-    const { name, duration, price, description } = req.body;
+    const { name, duration, price, priceMax, description } = req.body;
     if (!name || !duration || price === undefined) {
       return res.status(400).json({ error: 'name, duration, and price are required' });
     }
-    const newService = new Service({ name, duration: Number(duration), price: Number(price), description });
+    const newService = new Service({
+      name,
+      duration: Number(duration),
+      price: Number(price),
+      priceMax: priceMax !== undefined && priceMax !== null ? Number(priceMax) : undefined,
+      description
+    });
     await newService.save();
     res.status(201).json(newService);
   } catch (error) {
@@ -39,12 +45,15 @@ export const getServices = async (req: Request, res: Response) => {
 export const updateService = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, duration, price, description } = req.body;
+    const { name, duration, price, priceMax, description } = req.body;
 
     const updates: Record<string, any> = {};
     if (name !== undefined) updates.name = name;
     if (duration !== undefined) updates.duration = Number(duration);
     if (price !== undefined) updates.price = Number(price);
+    if (priceMax !== undefined) {
+      updates.priceMax = priceMax !== null && priceMax !== '' ? Number(priceMax) : null;
+    }
     if (description !== undefined) updates.description = description;
 
     const updated = await Service.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
@@ -55,3 +64,4 @@ export const updateService = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to update service' });
   }
 };
+
