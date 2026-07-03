@@ -68,6 +68,20 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  // System status toast notifications (e.g., success, info, warning)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const triggerToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+  };
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
   // Booking State
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -464,6 +478,28 @@ export default function App() {
                   <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-0.5">System Alert</p>
                   <p className="text-xs font-medium tracking-tight leading-snug">{apiError}</p>
                 </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              className="fixed top-6 left-1/2 -translate-x-1/2 z-[250] w-[85%] max-w-xs pointer-events-none"
+            >
+              <div className={`px-4 py-3 flex items-center gap-3 shadow-xl rounded-xl border text-white ${
+                toast.type === 'success' ? 'bg-[#2E7D32]/95 border-[#4CAF50]/20' : 'bg-[#C62828]/95 border-[#EF5350]/20'
+              }`}>
+                {toast.type === 'success' ? (
+                  <CheckCircle2 size={16} className="text-white shrink-0" />
+                ) : (
+                  <X size={16} className="text-white shrink-0" />
+                )}
+                <p className="text-xs font-bold tracking-tight leading-snug">{toast.message}</p>
               </div>
             </motion.div>
           )}
@@ -1637,7 +1673,6 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
     if (isNaN(newDuration) || newDuration <= 0) return;
     const rawPriceMax = editPriceMaxes[serviceId];
     const newPriceMax = rawPriceMax && rawPriceMax !== '' ? Number(rawPriceMax) : null;
-    setSavingPrice(serviceId);
     try {
       const updated = await api.updateService(serviceId, {
         price: newPrice,
@@ -1645,8 +1680,10 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
         priceMax: newPriceMax,
       });
       setServices(prev => prev.map(s => s._id === serviceId ? updated : s));
-    } catch (err) {
+      triggerToast('Service catalog updated successfully!', 'success');
+    } catch (err: any) {
       console.error(err);
+      triggerToast(err.message || 'Failed to update service details', 'error');
     } finally {
       setSavingPrice(null);
     }
@@ -1667,8 +1704,10 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
       setEditPrices(prev => ({ ...prev, [newService._id]: String(newService.price) }));
       setEditPriceMaxes(prev => ({ ...prev, [newService._id]: newService.priceMax ? String(newService.priceMax) : '' }));
       setAddForm({ name: '', duration: '', price: '', priceMax: '', description: '' });
-    } catch (err) {
+      triggerToast('New service added successfully!', 'success');
+    } catch (err: any) {
       console.error(err);
+      triggerToast(err.message || 'Failed to add new service', 'error');
     } finally {
       setAddLoading(false);
     }
