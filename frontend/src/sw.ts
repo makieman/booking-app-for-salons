@@ -8,6 +8,9 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
 declare const self: ServiceWorkerGlobalScope;
 
+import { saveNotification } from './utils/db';
+
+
 // ── Lifecycle: Take control immediately on activation ────────────────────────
 // This ensures users always get the latest version without a manual refresh.
 self.skipWaiting();
@@ -67,23 +70,41 @@ self.addEventListener('push', (event: PushEvent) => {
     sound?: 'default' | 'chime' | 'bell' | 'ding' | 'silent';
   };
 
+  const notificationId = `flo-booking-${Date.now()}`;
+
   event.waitUntil(
     (async () => {
+      // Save notification to IndexedDB
+      try {
+        await saveNotification({
+          id: notificationId,
+          title,
+          body,
+          url,
+          sound,
+          timestamp: Date.now(),
+          read: false,
+        });
+      } catch (err) {
+        console.error('[SW] Failed to save notification to IndexedDB:', err);
+      }
+
       // Show the notification
       await self.registration.showNotification(title, {
         body,
         icon:     '/android-chrome-192x192.png',
         badge:    '/favicon-32x32.png',
         vibrate:  sound === 'silent' ? [] : [100, 50, 100],
-        tag:      `flo-booking-${Date.now()}`,   // unique tag — prevents silent replacement
+        tag:      notificationId,   // unique tag — prevents silent replacement
         renotify: true,
         data:     { url, sound },
       } as any);
 
-      // Tell any open app window to play the sound
-      if (sound !== 'silent') {
-        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        for (const client of clients) {
+      // Tell any open app window to reload and play sound
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of clients) {
+        client.postMessage({ type: 'PUSH_NOTIFICATION_RECEIVED', id: notificationId });
+        if (sound !== 'silent') {
           client.postMessage({ type: 'PLAY_NOTIFICATION_SOUND', sound });
         }
       }

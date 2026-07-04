@@ -6,6 +6,7 @@ import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
 import { InstallPrompt } from './components/InstallPrompt';
 import { NotificationPrompt } from './components/NotificationPrompt';
+import { NotificationCenter } from './components/NotificationCenter';
 import { useAdminPushNotifications } from './hooks/useAdminPushNotifications';
 import { useAttendantPushNotifications } from './hooks/useAttendantPushNotifications';
 import { useNotificationSound } from './hooks/useNotificationSound';
@@ -323,6 +324,44 @@ export default function App() {
     setLookupError(null);
     setReschedulingBooking(null);
     setCancellingBookingId(null);
+  };
+
+  const handleNotificationNavigate = (url: string) => {
+    if (url.startsWith('/attendant')) {
+      if (attendantSession) {
+        setUserMode('attendant');
+      } else {
+        setLoginTab('staff');
+        setShowPinModal(true);
+      }
+    } else if (url.startsWith('/admin') || url.startsWith('/owner')) {
+      if (ownerSessionPin === ADMIN_PIN) {
+        setUserMode('owner');
+      } else {
+        setLoginTab('owner');
+        setShowPinModal(true);
+      }
+    } else {
+      setUserMode('customer');
+      const bookingMatch = url.match(/\/bookings\/([A-Za-z0-9-]+)/);
+      if (bookingMatch && bookingMatch[1]) {
+        const queryVal = bookingMatch[1];
+        setLookupQuery(queryVal);
+        setActiveStep('lookup');
+        setLookupLoading(true);
+        setLookupError(null);
+        api.lookupBookings(queryVal.includes('-') ? { reference: queryVal } : { phone: queryVal })
+          .then(data => {
+            setLookupResults(data || []);
+          })
+          .catch(err => {
+            setLookupError(err?.message || 'Booking lookup failed');
+          })
+          .finally(() => setLookupLoading(false));
+      } else {
+        resetFlow();
+      }
+    }
   };
 
   const handleStepBack = () => {
@@ -737,6 +776,7 @@ export default function App() {
             <a href="tel:0721530120" className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
               <Phone size={18} />
             </a>
+            <NotificationCenter onNavigate={handleNotificationNavigate} />
             <button
               onClick={() => {
                 if (userMode === 'owner') {
