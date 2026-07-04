@@ -66,3 +66,16 @@
 .luxury-card {
   @apply bg-brand-white border border-brand-gray-100 hover:border-brand-black transition-all duration-700 shadow-sm hover:shadow-luxury;
 }
+
+@keyframes swing {
+  0%, 100% { transform: rotate(0); }
+  10%, 30%, 50%, 70%, 90% { transform: rotate(10deg); }
+  20%, 40%, 60%, 80% { transform: rotate(-10deg); }
+}
+
+.animate-swing {
+  animation: swing 1.2s ease-in-out;
+  animation-iteration-count: 2; /* Swing twice on mount or when count changes */
+  transform-origin: top center;
+}
+
