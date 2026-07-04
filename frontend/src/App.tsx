@@ -452,9 +452,7 @@ export default function App() {
     );
   }
 
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-brand-white font-serif italic text-brand-gray-400">Loading...</div>;
-  }
+
 
   try {
     return (
@@ -832,7 +830,11 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-col gap-3">
-                        {filteredServices.length > 0 ? (
+                        {isLoading ? (
+                          Array.from({ length: 5 }).map((_, i) => (
+                            <ServiceSelectionCardSkeleton key={i} />
+                          ))
+                        ) : filteredServices.length > 0 ? (
                           filteredServices.map(service => (
                             <ServiceSelectionCard
                               key={service._id}
@@ -1471,6 +1473,21 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function ServiceSelectionCardSkeleton() {
+  return (
+    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[#E6D3C3] bg-white overflow-hidden animate-pulse">
+      <div className="flex-1 space-y-2.5">
+        <div className="h-4 w-2/3 bg-[#EFE7DD] rounded-full" />
+        <div className="h-3 w-1/3 bg-[#EFE7DD] rounded-full" />
+      </div>
+      <div className="flex flex-col items-end gap-3">
+        <div className="w-5 h-5 rounded-full bg-[#EFE7DD]" />
+        <div className="h-3.5 w-14 bg-[#EFE7DD] rounded-full" />
+      </div>
     </div>
   );
 }
