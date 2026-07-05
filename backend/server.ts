@@ -17,6 +17,7 @@ import bookingRoutes from './routes/bookingRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
 import adminRoutes from './routes/adminRoutes';
 import pushRoutes from './routes/pushRoutes';
+import notificationRoutes from './routes/notificationRoutes';
 import authRoutes from './routes/authRoutes';
 import attendantRoutes from './routes/attendantRoutes';
 
@@ -132,6 +133,7 @@ async function startServer(): Promise<void> {
   app.use('/api/availability', availabilityRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/push', pushRoutes);
+  app.use('/api/notifications', notificationRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/attendant', attendantRoutes);
 

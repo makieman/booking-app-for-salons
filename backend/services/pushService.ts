@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import PushSubscription from '../models/PushSubscription';
+import NotificationModel from '../models/Notification';
 
 // ── VAPID lazy initialisation ─────────────────────────────────────────────────
 // We set VAPID details on first use so a missing key doesn't crash startup.
@@ -117,6 +118,26 @@ export async function sendPushToAdmins(
     return;
   }
 
+  // Save notification to MongoDB
+  try {
+    const notif = new NotificationModel({
+      recipientId: 'admin',
+      recipientType: 'admin',
+      title: payload.title,
+      body: payload.body,
+      url: payload.url || '/',
+      sound: payload.sound || 'default',
+    });
+    const saved = await notif.save();
+    // Inject DB ID as unique tag into payload
+    payload = {
+      ...payload,
+      id: saved._id.toString(),
+    } as any;
+  } catch (err) {
+    console.error('[pushService] Failed to write admin notification to DB:', err);
+  }
+
   let subscriptions;
   try {
     const query: any = { role: 'admin' };
@@ -153,6 +174,26 @@ export async function sendPushToAttendant(
   try { ensureVapid(); } catch (err) {
     console.error('[pushService] VAPID init failed:', err);
     return;
+  }
+
+  // Save notification to MongoDB
+  try {
+    const notif = new NotificationModel({
+      recipientId: attendantId,
+      recipientType: 'attendant',
+      title: payload.title,
+      body: payload.body,
+      url: payload.url || '/',
+      sound: payload.sound || 'default',
+    });
+    const saved = await notif.save();
+    // Inject DB ID as unique tag into payload
+    payload = {
+      ...payload,
+      id: saved._id.toString(),
+    } as any;
+  } catch (err) {
+    console.error('[pushService] Failed to write attendant notification to DB:', err);
   }
 
   let subscriptions;
