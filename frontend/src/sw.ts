@@ -59,21 +59,42 @@ registerRoute(
   }),
 );
 
-// ── Push Notification Handler ─────────────────────────────────────────────────
 self.addEventListener('push', (event: PushEvent) => {
   if (!event.data) return;
 
-  const { title, body, url = '/', sound = 'default' } = event.data.json() as {
-    title: string;
-    body: string;
-    url?: string;
-    sound?: 'default' | 'chime' | 'bell' | 'ding' | 'silent';
-  };
-
-  const notificationId = `flo-booking-${Date.now()}`;
-
   event.waitUntil(
     (async () => {
+      let rawJson: any;
+      try {
+        rawJson = event.data.json();
+      } catch (e) {
+        console.error('[SW] Failed to parse push payload as JSON:', e);
+        return;
+      }
+
+      if (!rawJson || !rawJson.title || !rawJson.body) {
+        console.warn('[SW] Push payload missing title or body:', rawJson);
+        return;
+      }
+
+      const { title, body, url = '/', sound = 'default' } = rawJson;
+      // Use backend ID or tag if provided, otherwise generate one
+      const notificationId = rawJson.id || rawJson.tag || `flo-booking-${Date.now()}`;
+
+      try {
+        const existing = await getNotifications();
+        const isDuplicate = existing.some(
+          (n) => n.id === notificationId || 
+          (n.title === title && n.body === body && Date.now() - n.timestamp < 5000)
+        );
+        if (isDuplicate) {
+          console.log('[SW] Duplicate push notification blocked:', notificationId);
+          return;
+        }
+      } catch (err) {
+        console.warn('[SW] Duplicate check failed, continuing:', err);
+      }
+
       // Save notification to IndexedDB
       try {
         await saveNotification({

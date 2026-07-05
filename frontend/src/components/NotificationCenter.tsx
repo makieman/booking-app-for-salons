@@ -1,20 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Trash2, CheckCheck, X, Volume2 } from 'lucide-react';
+import { Bell, Trash2, CheckCheck, Volume2, RefreshCw } from 'lucide-react';
 import { useInAppNotifications } from '../hooks/useInAppNotifications';
 
 interface NotificationCenterProps {
   onNavigate?: (url: string) => void;
+  token?: string;
+  ownerPin?: string;
 }
 
-export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
+export function NotificationCenter({ onNavigate, token, ownerPin }: NotificationCenterProps) {
   const {
     notifications,
     unreadCount,
+    isLoading,
     markAsRead,
     markAllAsRead,
     deleteNotification,
     clearAll,
-  } = useInAppNotifications();
+  } = useInAppNotifications({ token, ownerPin });
 
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +48,17 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
     });
   };
 
+  // Group notifications into Today vs Earlier
+  const grouped = notifications.reduce(
+    (acc, item) => {
+      const isToday = new Date(item.timestamp).toDateString() === new Date().toDateString();
+      const groupKey = isToday ? 'Today' : 'Earlier';
+      acc[groupKey].push(item);
+      return acc;
+    },
+    { Today: [], Earlier: [] } as Record<'Today' | 'Earlier', typeof notifications>
+  );
+
   return (
     <div className="relative" ref={containerRef}>
       {/* Bell Trigger */}
@@ -71,9 +85,14 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
           {/* Header */}
           <div className="p-4 border-b border-brand-gray-100 flex items-center justify-between">
             <div>
-              <h3 className="font-serif italic font-black text-lg text-brand-black leading-none">
-                Notifications
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif italic font-black text-lg text-brand-black leading-none">
+                  Notifications
+                </h3>
+                {isLoading && (
+                  <RefreshCw size={12} className="animate-spin text-brand-gray-400" />
+                )}
+              </div>
               <p className="text-[10px] font-black uppercase tracking-wider text-brand-gray-400 mt-1">
                 {unreadCount} UNREAD
               </p>
@@ -104,71 +123,98 @@ export function NotificationCenter({ onNavigate }: NotificationCenterProps) {
           <div className="flex-1 overflow-y-auto divide-y divide-brand-gray-100/50 scrollbar-hide max-h-[350px]">
             {notifications.length === 0 ? (
               <div className="py-12 px-4 text-center flex flex-col items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-brand-gray-50 flex items-center justify-center text-brand-gray-300 mb-3">
-                  <Bell size={20} />
-                </div>
-                <p className="font-serif italic text-sm text-brand-gray-400">
-                  No notifications yet
-                </p>
-                <p className="text-[11px] text-brand-gray-400/80 mt-1 max-w-[200px] leading-relaxed">
-                  We'll let you know here when your appointment status updates.
-                </p>
+                {isLoading ? (
+                  <div className="w-12 h-12 rounded-full bg-brand-gray-50 flex items-center justify-center mb-3">
+                    <RefreshCw size={20} className="animate-spin text-brand-gray-400" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-brand-gray-50 flex items-center justify-center text-brand-gray-300 mb-3">
+                      <Bell size={20} />
+                    </div>
+                    <p className="font-serif italic text-sm text-brand-gray-400">
+                      No notifications yet
+                    </p>
+                    <p className="text-[11px] text-brand-gray-400/80 mt-1 max-w-[200px] leading-relaxed">
+                      We'll let you know here when appointment updates arrive.
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
-              notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  onClick={() => {
-                    markAsRead(notification.id);
-                    if (onNavigate && notification.url) {
-                      onNavigate(notification.url);
-                    }
-                    setIsOpen(false);
-                  }}
-                  className={`p-4 flex gap-3 transition-colors duration-300 cursor-pointer relative group ${
-                    notification.read ? 'bg-transparent' : 'bg-brand-gray-50/40 hover:bg-brand-gray-50/70'
-                  }`}
-                >
-                  {/* Status Indicator */}
-                  {!notification.read && (
-                    <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-brand-black rounded-full" />
-                  )}
+              (['Today', 'Earlier'] as const).map((groupKey) => {
+                const groupItems = grouped[groupKey];
+                if (groupItems.length === 0) return null;
 
-                  {/* Icon */}
-                  <div className="shrink-0 w-9 h-9 rounded-full bg-brand-gray-50 flex items-center justify-center text-brand-gray-600 border border-brand-gray-100">
-                    <Volume2 size={14} className={notification.read ? 'opacity-40' : 'opacity-100'} />
-                  </div>
+                return (
+                  <div key={groupKey} className="flex flex-col">
+                    {/* Group Title Section */}
+                    <div className="bg-brand-gray-50/50 px-4 py-1.5 border-y border-brand-gray-100/30">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-brand-gray-400">
+                        {groupKey}
+                      </span>
+                    </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0 pr-6">
-                    <p className={`text-xs sm:text-sm font-black leading-tight text-brand-black ${
-                      notification.read ? 'font-medium opacity-70' : 'font-black'
-                    }`}>
-                      {notification.title}
-                    </p>
-                    <p className="text-xs text-brand-gray-500 mt-1 leading-relaxed break-words">
-                      {notification.body}
-                    </p>
-                    <span className="text-[10px] text-brand-gray-400 block mt-1.5">
-                      {formatTime(notification.timestamp)}
-                    </span>
-                  </div>
+                    {/* Group Items */}
+                    <div className="divide-y divide-brand-gray-100/30">
+                      {groupItems.map((notification) => (
+                        <div
+                          key={notification.id}
+                          onClick={() => {
+                            markAsRead(notification.id);
+                            if (onNavigate && notification.url) {
+                              onNavigate(notification.url);
+                            }
+                            setIsOpen(false);
+                          }}
+                          className={`p-4 flex gap-3 transition-colors duration-300 cursor-pointer relative group ${
+                            notification.read ? 'bg-transparent hover:bg-brand-gray-50/20' : 'bg-brand-gray-50/40 hover:bg-brand-gray-50/70'
+                          }`}
+                        >
+                          {/* Status Indicator */}
+                          {!notification.read && (
+                            <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-brand-black rounded-full" />
+                          )}
 
-                  {/* Actions (Delete single) */}
-                  <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteNotification(notification.id);
-                      }}
-                      className="p-1 rounded-md text-brand-gray-400 hover:text-red-500 hover:bg-brand-gray-100 transition-all"
-                      title="Delete notification"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                          {/* Icon */}
+                          <div className="shrink-0 w-9 h-9 rounded-full bg-brand-gray-50 flex items-center justify-center text-brand-gray-600 border border-brand-gray-100">
+                            <Volume2 size={14} className={notification.read ? 'opacity-40' : 'opacity-100'} />
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0 pr-6">
+                            <p className={`text-xs sm:text-sm leading-tight text-brand-black ${
+                              notification.read ? 'font-medium opacity-70' : 'font-black'
+                            }`}>
+                              {notification.title}
+                            </p>
+                            <p className="text-xs text-brand-gray-500 mt-1 leading-relaxed break-words">
+                              {notification.body}
+                            </p>
+                            <span className="text-[10px] text-brand-gray-400 block mt-1.5">
+                              {formatTime(notification.timestamp)}
+                            </span>
+                          </div>
+
+                          {/* Actions (Delete single) */}
+                          <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteNotification(notification.id);
+                              }}
+                              className="p-1 rounded-md text-brand-gray-400 hover:text-red-500 hover:bg-brand-gray-100 transition-all"
+                              title="Delete notification"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

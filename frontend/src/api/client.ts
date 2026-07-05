@@ -354,3 +354,86 @@ export async function rescheduleBookingCustomer(id: string, data: { date: string
   }
   return res.json();
 }
+
+/**
+ * Helper to build auth headers for notifications (Bearer token or X-Owner-Pin)
+ */
+function notificationHeaders(auth: { token?: string; ownerPin?: string }): HeadersInit {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (auth.ownerPin) {
+    headers['X-Owner-Pin'] = auth.ownerPin;
+  } else if (auth.token) {
+    headers['Authorization'] = `Bearer ${auth.token}`;
+  }
+  return headers;
+}
+
+/**
+ * Fetch top 50 notifications from backend
+ */
+export async function getBackendNotifications(auth: { token?: string; ownerPin?: string }): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/notifications`, {
+    headers: notificationHeaders(auth),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to load notifications');
+  }
+  return res.json();
+}
+
+/**
+ * Mark a single notification as read
+ */
+export async function markBackendNotificationAsRead(id: string, auth: { token?: string; ownerPin?: string }): Promise<void> {
+  const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+    method: 'PATCH',
+    headers: notificationHeaders(auth),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to mark notification read');
+  }
+}
+
+/**
+ * Mark all notifications as read
+ */
+export async function markAllBackendNotificationsRead(auth: { token?: string; ownerPin?: string }): Promise<void> {
+  const res = await fetch(`${API_BASE}/notifications/read-all`, {
+    method: 'POST',
+    headers: notificationHeaders(auth),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to mark all notifications read');
+  }
+}
+
+/**
+ * Delete a single notification
+ */
+export async function deleteBackendNotification(id: string, auth: { token?: string; ownerPin?: string }): Promise<void> {
+  const res = await fetch(`${API_BASE}/notifications/${id}`, {
+    method: 'DELETE',
+    headers: notificationHeaders(auth),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to delete notification');
+  }
+}
+
+/**
+ * Clear all notifications
+ */
+export async function clearAllBackendNotifications(auth: { token?: string; ownerPin?: string }): Promise<void> {
+  const res = await fetch(`${API_BASE}/notifications`, {
+    method: 'DELETE',
+    headers: notificationHeaders(auth),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to clear notifications');
+  }
+}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Settings, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -776,7 +776,11 @@ export default function App() {
             <a href="tel:0721530120" className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
               <Phone size={18} />
             </a>
-            <NotificationCenter onNavigate={handleNotificationNavigate} />
+            <NotificationCenter 
+              onNavigate={handleNotificationNavigate} 
+              token={attendantSession?.token} 
+              ownerPin={ownerSessionPin} 
+            />
             <button
               onClick={() => {
                 if (userMode === 'owner') {
@@ -800,7 +804,7 @@ export default function App() {
               }}
               className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500"
             >
-              {userMode === 'owner' ? <LayoutDashboard size={18} /> : userMode === 'attendant' ? <User size={18} /> : <Settings size={18} />}
+              {userMode === 'owner' ? <LayoutDashboard size={18} /> : userMode === 'attendant' ? <User size={18} /> : <Shield size={18} />}
             </button>
           </div>
         </header>
@@ -869,7 +873,7 @@ export default function App() {
                         ))}
                       </div>
 
-                      <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-3 pb-24">
                         {isLoading ? (
                           Array.from({ length: 5 }).map((_, i) => (
                             <ServiceSelectionCardSkeleton key={i} />
@@ -889,15 +893,24 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      <div className="pt-4 sticky bottom-4 z-10 bg-gradient-to-t from-[#FAF7F3] via-[#FAF7F3] to-transparent pb-4">
-                        <button
-                          disabled={!selectedService}
-                          onClick={() => setActiveStep('date')}
-                          className="w-full bg-[#B08968] text-white py-4.5 rounded-full font-semibold uppercase tracking-wider text-sm transition-all disabled:opacity-40 hover:bg-[#9c7554] active:scale-[0.98] shadow-md hover:shadow-lg"
-                        >
-                          Continue
-                        </button>
-                      </div>
+                      <AnimatePresence>
+                        {selectedService && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+                            className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-8 z-50"
+                          >
+                            <button
+                              onClick={() => setActiveStep('date')}
+                              className="w-full bg-[#B08968] text-white py-4.5 rounded-full font-semibold uppercase tracking-wider text-sm shadow-2xl hover:bg-[#9c7554] active:scale-[0.98] transition-all cursor-pointer"
+                            >
+                              Continue
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </motion.div>
                   )}
 
