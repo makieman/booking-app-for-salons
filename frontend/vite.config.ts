@@ -27,6 +27,7 @@ export default defineConfig({
         'android-chrome-192x192.png',
         'android-chrome-512x512.png',
         'logo-transparent.png',
+        'logo-bg.jpg',
       ],
       manifest: {
         name: 'Flo Sisterlocks',

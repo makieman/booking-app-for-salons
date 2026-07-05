@@ -748,11 +748,11 @@ export default function App() {
 
         <header className="px-4 sm:px-8 py-6 sm:py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100">
           <div className="flex items-center gap-5 cursor-pointer group" onClick={resetFlow}>
-            <div className="h-16 w-16 bg-brand-black rounded-full flex items-center justify-center p-3 transition-transform duration-500 group-hover:scale-105">
+            <div className="h-16 w-16 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
               <img
-                src="/logo-transparent.png"
+                src="/logo-bg.jpg"
                 alt="Flobooking Logo"
-                className="h-full w-auto object-contain"
+                className="h-full w-auto object-contain rounded-full"
               />
             </div>
             {/* Show attendant name badge when in staff mode */}
