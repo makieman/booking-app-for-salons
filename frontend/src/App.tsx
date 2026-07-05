@@ -1656,6 +1656,14 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
   const [staffAddLoading, setStaffAddLoading] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
 
+  // Edit staff state
+  const [editingAttendantId, setEditingAttendantId] = useState<string | null>(null);
+  const [editStaffForm, setEditStaffForm] = useState({ name: '', pin: '', serviceIds: [] as string[] });
+  const [editStaffSaving, setEditStaffSaving] = useState(false);
+  const [editStaffError, setEditStaffError] = useState<string | null>(null);
+  const [addStaffSearchQuery, setAddStaffSearchQuery] = useState('');
+  const [editStaffSearchQuery, setEditStaffSearchQuery] = useState('');
+
   const todayStr = new Date().toISOString().split('T')[0];
   const todaysConfirmed = confirmedBookings.filter(b => b.date === todayStr && b.status === 'confirmed');
   const sortedToday = [...todaysConfirmed].sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -2380,47 +2388,203 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                     <div className="p-16 text-center border border-brand-gray-100 bg-white font-serif italic text-brand-gray-300 shadow-sm">Loading...</div>
                   ) : attendants.length === 0 ? (
                     <div className="p-16 text-center border border-brand-gray-100 bg-white font-serif italic text-brand-gray-300 shadow-sm">No staff accounts yet.</div>
-                  ) : attendants.map(a => (
-                    <div key={a._id} className={`border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all bg-white shadow-sm hover:border-brand-black ${a.isActive !== false ? 'border-brand-gray-100' : 'border-brand-gray-50 opacity-40'
-                      }`}>
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-brand-black flex-shrink-0 flex items-center justify-center text-white font-black text-xs font-serif italic shadow-sm">
-                          {a.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-serif italic text-lg sm:text-xl leading-none text-brand-black">{a.name}</p>
-                          <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-500 mt-1">@{a.username}</p>
-                        </div>
+                  ) : attendants.map(a => {
+                    const isEditing = editingAttendantId === a._id;
+                    return (
+                      <div key={a._id} className={`border rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all bg-white shadow-sm hover:border-brand-black ${a.isActive !== false ? 'border-brand-gray-100' : 'border-brand-gray-50 opacity-40'
+                        }`}>
+                        {isEditing ? (
+                          <div className="w-full space-y-4">
+                            <div className="flex justify-between items-center border-b border-brand-gray-100 pb-2">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-gray-600">Edit Staff Member</p>
+                              <button type="button" onClick={() => setEditingAttendantId(null)} className="text-brand-gray-400 hover:text-brand-black transition-colors">
+                                <X size={16} />
+                              </button>
+                            </div>
+                            {editStaffError && (
+                              <p className="text-red-500 text-[10px] font-black uppercase tracking-widest">{editStaffError}</p>
+                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Display Name</label>
+                                <input
+                                  type="text"
+                                  value={editStaffForm.name}
+                                  onChange={e => setEditStaffForm(p => ({ ...p, name: e.target.value }))}
+                                  className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-1.5 font-bold text-sm bg-transparent"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">PIN (4–6 digits, optional)</label>
+                                <input
+                                  type="password"
+                                  maxLength={6}
+                                  placeholder="Leave blank to keep current"
+                                  value={editStaffForm.pin}
+                                  onChange={e => setEditStaffForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, '') }))}
+                                  className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-1.5 font-bold text-sm bg-transparent tracking-[0.5em]"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2.5">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">
+                                  Services Offered ({editStaffForm.serviceIds.length})
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Search services..."
+                                  value={editStaffSearchQuery}
+                                  onChange={e => setEditStaffSearchQuery(e.target.value)}
+                                  className="border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-1 font-bold text-xs bg-transparent w-full sm:w-48 placeholder:font-normal placeholder:text-brand-gray-300"
+                                />
+                              </div>
+                              <div className="max-h-48 overflow-y-auto border border-brand-gray-100 rounded-[10px] p-2 space-y-1 bg-brand-gray-50/50">
+                                {services
+                                  .filter(s => s.name.toLowerCase().includes(editStaffSearchQuery.toLowerCase()))
+                                  .map(s => {
+                                    const isSelected = editStaffForm.serviceIds.includes(s._id);
+                                    return (
+                                      <button
+                                        key={s._id}
+                                        type="button"
+                                        onClick={() => setEditStaffForm(p => ({
+                                          ...p,
+                                          serviceIds: isSelected
+                                            ? p.serviceIds.filter(id => id !== s._id)
+                                            : [...p.serviceIds, s._id]
+                                        }))}
+                                        className={`w-full flex items-center justify-between p-2.5 rounded-md border text-left transition-all active:scale-[0.99] ${
+                                          isSelected
+                                            ? 'bg-brand-black/5 border-brand-black text-brand-black font-semibold'
+                                            : 'border-transparent hover:bg-brand-gray-50 text-brand-gray-700 bg-white shadow-sm'
+                                        }`}
+                                      >
+                                        <span className="text-[11px] uppercase tracking-wider font-medium">{s.name}</span>
+                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                                          isSelected ? 'bg-brand-black border-brand-black text-white' : 'border-brand-gray-300'
+                                        }`}>
+                                          {isSelected && <CheckCircle2 size={10} />}
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                {services.filter(s => s.name.toLowerCase().includes(editStaffSearchQuery.toLowerCase())).length === 0 && (
+                                  <div className="p-4 text-center text-brand-gray-400 text-xs italic">No matching services.</div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => setEditingAttendantId(null)}
+                                className="px-4 py-2 border border-brand-gray-200 text-brand-gray-600 hover:border-brand-black hover:text-brand-black text-[10px] font-black uppercase tracking-widest rounded-[10px] active:scale-95 bg-white transition-all min-h-[38px]"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!editStaffForm.name || (editStaffForm.pin.length > 0 && editStaffForm.pin.length < 4) || editStaffSaving}
+                                onClick={async () => {
+                                  setEditStaffSaving(true);
+                                  setEditStaffError(null);
+                                  try {
+                                    const updatePayload: any = {
+                                      name: editStaffForm.name.trim(),
+                                      serviceIds: editStaffForm.serviceIds
+                                    };
+                                    if (editStaffForm.pin) {
+                                      updatePayload.pin = editStaffForm.pin;
+                                    }
+                                    const updated = await api.updateAttendant(ownerPin, a._id, updatePayload);
+                                    setAttendants(prev => prev.map(x => x._id === a._id ? updated : x));
+                                    setEditingAttendantId(null);
+                                  } catch (err: any) {
+                                    setEditStaffError(err.message || 'Failed to update staff member');
+                                  } finally {
+                                    setEditStaffSaving(false);
+                                  }
+                                }}
+                                className="px-4 py-2 bg-brand-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-brand-gray-800 rounded-[10px] active:scale-95 disabled:opacity-30 flex items-center gap-1.5 transition-all min-h-[38px]"
+                              >
+                                {editStaffSaving && (
+                                  <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                )}
+                                Save Changes
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-full bg-brand-black flex-shrink-0 flex items-center justify-center text-white font-black text-xs font-serif italic shadow-sm">
+                                {a.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-serif italic text-lg sm:text-xl leading-none text-brand-black">{a.name}</p>
+                                <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-500 mt-1">@{a.username}</p>
+                                <p className="text-[10px] font-bold text-brand-gray-400 uppercase tracking-wider mt-1.5">
+                                  {a.serviceIds && a.serviceIds.length > 0 ? (
+                                    `${a.serviceIds.length} services offered`
+                                  ) : (
+                                    'No services assigned'
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-start sm:justify-end">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingAttendantId(a._id);
+                                  const currentIds = (a.serviceIds || []).map((s: any) => typeof s === 'object' ? s._id : s);
+                                  setEditStaffForm({
+                                    name: a.name,
+                                    pin: '',
+                                    serviceIds: currentIds
+                                  });
+                                  setEditStaffError(null);
+                                  setEditStaffSearchQuery('');
+                                }}
+                                className="px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-brand-gray-200 text-brand-gray-600 hover:border-brand-black hover:text-brand-black bg-transparent transition-all rounded-[10px] active:scale-95 text-center min-h-[38px]"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  api.updateAttendant(ownerPin, a._id, { isActive: !a.isActive })
+                                    .then(updated => setAttendants(prev => prev.map(x => x._id === a._id ? updated : x)))
+                                    .catch(console.error);
+                                }}
+                                className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[10px] active:scale-95 text-center min-h-[38px] ${a.isActive !== false
+                                    ? 'border-brand-gray-200 text-brand-gray-600 hover:border-brand-black hover:text-brand-black bg-transparent'
+                                    : 'border-brand-black bg-brand-black text-white hover:bg-brand-gray-800'
+                                  }`}
+                              >
+                                {a.isActive !== false ? 'Deactivate' : 'Activate'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to delete ${a.name}? This cannot be undone.`)) {
+                                    api.deleteAttendant(ownerPin, a._id)
+                                      .then(() => setAttendants(prev => prev.filter(x => x._id !== a._id)))
+                                      .catch(err => alert(err.message || 'Failed to delete staff account'));
+                                  }
+                                }}
+                                className="px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-500 transition-all rounded-[10px] active:scale-95 text-center min-h-[38px] bg-transparent"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        <button
-                          onClick={() => {
-                            api.updateAttendant(ownerPin, a._id, { isActive: !a.isActive })
-                              .then(updated => setAttendants(prev => prev.map(x => x._id === a._id ? updated : x)))
-                              .catch(console.error);
-                          }}
-                          className={`flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest border transition-all rounded-[10px] active:scale-95 text-center min-h-[38px] ${a.isActive !== false
-                              ? 'border-brand-gray-200 text-brand-gray-600 hover:border-brand-black hover:text-brand-black bg-transparent'
-                              : 'border-brand-black bg-brand-black text-white hover:bg-brand-gray-800'
-                            }`}
-                        >
-                          {a.isActive !== false ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Are you sure you want to delete ${a.name}? This cannot be undone.`)) {
-                              api.deleteAttendant(ownerPin, a._id)
-                                .then(() => setAttendants(prev => prev.filter(x => x._id !== a._id)))
-                                .catch(err => alert(err.message || 'Failed to delete staff account'));
-                            }
-                          }}
-                          className="flex-1 sm:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-500 transition-all rounded-[10px] active:scale-95 text-center min-h-[38px] bg-transparent"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Add staff form */}
@@ -2462,27 +2626,51 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                       />
                     </div>
                     <div className="space-y-2.5">
-                      <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Services Offered</label>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {services.map(s => (
-                          <button
-                            key={s._id}
-                            type="button"
-                            onClick={() => setStaffForm(p => ({
-                              ...p,
-                              serviceIds: p.serviceIds.includes(s._id)
-                                ? p.serviceIds.filter(id => id !== s._id)
-                                : [...p.serviceIds, s._id]
-                            }))}
-                            className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest border transition-all active:scale-95 flex items-center gap-1.5 ${staffForm.serviceIds.includes(s._id)
-                                ? 'bg-brand-black text-white border-brand-black shadow-sm'
-                                : 'border-brand-gray-200 text-brand-gray-600 hover:border-brand-black hover:text-brand-black bg-white'
-                              }`}
-                          >
-                            {staffForm.serviceIds.includes(s._id) && <CheckCircle2 size={10} />}
-                            {s.name}
-                          </button>
-                        ))}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">
+                          Services Offered ({staffForm.serviceIds.length})
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Search services..."
+                          value={addStaffSearchQuery}
+                          onChange={e => setAddStaffSearchQuery(e.target.value)}
+                          className="border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-1 font-bold text-xs bg-transparent w-full sm:w-48 placeholder:font-normal placeholder:text-brand-gray-300"
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto border border-brand-gray-100 rounded-[10px] p-2 space-y-1 bg-brand-gray-50/50">
+                        {services
+                          .filter(s => s.name.toLowerCase().includes(addStaffSearchQuery.toLowerCase()))
+                          .map(s => {
+                            const isSelected = staffForm.serviceIds.includes(s._id);
+                            return (
+                              <button
+                                key={s._id}
+                                type="button"
+                                onClick={() => setStaffForm(p => ({
+                                  ...p,
+                                  serviceIds: isSelected
+                                    ? p.serviceIds.filter(id => id !== s._id)
+                                    : [...p.serviceIds, s._id]
+                                }))}
+                                className={`w-full flex items-center justify-between p-2.5 rounded-md border text-left transition-all active:scale-[0.99] ${
+                                  isSelected
+                                    ? 'bg-brand-black/5 border-brand-black text-brand-black font-semibold'
+                                    : 'border-transparent hover:bg-brand-gray-50 text-brand-gray-700 bg-white shadow-sm'
+                                }`}
+                              >
+                                <span className="text-[11px] uppercase tracking-wider font-medium">{s.name}</span>
+                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+                                  isSelected ? 'bg-brand-black border-brand-black text-white' : 'border-brand-gray-300'
+                                }`}>
+                                  {isSelected && <CheckCircle2 size={10} />}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        {services.filter(s => s.name.toLowerCase().includes(addStaffSearchQuery.toLowerCase())).length === 0 && (
+                          <div className="p-4 text-center text-brand-gray-400 text-xs italic">No matching services.</div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2495,6 +2683,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                         const created = await api.createAttendant(ownerPin, staffForm);
                         setAttendants(prev => [...prev, created]);
                         setStaffForm({ name: '', username: '', pin: '', serviceIds: [] });
+                        setAddStaffSearchQuery('');
                       } catch (err: any) {
                         setStaffError(err.message || 'Failed to create staff account');
                       } finally {
