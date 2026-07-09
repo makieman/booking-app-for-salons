@@ -1,35 +1,32 @@
 import { Request, Response } from 'express';
 import Notification from '../models/Notification';
 
-// Helper to determine the recipient details from request auth headers
-export function getRecipientInfo(req: Request): { recipientId: string; recipientType: 'admin' | 'attendant' } | null {
-  // Check if owner pin matches
-  const pin = req.headers['x-owner-pin'] as string | undefined;
-  const validPin = process.env.OWNER_PIN ?? '1234';
-  if (pin && pin === validPin) {
-    return { recipientId: 'admin', recipientType: 'admin' };
+/**
+ * Determines who is making the notification request from JWT-based auth.
+ * - req.owner  → recipientType: 'admin',     recipientId: tenant ObjectId string
+ * - req.attendant → recipientType: 'attendant', recipientId: attendant ObjectId string
+ * The X-Owner-Pin fallback has been removed; all callers must use JWT auth.
+ */
+function getRecipientInfo(req: Request): { recipientId: string; recipientType: 'admin' | 'attendant' } | null {
+  if (req.owner) {
+    return { recipientId: req.tenant!._id.toString(), recipientType: 'admin' };
   }
-
-  // Check if attendant session exists
   if (req.attendant?.id) {
     return { recipientId: req.attendant.id, recipientType: 'attendant' };
   }
-
   return null;
 }
 
 export const getNotifications = async (req: Request, res: Response): Promise<void> => {
   try {
     const recipient = getRecipientInfo(req);
-    if (!recipient) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
+    if (!recipient) { res.status(401).json({ error: 'Authentication required' }); return; }
 
-    const { recipientId, recipientType } = recipient;
-    const list = await Notification.find({ recipientId, recipientType })
-      .sort({ createdAt: -1 })
-      .limit(50); // SaaS-grade limit
+    const list = await Notification.find({
+      tenantId: req.tenant!._id,
+      recipientId: recipient.recipientId,
+      recipientType: recipient.recipientType,
+    }).sort({ createdAt: -1 }).limit(50);
 
     res.json(list);
   } catch (error) {
@@ -41,23 +38,16 @@ export const getNotifications = async (req: Request, res: Response): Promise<voi
 export const markAsRead = async (req: Request, res: Response): Promise<void> => {
   try {
     const recipient = getRecipientInfo(req);
-    if (!recipient) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
+    if (!recipient) { res.status(401).json({ error: 'Authentication required' }); return; }
 
     const { id } = req.params;
     const notif = await Notification.findOneAndUpdate(
-      { _id: id, recipientId: recipient.recipientId, recipientType: recipient.recipientType },
+      { _id: id, tenantId: req.tenant!._id, recipientId: recipient.recipientId, recipientType: recipient.recipientType },
       { read: true },
       { new: true }
     );
 
-    if (!notif) {
-      res.status(404).json({ error: 'Notification not found' });
-      return;
-    }
-
+    if (!notif) { res.status(404).json({ error: 'Notification not found' }); return; }
     res.json({ success: true, notification: notif });
   } catch (error) {
     console.error('[NotificationController] markAsRead error:', error);
@@ -68,13 +58,12 @@ export const markAsRead = async (req: Request, res: Response): Promise<void> => 
 export const markAllRead = async (req: Request, res: Response): Promise<void> => {
   try {
     const recipient = getRecipientInfo(req);
-    if (!recipient) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
+    if (!recipient) { res.status(401).json({ error: 'Authentication required' }); return; }
 
-    const { recipientId, recipientType } = recipient;
-    await Notification.updateMany({ recipientId, recipientType, read: false }, { read: true });
+    await Notification.updateMany(
+      { tenantId: req.tenant!._id, recipientId: recipient.recipientId, recipientType: recipient.recipientType, read: false },
+      { read: true }
+    );
 
     res.json({ success: true });
   } catch (error) {
@@ -86,23 +75,17 @@ export const markAllRead = async (req: Request, res: Response): Promise<void> =>
 export const deleteNotification = async (req: Request, res: Response): Promise<void> => {
   try {
     const recipient = getRecipientInfo(req);
-    if (!recipient) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
+    if (!recipient) { res.status(401).json({ error: 'Authentication required' }); return; }
 
     const { id } = req.params;
     const result = await Notification.deleteOne({
       _id: id,
+      tenantId: req.tenant!._id,
       recipientId: recipient.recipientId,
-      recipientType: recipient.recipientType
+      recipientType: recipient.recipientType,
     });
 
-    if (result.deletedCount === 0) {
-      res.status(404).json({ error: 'Notification not found' });
-      return;
-    }
-
+    if (result.deletedCount === 0) { res.status(404).json({ error: 'Notification not found' }); return; }
     res.json({ success: true });
   } catch (error) {
     console.error('[NotificationController] deleteNotification error:', error);
@@ -113,13 +96,13 @@ export const deleteNotification = async (req: Request, res: Response): Promise<v
 export const clearAll = async (req: Request, res: Response): Promise<void> => {
   try {
     const recipient = getRecipientInfo(req);
-    if (!recipient) {
-      res.status(401).json({ error: 'Authentication required' });
-      return;
-    }
+    if (!recipient) { res.status(401).json({ error: 'Authentication required' }); return; }
 
-    const { recipientId, recipientType } = recipient;
-    await Notification.deleteMany({ recipientId, recipientType });
+    await Notification.deleteMany({
+      tenantId: req.tenant!._id,
+      recipientId: recipient.recipientId,
+      recipientType: recipient.recipientType,
+    });
 
     res.json({ success: true });
   } catch (error) {

@@ -3,7 +3,7 @@ import Service from '../models/Service';
 
 /**
  * POST /api/services
- * Creates a new service (e.g., a new treatment the salon offers).
+ * Creates a new service for the resolved tenant.
  */
 export const createService = async (req: Request, res: Response) => {
   try {
@@ -12,11 +12,12 @@ export const createService = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'name, duration, and price are required' });
     }
     const newService = new Service({
+      tenantId: req.tenant!._id,
       name,
       duration: Number(duration),
       price: Number(price),
       priceMax: priceMax !== undefined && priceMax !== null ? Number(priceMax) : undefined,
-      description
+      description,
     });
     await newService.save();
     res.status(201).json(newService);
@@ -27,11 +28,11 @@ export const createService = async (req: Request, res: Response) => {
 
 /**
  * GET /api/services
- * Returns all available services.
+ * Returns all services for the resolved tenant.
  */
 export const getServices = async (req: Request, res: Response) => {
   try {
-    const services = await Service.find();
+    const services = await Service.find({ tenantId: req.tenant!._id });
     res.json(services);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch services' });
@@ -40,7 +41,7 @@ export const getServices = async (req: Request, res: Response) => {
 
 /**
  * PATCH /api/services/:id
- * Updates a service's editable fields (name, duration, price, description).
+ * Updates a service belonging to the resolved tenant.
  */
 export const updateService = async (req: Request, res: Response) => {
   try {
@@ -56,7 +57,12 @@ export const updateService = async (req: Request, res: Response) => {
     }
     if (description !== undefined) updates.description = description;
 
-    const updated = await Service.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
+    // Scope to tenant — prevents cross-tenant updates
+    const updated = await Service.findOneAndUpdate(
+      { _id: id, tenantId: req.tenant!._id },
+      updates,
+      { new: true, runValidators: true }
+    );
     if (!updated) return res.status(404).json({ error: 'Service not found' });
 
     res.json(updated);
@@ -64,4 +70,3 @@ export const updateService = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to update service' });
   }
 };
-

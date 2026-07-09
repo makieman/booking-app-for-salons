@@ -6,36 +6,33 @@ import { generateAvailableSlots } from '../services/slotService';
 
 /**
  * GET /api/availability?date=YYYY-MM-DD&serviceId=xxx[&attendantId=yyy]
- *
- * Returns an array of available time slots (HH:mm strings).
- * - If attendantId is provided: slots are based only on THAT attendant's bookings.
- * - If attendantId is omitted: uses global booking overlap (backward compatible).
+ * Returns available time slots. All queries scoped to the resolved tenant.
+ * Uses tenant.workingHours to determine the bookable window.
  */
 export const getAvailability = async (req: Request, res: Response) => {
   try {
     const { date, serviceId, attendantId } = req.query;
+    const tenantId = req.tenant!._id;
 
     if (!date || !serviceId) {
       return res.status(400).json({ error: 'Date and serviceId are required' });
     }
 
-    const service = await Service.findById(serviceId as string);
+    const service = await Service.findOne({ _id: serviceId as string, tenantId });
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    // Scope to attendant when provided; global otherwise (backward compat)
-    const bookingQuery: Record<string, unknown> = { date: date as string };
-    if (attendantId) {
-      bookingQuery.attendantId = attendantId as string;
-    }
+    const bookingQuery: Record<string, unknown> = { tenantId, date: date as string };
+    if (attendantId) bookingQuery.attendantId = attendantId as string;
 
     const existingBookings = await Booking.find(bookingQuery);
 
     const availableSlots = generateAvailableSlots(
       date as string,
       service.duration,
-      existingBookings
+      existingBookings,
+      req.tenant!.workingHours,
     );
 
     res.json(availableSlots);
@@ -47,35 +44,25 @@ export const getAvailability = async (req: Request, res: Response) => {
 
 /**
  * GET /api/availability/any?date=YYYY-MM-DD&serviceId=xxx
- *
- * Returns availability for ALL active attendants who can perform this service,
- * plus a union of all available slots. Used when the customer picks "Any Available".
- *
- * Response:
- * {
- *   slots: string[],                        // union of all attendant slots
- *   attendantSlots: {
- *     attendantId: string,
- *     name: string,
- *     slots: string[]
- *   }[]
- * }
+ * Returns availability for ALL active attendants in this tenant who can
+ * perform this service. Scoped entirely to the resolved tenant.
  */
 export const getAnyAvailability = async (req: Request, res: Response) => {
   try {
     const { date, serviceId } = req.query;
+    const tenantId = req.tenant!._id;
 
     if (!date || !serviceId) {
       return res.status(400).json({ error: 'Date and serviceId are required' });
     }
 
-    const service = await Service.findById(serviceId as string);
+    const service = await Service.findOne({ _id: serviceId as string, tenantId });
     if (!service) {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    // Find active attendants that can perform this service
     const attendants = await Attendant.find({
+      tenantId,
       isActive: true,
       serviceIds: serviceId as string,
     }).select('_id name');
@@ -84,19 +71,23 @@ export const getAnyAvailability = async (req: Request, res: Response) => {
       return res.json({ slots: [], attendantSlots: [] });
     }
 
-    // Compute slots per attendant in parallel
     const attendantSlots = await Promise.all(
       attendants.map(async attendant => {
         const bookings = await Booking.find({
+          tenantId,
           date: date as string,
           attendantId: attendant._id,
         });
-        const slots = generateAvailableSlots(date as string, service.duration, bookings);
+        const slots = generateAvailableSlots(
+          date as string,
+          service.duration,
+          bookings,
+          req.tenant!.workingHours,
+        );
         return { attendantId: attendant._id.toString(), name: attendant.name, slots };
       })
     );
 
-    // Union of all slots across attendants (deduplicated, sorted)
     const allSlots = [...new Set(attendantSlots.flatMap(a => a.slots))].sort();
 
     res.json({ slots: allSlots, attendantSlots });

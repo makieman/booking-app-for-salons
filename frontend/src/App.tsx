@@ -10,6 +10,7 @@ import { NotificationCenter } from './components/NotificationCenter';
 import { useAdminPushNotifications } from './hooks/useAdminPushNotifications';
 import { useAttendantPushNotifications } from './hooks/useAttendantPushNotifications';
 import { useNotificationSound } from './hooks/useNotificationSound';
+import { useTenant } from './hooks/useTenant';
 
 /** Formats a service price as a fixed price or a range.
  *  e.g. formatPrice(2000)        → "KES 2,000"
@@ -25,6 +26,61 @@ function formatPrice(price: number, priceMax?: number): string {
 
 export default function App() {
   const [renderError, setRenderError] = useState<Error | null>(null);
+
+  // ── Tenant Context and Routing ──────────────────────────────────────────
+  const { tenant, loading: tenantLoading, error: tenantError, tenantSlug, viewMode, navigate, setTenant } = useTenant();
+
+  // ── Owner Token Session ──────────────────────────────────────────────────
+  const [ownerToken, setOwnerToken] = useState<string | null>(localStorage.getItem('ownerToken'));
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
+  const [ownerLoginLoading, setOwnerLoginLoading] = useState(false);
+  const [ownerLoginError, setOwnerLoginError] = useState<string | null>(null);
+  const [loginSlug, setLoginSlug] = useState(tenantSlug || '');
+  const [staffSlug, setStaffSlug] = useState(tenantSlug || '');
+
+  useEffect(() => {
+    if (tenantSlug) {
+      setLoginSlug(tenantSlug);
+      setStaffSlug(tenantSlug);
+    }
+  }, [tenantSlug]);
+
+  // ── Tenant Registration State ───────────────────────────────────────────
+  const [regSalonName, setRegSalonName] = useState('');
+  const [regSlug, setRegSlug] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState<string | null>(null);
+  const handleOwnerLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginSlug) return;
+    setOwnerLoginLoading(true);
+    setOwnerLoginError(null);
+    try {
+      const result = await api.loginOwner({
+        slug: loginSlug,
+        email: ownerEmail,
+        password: ownerPassword,
+      });
+      localStorage.setItem('ownerToken', result.token);
+      localStorage.setItem('ownerTenantSlug', result.tenant.slug);
+      setOwnerToken(result.token);
+      api.setApiTenantSlug(result.tenant.slug);
+      api.setApiAuthToken(result.token);
+      setTenant(result.tenant);
+      setUserMode('owner');
+      setShowPinModal(false);
+      setOwnerEmail('');
+      setOwnerPassword('');
+      navigate('admin', result.tenant.slug);
+    } catch (err: any) {
+      setOwnerLoginError(err.message || 'Invalid credentials');
+    } finally {
+      setOwnerLoginLoading(false);
+    }
+  };
 
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent) => {
@@ -117,6 +173,17 @@ export default function App() {
 
   const dateCtaRef = useRef<HTMLButtonElement>(null);
 
+  // Synchronize userMode with viewMode
+  useEffect(() => {
+    if (viewMode === 'admin') {
+      setUserMode('owner');
+    } else if (viewMode === 'staff') {
+      setUserMode('attendant');
+    } else if (viewMode === 'customer') {
+      setUserMode('customer');
+    }
+  }, [viewMode]);
+
   // ── Session restore on mount ───────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('attendantToken');
@@ -126,6 +193,7 @@ export default function App() {
         if (payload.exp * 1000 > Date.now()) {
           setUserMode('attendant');
           setAttendantSession({ _id: payload.sub, name: payload.name, token });
+          api.setApiAuthToken(token);
         } else {
           localStorage.removeItem('attendantToken');
         }
@@ -133,7 +201,25 @@ export default function App() {
         localStorage.removeItem('attendantToken');
       }
     }
-  }, []);
+
+    const ownerTok = localStorage.getItem('ownerToken');
+    if (ownerTok) {
+      try {
+        const payload = JSON.parse(atob(ownerTok.split('.')[1]));
+        if (payload.exp * 1000 > Date.now()) {
+          setOwnerToken(ownerTok);
+          api.setApiAuthToken(ownerTok);
+          if (viewMode === 'admin') {
+            setUserMode('owner');
+          }
+        } else {
+          localStorage.removeItem('ownerToken');
+        }
+      } catch {
+        localStorage.removeItem('ownerToken');
+      }
+    }
+  }, [viewMode]);
 
   // ── Keyboard support for PIN Modal ─────────────────────────────────────────
   useEffect(() => {
@@ -154,28 +240,7 @@ export default function App() {
       }
 
       if (loginTab === 'owner') {
-        if (/^[0-9]$/.test(e.key)) {
-          setPin(prev => {
-            if (prev.length >= 4) return prev;
-            const next = prev + e.key;
-            if (next.length === 4) {
-              if (next === ADMIN_PIN) {
-                setUserMode('owner');
-                setOwnerSessionPin(next);
-                setShowPinModal(false);
-                return '';
-              } else {
-                setPinError(true);
-                setTimeout(() => setPin(''), 600);
-              }
-            }
-            return next;
-          });
-          setPinError(false);
-        } else if (e.key === 'Backspace') {
-          setPin(prev => prev.slice(0, -1));
-          setPinError(false);
-        }
+        // Owner login uses standard email & password form inputs, no PIN pad listener needed
       } else {
         if (/^[0-9]$/.test(e.key)) {
           setStaffPin(prev => {
@@ -493,6 +558,42 @@ export default function App() {
 
 
 
+  if (tenantLoading) {
+    return (
+      <div className="min-h-screen bg-brand-white flex flex-col items-center justify-center font-sans">
+        <div className="space-y-4 text-center">
+          <div className="w-12 h-12 border-4 border-brand-black border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: 'var(--brand-color, #1F1F1F) transparent var(--brand-color, #1F1F1F) var(--brand-color, #1F1F1F)' }} />
+          <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-500">Loading salon details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (viewMode === 'select') {
+    return <TenantSelectView />;
+  }
+
+  if (viewMode === 'register') {
+    return <TenantRegisterView />;
+  }
+
+  if (tenantError) {
+    return (
+      <div className="min-h-screen bg-brand-white flex flex-col items-center justify-center p-6 font-sans">
+        <div className="border border-brand-gray-100 bg-white p-8 space-y-6 shadow-2xl max-w-sm text-center rounded-xl">
+          <div className="text-red-500 font-bold text-3xl">⚠️ Error</div>
+          <p className="text-sm text-brand-gray-600 font-medium">{tenantError}</p>
+          <button
+            onClick={() => navigate('select')}
+            className="w-full bg-brand-black text-white py-3 rounded-full font-semibold uppercase tracking-wider text-xs shadow-md hover:bg-brand-gray-800 transition-all cursor-pointer"
+          >
+            Go back to Selector
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   try {
     return (
       <div className="min-h-screen max-w-lg mx-auto bg-brand-white relative flex flex-col font-sans tracking-tight">
@@ -591,68 +692,69 @@ export default function App() {
 
                 <div className="px-8 py-6 space-y-6">
                   {loginTab === 'owner' ? (
-                    <>
-                      {/* PIN dots */}
-                      <motion.div
-                        animate={pinError ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
-                        transition={{ duration: 0.4 }}
-                        className="flex justify-center gap-4 pt-2"
-                      >
-                        {[0, 1, 2, 3].map(i => (
-                          <div
-                            key={i}
-                            className={`w-4 h-4 border-2 transition-all duration-200 ${i < pin.length ? 'bg-brand-black border-brand-black' : 'bg-transparent border-brand-gray-300'
-                              }`}
-                          />
-                        ))}
-                      </motion.div>
-                      {pinError && (
-                        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                          className="text-center text-[11px] font-black uppercase tracking-widest text-red-500">
-                          Incorrect PIN
-                        </motion.p>
-                      )}
-                      {/* Number pad */}
-                      <div className="grid grid-cols-3 gap-2">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                          <button key={n}
-                            onClick={() => {
-                              if (pin.length >= 4) return;
-                              const next = pin + String(n);
-                              setPin(next); setPinError(false);
-                              if (next.length === 4) {
-                                if (next === ADMIN_PIN) {
-                                  setUserMode('owner'); setOwnerSessionPin(next); setShowPinModal(false); setPin('');
-                                } else { setPinError(true); setTimeout(() => setPin(''), 600); }
-                              }
-                            }}
-                            className="py-4 text-xl font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
-                          >{n}</button>
-                        ))}
-                        <button onClick={() => { setPin(''); setPinError(false); }}
-                          className="py-4 text-[11px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all text-brand-gray-500"
-                        >Clear</button>
-                        <button
-                          onClick={() => {
-                            if (pin.length >= 4) return;
-                            const next = pin + '0';
-                            setPin(next); setPinError(false);
-                            if (next.length === 4) {
-                              if (next === ADMIN_PIN) {
-                                setUserMode('owner'); setOwnerSessionPin(next); setShowPinModal(false); setPin('');
-                              } else { setPinError(true); setTimeout(() => setPin(''), 600); }
-                            }
-                          }}
-                          className="py-4 text-xl font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
-                        >0</button>
-                        <button onClick={() => { setPin(p => p.slice(0, -1)); setPinError(false); }}
-                          className="py-4 text-[11px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all text-brand-gray-500"
-                        >⌫</button>
+                    <form onSubmit={handleOwnerLoginSubmit} className="space-y-5">
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Salon ID (Slug)</label>
+                        <input
+                          type="text"
+                          required
+                          value={loginSlug}
+                          onChange={e => { setLoginSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setOwnerLoginError(null); }}
+                          placeholder="e.g. flo-sisterlocks"
+                          disabled={!!tenantSlug}
+                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors disabled:opacity-60"
+                        />
                       </div>
-                    </>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Owner Email</label>
+                        <input
+                          type="email"
+                          required
+                          value={ownerEmail}
+                          onChange={e => { setOwnerEmail(e.target.value); setOwnerLoginError(null); }}
+                          placeholder="owner@example.com"
+                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={ownerPassword}
+                          onChange={e => { setOwnerPassword(e.target.value); setOwnerLoginError(null); }}
+                          placeholder="••••••••"
+                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors"
+                        />
+                      </div>
+                      {ownerLoginError && (
+                        <p className="text-[11px] font-black uppercase tracking-widest text-red-500">
+                          {ownerLoginError}
+                        </p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={ownerLoginLoading}
+                        className="w-full py-4 text-xs font-black uppercase tracking-widest bg-brand-black text-white hover:bg-brand-gray-700 transition-all active:scale-95 disabled:opacity-50"
+                      >
+                        {ownerLoginLoading ? 'Signing In...' : 'Sign In as Owner'}
+                      </button>
+                    </form>
                   ) : (
                     /* ── Staff Login ── */
                     <div className="space-y-5">
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Salon ID (Slug)</label>
+                        <input
+                          type="text"
+                          required
+                          value={staffSlug}
+                          onChange={e => { setStaffSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setStaffPinError(false); }}
+                          placeholder="e.g. flo-sisterlocks"
+                          disabled={!!tenantSlug}
+                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors disabled:opacity-60"
+                        />
+                      </div>
                       <div className="space-y-2">
                         <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Username</label>
                         <input
@@ -711,18 +813,21 @@ export default function App() {
                         </div>
                       </div>
                       <button
-                        disabled={staffLoginLoading || !staffUsername || staffPin.length < 4}
+                        disabled={staffLoginLoading || !staffUsername || staffPin.length < 4 || !staffSlug}
                         onClick={async () => {
                           setStaffLoginLoading(true);
                           setStaffPinError(false);
                           try {
+                            api.setApiTenantSlug(staffSlug);
                             const result = await api.loginAttendant(staffUsername, staffPin);
                             localStorage.setItem('attendantToken', result.token);
+                            localStorage.setItem('staffTenantSlug', staffSlug);
                             setAttendantSession({ _id: result.attendant._id, name: result.attendant.name, token: result.token });
                             setUserMode('attendant');
                             setShowPinModal(false);
                             setStaffUsername('');
                             setStaffPin('');
+                            navigate('staff', staffSlug);
                           } catch (err: any) {
                             setStaffPinError(true);
                             setStaffPin('');
@@ -750,8 +855,8 @@ export default function App() {
           <div className="flex items-center gap-5 cursor-pointer group" onClick={resetFlow}>
             <div className="h-16 w-16 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
               <img
-                src="/logo-bg.jpg"
-                alt="Flobooking Logo"
+                src={tenant?.branding?.logoUrl || "/logo-bg.jpg"}
+                alt={tenant?.name || "Salon Logo"}
                 className="h-full w-auto object-contain rounded-full"
               />
             </div>
@@ -773,32 +878,37 @@ export default function App() {
                 <Search size={18} />
               </button>
             )}
-            <a href="tel:0721530120" className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
+            <a href={`tel:${tenant?.supportPhone || "0721530120"}`} className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
               <Phone size={18} />
             </a>
             <NotificationCenter 
               onNavigate={handleNotificationNavigate} 
-              token={attendantSession?.token} 
+              token={attendantSession?.token || ownerToken || undefined} 
               ownerPin={ownerSessionPin} 
             />
             <button
               onClick={() => {
-                if (userMode === 'owner') {
+                if (userMode === 'owner' || (userMode === 'attendant' && attendantSession)) {
+                  if (userMode === 'attendant') {
+                    localStorage.removeItem('attendantToken');
+                    setAttendantSession(null);
+                  } else {
+                    localStorage.removeItem('ownerToken');
+                    setOwnerToken(null);
+                  }
+                  api.setApiAuthToken(null);
                   setUserMode('customer');
-                  setOwnerSessionPin('');
-                } else if (userMode === 'attendant') {
-                  // Attendant logout — clear token
-                  localStorage.removeItem('attendantToken');
-                  setAttendantSession(null);
-                  setUserMode('customer');
+                  navigate('customer');
                 } else {
-                  // Customer — open login modal
                   setPin('');
                   setPinError(false);
                   setStaffPin('');
                   setStaffPinError(false);
                   setStaffUsername('');
                   setLoginTab('owner');
+                  setOwnerEmail('');
+                  setOwnerPassword('');
+                  setOwnerLoginError(null);
                   setShowPinModal(true);
                 }
               }}
@@ -811,7 +921,7 @@ export default function App() {
 
         <main className="flex-1 flex flex-col">
           {userMode === 'owner' ? (
-            <AdminView bookings={bookings} ownerPin={ownerSessionPin} />
+            <AdminView bookings={bookings} ownerPin={ownerSessionPin} ownerToken={ownerToken!} triggerToast={triggerToast} />
           ) : userMode === 'attendant' && attendantSession ? (
             <AttendantView session={attendantSession} />
           ) : (
@@ -1624,8 +1734,9 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
   );
 }
 
-function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { bookings: Booking[], ownerPin?: string }) {
-  const [activeTab, setActiveTab] = useState<'ledger' | 'pending' | 'services' | 'staff'>('ledger');
+function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, ownerToken, triggerToast }: { bookings: Booking[], ownerPin?: string, ownerToken: string, triggerToast: (msg: string, type?: 'success' | 'error') => void }) {
+  const { tenant } = useTenant();
+  const [activeTab, setActiveTab] = useState<'ledger' | 'pending' | 'services' | 'staff' | 'settings'>('ledger');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   const [confirmedBookings, setConfirmedBookings] = useState<Booking[]>(initialBookings);
   const [services, setServices] = useState<Service[]>([]);
@@ -1651,7 +1762,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
   // Staff management form state
   const [ownerPin, setOwnerPin] = useState(initialOwnerPin || '');
   const [ownerPinInput, setOwnerPinInput] = useState('');
-  const [ownerPinConfirmed, setOwnerPinConfirmed] = useState(!!initialOwnerPin);
+  const [ownerPinConfirmed, setOwnerPinConfirmed] = useState(true); // Always true when logged in with Owner JWT
   const [staffForm, setStaffForm] = useState({ name: '', username: '', pin: '', serviceIds: [] as string[] });
   const [staffAddLoading, setStaffAddLoading] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -1791,11 +1902,12 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
     }
   };
 
-  const tabs: { key: 'ledger' | 'pending' | 'services' | 'staff'; label: string }[] = [
+  const tabs: { key: 'ledger' | 'pending' | 'services' | 'staff' | 'settings'; label: string }[] = [
     { key: 'ledger', label: 'Ledger' },
     { key: 'pending', label: 'Pending' },
     { key: 'services', label: 'Services' },
     { key: 'staff', label: 'Staff' },
+    { key: 'settings', label: 'Settings' },
   ];
 
   return (
@@ -1895,8 +2007,8 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
                   <h3 className="text-3xl sm:text-4xl font-black text-white">{sortedToday.length}</h3>
                 </div>
                 <div className="border border-brand-gray-100 bg-white p-4 sm:p-6 flex flex-col justify-between h-24 sm:h-28 shadow-sm">
-                  <p className="text-[10px] sm:text-[11px] text-brand-gray-600 font-black uppercase tracking-[0.2em]">Certified Artist</p>
-                  <h3 className="text-base sm:text-xl font-serif italic text-brand-black truncate">Flo Sisterlocks</h3>
+                  <p className="text-[10px] sm:text-[11px] text-brand-gray-600 font-black uppercase tracking-[0.2em]">Salon Owner</p>
+                  <h3 className="text-base sm:text-xl font-serif italic text-brand-black truncate">{tenant?.name || 'Flo Sisterlocks'}</h3>
                 </div>
               </div>
             </header>
@@ -2702,6 +2814,9 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin }: { b
             )}
           </>
         )}
+        {activeTab === 'settings' && ownerToken && (
+          <SettingsTab ownerToken={ownerToken} />
+        )}
 
       </div>
     </div>
@@ -2905,6 +3020,536 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SettingsTab Component (Branding, Logos, Locale, Payments) ─────────────────
+
+function SettingsTab({ ownerToken }: { ownerToken: string }) {
+  const { tenant, setTenant } = useTenant();
+  const [name, setName] = useState(tenant?.name || '');
+  const [primaryColor, setPrimaryColor] = useState(tenant?.branding?.primaryColor || '#B08968');
+  const [emailFromName, setEmailFromName] = useState(tenant?.branding?.emailFromName || '');
+  const [emailReplyTo, setEmailReplyTo] = useState(tenant?.branding?.emailReplyTo || '');
+  const [whatsappSenderNumber, setWhatsappSenderNumber] = useState(tenant?.branding?.whatsappSenderNumber || '');
+
+  const [locale, setLocale] = useState<'en' | 'sw'>(tenant?.locale || 'en');
+  const [mpesaTillNumber, setMpesaTillNumber] = useState(tenant?.mpesaTillNumber || '');
+  const [mpesaPaybillNumber, setMpesaPaybillNumber] = useState(tenant?.mpesaPaybillNumber || '');
+  const [supportPhone, setSupportPhone] = useState(tenant?.supportPhone || '');
+  const [supportEmail, setSupportEmail] = useState(tenant?.supportEmail || '');
+
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
+
+  const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Sync state if tenant loads late
+  useEffect(() => {
+    if (tenant) {
+      setName(tenant.name);
+      setPrimaryColor(tenant.branding?.primaryColor || '#B08968');
+      setEmailFromName(tenant.branding?.emailFromName || '');
+      setEmailReplyTo(tenant.branding?.emailReplyTo || '');
+      setWhatsappSenderNumber(tenant.branding?.whatsappSenderNumber || '');
+      setLocale(tenant.locale);
+      setMpesaTillNumber(tenant.mpesaTillNumber || '');
+      setMpesaPaybillNumber(tenant.mpesaPaybillNumber || '');
+      setSupportPhone(tenant.supportPhone || '');
+      setSupportEmail(tenant.supportEmail || '');
+    }
+  }, [tenant]);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const updated = await api.updateTenantSettings(ownerToken, {
+        name,
+        branding: {
+          primaryColor,
+          emailFromName,
+          emailReplyTo,
+          whatsappSenderNumber,
+        },
+        locale,
+        mpesaTillNumber,
+        mpesaPaybillNumber,
+        supportPhone,
+        supportEmail,
+      });
+      setTenant(updated);
+      setSuccess('Settings updated successfully!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to update settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUploadLogo = async () => {
+    if (!logoFile) return;
+    setUploadingLogo(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await api.uploadBrandingLogo(ownerToken, logoFile);
+      setTenant({
+        ...tenant!,
+        branding: result.branding,
+      });
+      setLogoFile(null);
+      setSuccess('Logo uploaded successfully!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleUploadFavicon = async () => {
+    if (!faviconFile) return;
+    setUploadingFavicon(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await api.uploadBrandingFavicon(ownerToken, faviconFile);
+      setTenant({
+        ...tenant!,
+        branding: result.branding,
+      });
+      setFaviconFile(null);
+      setSuccess('Favicon uploaded successfully!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload favicon');
+    } finally {
+      setUploadingFavicon(false);
+    }
+  };
+
+  return (
+    <div className="space-y-8 px-4 sm:px-0 max-w-xl pb-16">
+      <header className="space-y-2">
+        <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-none uppercase">Salon<br />Branding & Settings</h2>
+        <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[11px] sm:text-[12px]">
+          White-labeling // branding // locales // payments
+        </p>
+      </header>
+
+      {error && <p className="text-red-500 font-black uppercase text-xs tracking-widest">{error}</p>}
+      {success && <p className="text-green-600 font-black uppercase text-xs tracking-widest">{success}</p>}
+
+      <div className="space-y-6">
+        {/* Settings Form */}
+        <form onSubmit={handleSaveSettings} className="border border-brand-gray-100 bg-white p-6 sm:p-8 space-y-6 shadow-sm rounded-xl">
+          <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4">
+            General Information & Colors
+          </p>
+
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Salon Name</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-bold text-sm bg-transparent"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Primary Brand Color</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={e => setPrimaryColor(e.target.value)}
+                  className="w-10 h-10 border border-brand-gray-200 cursor-pointer rounded"
+                />
+                <input
+                  type="text"
+                  value={primaryColor}
+                  onChange={e => setPrimaryColor(e.target.value)}
+                  className="flex-1 border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-bold text-sm bg-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Support Phone</label>
+                <input
+                  type="text"
+                  value={supportPhone}
+                  onChange={e => setSupportPhone(e.target.value)}
+                  placeholder="0721 530 120"
+                  className="w-full border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-bold text-sm bg-transparent"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Support Email</label>
+                <input
+                  type="email"
+                  value={supportEmail}
+                  onChange={e => setSupportEmail(e.target.value)}
+                  placeholder="support@salon.com"
+                  className="w-full border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-bold text-sm bg-transparent"
+                />
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4 pt-2">
+            Email & Notification Config
+          </p>
+
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Email Display Name</label>
+              <input
+                type="text"
+                value={emailFromName}
+                onChange={e => setEmailFromName(e.target.value)}
+                placeholder="e.g. Flo Sisterlocks"
+                className="w-full border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-bold text-sm bg-transparent"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Email Reply-To</label>
+              <input
+                type="email"
+                value={emailReplyTo}
+                onChange={e => setEmailReplyTo(e.target.value)}
+                placeholder="e.g. reply@flosisterlocks.com"
+                className="w-full border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-bold text-sm bg-transparent"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">WhatsApp Sender Number</label>
+              <input
+                type="text"
+                value={whatsappSenderNumber}
+                onChange={e => setWhatsappSenderNumber(e.target.value)}
+                placeholder="e.g. +254721530120"
+                className="w-full border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-bold text-sm bg-transparent"
+              />
+            </div>
+          </div>
+
+          <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4 pt-2">
+            Payments & Regional Settings
+          </p>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Till Number</label>
+                <input
+                  type="text"
+                  value={mpesaTillNumber}
+                  onChange={e => setMpesaTillNumber(e.target.value)}
+                  placeholder="M-Pesa Buy Goods"
+                  className="w-full border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2.5 font-bold text-sm bg-transparent"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Paybill Number</label>
+                <input
+                  type="text"
+                  value={mpesaPaybillNumber}
+                  onChange={e => setMpesaPaybillNumber(e.target.value)}
+                  placeholder="M-Pesa Business Number"
+                  className="w-full border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2.5 font-bold text-sm bg-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Default Locale</label>
+              <select
+                value={locale}
+                onChange={e => setLocale(e.target.value as 'en' | 'sw')}
+                className="w-full border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-bold text-sm bg-transparent"
+              >
+                <option value="en">English (en)</option>
+                <option value="sw">Kiswahili (sw)</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs hover:bg-brand-gray-800 transition-all rounded-[10px] cursor-pointer"
+          >
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </form>
+
+        {/* Uploads Panel */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* Logo Upload Card */}
+          <div className="border border-brand-gray-100 bg-white p-6 sm:p-8 space-y-6 shadow-sm rounded-xl">
+            <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4">
+              Salon Logo
+            </p>
+
+            <div className="flex flex-col items-center gap-4">
+              {tenant?.branding?.logoUrl ? (
+                <div className="p-4 border border-brand-gray-100 bg-brand-gray-50/50 rounded flex justify-center items-center w-full max-h-36 overflow-hidden">
+                  <img src={tenant.branding.logoUrl} alt="Logo" className="max-h-24 max-w-full object-contain" />
+                </div>
+              ) : (
+                <div className="p-8 border border-dashed border-brand-gray-200 text-brand-gray-400 text-xs italic bg-brand-gray-50/30 w-full text-center rounded">
+                  No logo uploaded yet. Default logo will be used.
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => setLogoFile(e.target.files?.[0] || null)}
+                className="text-xs text-brand-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-[10px] file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-wider file:bg-brand-gray-50 file:text-brand-gray-700 hover:file:bg-brand-gray-100 cursor-pointer w-full"
+              />
+
+              <button
+                type="button"
+                onClick={handleUploadLogo}
+                disabled={!logoFile || uploadingLogo}
+                className="w-full py-3 text-[10px] font-black uppercase tracking-widest bg-brand-black text-white hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all rounded-[10px]"
+              >
+                {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+              </button>
+            </div>
+          </div>
+
+          {/* Favicon Upload Card */}
+          <div className="border border-brand-gray-100 bg-white p-6 sm:p-8 space-y-6 shadow-sm rounded-xl">
+            <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4">
+              Salon Favicon
+            </p>
+
+            <div className="flex flex-col items-center gap-4">
+              {tenant?.branding?.faviconUrl ? (
+                <div className="p-4 border border-brand-gray-100 bg-brand-gray-50/50 rounded flex justify-center items-center w-16 h-16 overflow-hidden">
+                  <img src={tenant.branding.faviconUrl} alt="Favicon" className="w-8 h-8 object-contain" />
+                </div>
+              ) : (
+                <div className="p-4 border border-dashed border-brand-gray-200 text-brand-gray-400 text-xs italic bg-brand-gray-50/30 w-full text-center rounded">
+                  No favicon uploaded.
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => setFaviconFile(e.target.files?.[0] || null)}
+                className="text-xs text-brand-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-[10px] file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-wider file:bg-brand-gray-50 file:text-brand-gray-700 hover:file:bg-brand-gray-100 cursor-pointer w-full"
+              />
+
+              <button
+                type="button"
+                onClick={handleUploadFavicon}
+                disabled={!faviconFile || uploadingFavicon}
+                className="w-full py-3 text-[10px] font-black uppercase tracking-widest bg-brand-black text-white hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all rounded-[10px]"
+              >
+                {uploadingFavicon ? 'Uploading...' : 'Upload Favicon'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── TenantSelectView Component (Path route target when not resolved) ─────────
+
+function TenantSelectView() {
+  const [slugInput, setSlugInput] = useState('');
+  const { navigate } = useTenant();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (slugInput.trim()) {
+      navigate('customer', slugInput.toLowerCase().trim());
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-brand-cream flex items-center justify-center p-6 font-sans">
+      <div className="border border-brand-border bg-brand-white p-8 sm:p-10 space-y-8 shadow-luxury max-w-md w-full rounded-2xl">
+        <div className="text-center space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-brand-muted">Salon Portal</p>
+          <h1 className="text-4xl font-serif italic font-black tracking-tight text-brand-charcoal">Select Your Salon</h1>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2">
+            <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-muted">Salon Identifier (Slug)</label>
+            <input
+              type="text"
+              required
+              value={slugInput}
+              onChange={e => setSlugInput(e.target.value)}
+              placeholder="e.g. flo-sisterlocks"
+              className="w-full border-b-2 border-brand-border focus:border-brand-charcoal focus:outline-none py-3 font-medium text-sm bg-transparent tracking-wide"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-brand-charcoal text-white py-4.5 rounded-full font-semibold uppercase tracking-wider text-xs shadow-2xl hover:bg-brand-muted active:scale-[0.98] transition-all cursor-pointer"
+          >
+            Enter Salon
+          </button>
+        </form>
+
+        <div className="relative flex py-2 items-center">
+          <div className="flex-grow border-t border-brand-border"></div>
+          <span className="flex-shrink mx-4 text-brand-muted text-[10px] font-black uppercase tracking-widest">Or</span>
+          <div className="flex-grow border-t border-brand-border"></div>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => navigate('customer', 'flo-sisterlocks')}
+            className="w-full border border-brand-border text-brand-charcoal py-3.5 rounded-full font-semibold uppercase tracking-wider text-xs hover:border-brand-charcoal hover:text-brand-charcoal transition-all active:scale-[0.98] cursor-pointer bg-white"
+          >
+            Go to Flo Sisterlocks (Default)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('register')}
+            className="w-full bg-brand-border/30 text-brand-charcoal py-3.5 rounded-full font-semibold uppercase tracking-wider text-xs hover:bg-brand-border/60 transition-all active:scale-[0.98] cursor-pointer text-center block"
+          >
+            Register a New Salon
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── TenantRegisterView Component (Owner Signup / Onboarding) ──────────────────
+
+function TenantRegisterView() {
+  const { navigate, setTenant } = useTenant();
+  const [salonName, setSalonName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.registerTenant({
+        salonName,
+        slug,
+        ownerEmail: email,
+        ownerPassword: password
+      });
+
+      localStorage.setItem('ownerToken', result.token);
+      api.setApiAuthToken(result.token);
+      setTenant(result.tenant);
+
+      // Navigate to owner view (admin dashboard)
+      navigate('admin', result.tenant.slug);
+    } catch (err: any) {
+      setError(err.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-brand-cream flex items-center justify-center p-6 font-sans">
+      <div className="border border-brand-border bg-brand-white p-8 sm:p-10 space-y-8 shadow-luxury max-w-md w-full rounded-2xl">
+        <div className="text-center space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-brand-muted">Onboarding</p>
+          <h1 className="text-4xl font-serif italic font-black tracking-tight text-brand-charcoal">Register Salon</h1>
+        </div>
+
+        {error && <p className="text-red-500 font-black uppercase text-xs tracking-widest text-center">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1">
+            <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-muted">Salon Name</label>
+            <input
+              type="text" required placeholder="e.g. Flo Sisterlocks"
+              value={salonName}
+              onChange={e => setSalonName(e.target.value)}
+              className="w-full border-b-2 border-brand-border focus:border-brand-charcoal focus:outline-none py-2 font-medium text-sm bg-transparent"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-muted">URL Slug</label>
+            <input
+              type="text" required placeholder="e.g. flo-sisterlocks"
+              value={slug}
+              onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              className="w-full border-b-2 border-brand-border focus:border-brand-charcoal focus:outline-none py-2 font-medium text-sm bg-transparent"
+            />
+            <p className="text-[9px] text-brand-muted mt-1 font-medium">Lowercase letters, numbers, and hyphens only.</p>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-muted">Owner Email</label>
+            <input
+              type="email" required placeholder="owner@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full border-b-2 border-brand-border focus:border-brand-charcoal focus:outline-none py-2 font-medium text-sm bg-transparent"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-muted">Password (8+ characters)</label>
+            <input
+              type="password" required placeholder="••••••••" minLength={8}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full border-b-2 border-brand-border focus:border-brand-charcoal focus:outline-none py-2 font-medium text-sm bg-transparent"
+            />
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-brand-charcoal text-white py-4.5 rounded-full font-semibold uppercase tracking-wider text-xs shadow-2xl hover:bg-brand-muted active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+            >
+              {loading ? 'Creating Salon...' : 'Register & Start'}
+            </button>
+          </div>
+        </form>
+
+        <button
+          type="button"
+          onClick={() => navigate('select')}
+          className="w-full text-center text-xs font-black uppercase tracking-widest text-brand-muted hover:text-brand-charcoal transition-colors"
+        >
+          ← Back to Selector
+        </button>
       </div>
     </div>
   );

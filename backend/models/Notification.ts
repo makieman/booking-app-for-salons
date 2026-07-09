@@ -1,7 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface INotification extends Document {
-  recipientId: string; // Attendant ObjectId or "admin"
+  tenantId: mongoose.Types.ObjectId;
+  recipientId: string; // Attendant ObjectId or tenant ObjectId (for admin)
   recipientType: 'admin' | 'attendant' | 'customer';
   customerPhone?: string; // Optional: phone number for customer-focused logs
   title: string;
@@ -15,6 +16,7 @@ export interface INotification extends Document {
 
 const NotificationSchema: Schema = new Schema(
   {
+    tenantId:      { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
     recipientId:   { type: String, required: true, index: true },
     recipientType: { type: String, enum: ['admin', 'attendant', 'customer'], required: true, index: true },
     customerPhone: { type: String, index: true },

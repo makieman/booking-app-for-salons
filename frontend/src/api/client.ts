@@ -10,6 +10,49 @@ import type { Attendant, Booking } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+let activeTenantSlug: string | null = null;
+let activeAuthToken: string | null = null;
+
+export function setApiTenantSlug(slug: string | null) {
+  activeTenantSlug = slug;
+}
+
+export function setApiAuthToken(token: string | null) {
+  activeAuthToken = token;
+}
+
+// Intercept window.fetch to inject X-Tenant-Slug and Authorization headers automatically
+const originalFetch = window.fetch;
+window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
+  init = init || {};
+  init.headers = init.headers || {};
+
+  const setHeader = (name: string, value: string) => {
+    if (init!.headers instanceof Headers) {
+      init!.headers.set(name, value);
+    } else if (Array.isArray(init!.headers)) {
+      const index = init!.headers.findIndex(([k]) => k.toLowerCase() === name.toLowerCase());
+      if (index >= 0) {
+        init!.headers[index] = [name, value];
+      } else {
+        init!.headers.push([name, value]);
+      }
+    } else {
+      (init!.headers as Record<string, string>)[name] = value;
+    }
+  };
+
+  if (activeTenantSlug) {
+    setHeader('X-Tenant-Slug', activeTenantSlug);
+  }
+
+  if (activeAuthToken) {
+    setHeader('Authorization', `Bearer ${activeAuthToken}`);
+  }
+
+  return originalFetch(input, init);
+};
+
 /** Adds Authorization Bearer header when a token is provided */
 function authHeaders(token?: string): HeadersInit {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -436,4 +479,112 @@ export async function clearAllBackendNotifications(auth: { token?: string; owner
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to clear notifications');
   }
+}
+
+// ── Tenant Settings & Branding ──────────────────────────────────────────────
+
+export async function loginOwner(data: {
+  slug: string;
+  email: string;
+  password: string;
+}): Promise<{ token: string; tenant: any }> {
+  const res = await fetch(`${API_BASE}/auth/owner/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Login failed');
+  }
+  return res.json();
+}
+
+export async function registerTenant(data: {
+  salonName: string;
+  slug: string;
+  ownerEmail: string;
+  ownerPassword: string;
+}): Promise<{ token: string; tenant: any }> {
+  const res = await fetch(`${API_BASE}/auth/tenant/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Registration failed');
+  }
+  return res.json();
+}
+
+export async function getPublicTenant(): Promise<any> {
+  const res = await fetch(`${API_BASE}/tenant/public`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to load salon details');
+  }
+  return res.json();
+}
+
+export async function getTenantSettings(token: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/tenant/settings`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to load settings');
+  }
+  return res.json();
+}
+
+export async function updateTenantSettings(token: string, data: any): Promise<any> {
+  const res = await fetch(`${API_BASE}/tenant/settings`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update settings');
+  }
+  return res.json();
+}
+
+export async function uploadBrandingLogo(token: string, file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('logo', file);
+
+  const res = await fetch(`${API_BASE}/tenant/branding/logo`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      // Do NOT set Content-Type header; fetch will automatically set it to multipart/form-data with correct boundary
+    },
+    body: formData,
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to upload logo');
+  }
+  return res.json();
+}
+
+export async function uploadBrandingFavicon(token: string, file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('favicon', file);
+
+  const res = await fetch(`${API_BASE}/tenant/branding/favicon`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      // Do NOT set Content-Type header; fetch will automatically set it to multipart/form-data with correct boundary
+    },
+    body: formData,
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to upload favicon');
+  }
+  return res.json();
 }

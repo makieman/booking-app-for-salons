@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
+import { TenantProvider } from './hooks/useTenant.tsx';
 
 // Register the service worker for PWA functionality.
 // onNeedRefresh fires when a new SW is installed and waiting.
@@ -30,6 +31,8 @@ const updateSW = registerSW({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <TenantProvider>
+      <App />
+    </TenantProvider>
   </StrictMode>,
 );
