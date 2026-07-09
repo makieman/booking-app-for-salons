@@ -63,3 +63,27 @@ export interface AttendantSession {
   name: string;
   token: string;
 }
+
+export interface Tenant {
+  _id: string;
+  name: string;
+  slug: string;
+  ownerEmail: string;
+  timezone: string;
+  workingHours: { start: string; end: string };
+  branding: {
+    logoUrl?: string;
+    faviconUrl?: string;
+    primaryColor?: string;
+    emailFromName?: string;
+    emailReplyTo?: string;
+    whatsappSenderNumber?: string;
+  };
+  locale: 'en' | 'sw';
+  mpesaTillNumber?: string;
+  mpesaPaybillNumber?: string;
+  supportPhone?: string;
+  supportEmail?: string;
+  plan: 'free' | 'paid';
+  isActive: boolean;
+}

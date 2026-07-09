@@ -12,6 +12,7 @@ import mongoose, { Schema, Document } from 'mongoose';
  * - image: Optional URL to a service image
  */
 export interface IService extends Document {
+  tenantId: mongoose.Types.ObjectId;
   name: string;
   duration: number; // in minutes
   price: number;
@@ -21,6 +22,7 @@ export interface IService extends Document {
 }
 
 const ServiceSchema: Schema = new Schema({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
   name: { type: String, required: true },
   duration: { type: Number, required: true },
   price: { type: Number, required: true },

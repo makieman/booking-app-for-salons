@@ -8,7 +8,7 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
 declare const self: ServiceWorkerGlobalScope;
 
-import { saveNotification } from './utils/db';
+import { saveNotification, getNotifications } from './utils/db';
 
 
 // ── Lifecycle: Take control immediately on activation ────────────────────────

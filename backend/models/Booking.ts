@@ -5,6 +5,7 @@ import type { IAttendant } from './Attendant';
  * Booking interface — represents a customer's booked appointment.
  *
  * Fields:
+ * - tenantId: The salon this booking belongs to
  * - customerName: The client's full name
  * - phone: Contact number
  * - serviceId: Reference to the Service they booked
@@ -14,6 +15,7 @@ import type { IAttendant } from './Attendant';
  * - status: The booking lifecycle state (pending → confirmed | cancelled)
  */
 export interface IBooking extends Document {
+  tenantId: mongoose.Types.ObjectId;
   reference: string;
   customerName: string;
   phone: string;
@@ -32,7 +34,9 @@ export interface IBooking extends Document {
 
 const BookingSchema: Schema = new Schema(
   {
-    reference: { type: String, required: true, unique: true, index: true },
+    tenantId:  { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
+    // reference is no longer globally unique — scoped per-tenant via compound index below
+    reference: { type: String, required: true, index: true },
     customerName: { type: String, required: true },
     phone: { type: String, required: true },
     email: { type: String, required: false },  // Optional — used for email notifications
@@ -51,11 +55,13 @@ const BookingSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-// Index to help with queries by date and status
-BookingSchema.index({ date: 1 });
-BookingSchema.index({ status: 1 });
-// Composite indexes for attendant dashboard queries
-BookingSchema.index({ attendantId: 1, date: 1 });
-BookingSchema.index({ attendantId: 1, status: 1 });
+// Compound unique: reference is unique within a tenant, not globally
+BookingSchema.index({ tenantId: 1, reference: 1 }, { unique: true });
+
+// Performance indexes for common query patterns
+BookingSchema.index({ tenantId: 1, date: 1 });
+BookingSchema.index({ tenantId: 1, status: 1 });
+BookingSchema.index({ tenantId: 1, attendantId: 1, date: 1 });
+BookingSchema.index({ tenantId: 1, attendantId: 1, status: 1 });
 
 export default mongoose.model<IBooking>('Booking', BookingSchema);

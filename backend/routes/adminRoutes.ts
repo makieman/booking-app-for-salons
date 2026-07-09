@@ -11,18 +11,17 @@ import { requireOwnerAuth } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
-// ── Booking management (existing routes, no auth change for backward compat) ──
-// GET /api/admin/bookings — fetch all bookings (optionally ?status=pending|?attendantId=xxx)
-router.get('/bookings', getAdminBookings);
+// ── Booking management (owner-only with JWT) ──────────────────────────────────
+// GET /api/admin/bookings — fetch all bookings
+router.get('/bookings', requireOwnerAuth, getAdminBookings);
 
 // PATCH /api/admin/bookings/:id — confirm or cancel a booking
-router.patch('/bookings/:id', updateBookingStatus);
+router.patch('/bookings/:id', requireOwnerAuth, updateBookingStatus);
 
 // ── Attendant / Staff management (owner-only) ─────────────────────────────────
 // GET /api/admin/attendants/public?serviceId=xxx — customer-facing, no auth
 router.get('/attendants/public', publicListAttendants);
 
-// All routes below require the owner PIN header
 // GET /api/admin/attendants — list all staff (owner only)
 router.get('/attendants', requireOwnerAuth, listAttendants);
 

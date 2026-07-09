@@ -1,0 +1,75 @@
+<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;letter-spacing:-0.5px;color:#1F1F1F;">
+  Booking Update
+</h2>
+<div style="width:48px;height:3px;background:{{#if tenant.branding.primaryColor}}{{tenant.branding.primaryColor}}{{else}}#1F1F1F{{/if}};margin-bottom:20px;"></div>
+<p style="margin:0 0 8px;font-size:14px;color:#6b6b6b;line-height:1.6;">
+  Hi <strong style="color:#1F1F1F;">{{booking.customerName}}</strong>,
+</p>
+<p style="margin:0 0 20px;font-size:14px;color:#6b6b6b;line-height:1.6;">
+  Unfortunately your booking has been <strong style="color:#1F1F1F;">cancelled</strong>.
+  We apologise for any inconvenience. Please book a new slot or get in touch with us directly.
+</p>
+
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+  style="background:#f5f5f5;border:1px solid #e5e5e5;margin-top:24px;">
+  <tr>
+    <td style="padding:24px 28px;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        {{#if attendantName}}
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Artist</span>
+          </td>
+          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{attendantName}}</span>
+          </td>
+        </tr>
+        {{/if}}
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Service</span>
+          </td>
+          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{service.name}}</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Date</span>
+          </td>
+          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{formattedDate}}</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Time</span>
+          </td>
+          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{booking.startTime}} – {{booking.endTime}}</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Price</span>
+          </td>
+          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
+            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{formattedPrice}}</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;">
+            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Reference</span>
+          </td>
+          <td align="right" style="padding:8px 0;">
+            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{booking.reference}}</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:24px 0 0;font-size:12px;color:#6b6b6b;line-height:1.6;">
+  To rebook, visit our website or call/WhatsApp <strong>{{tenant.supportPhone}}</strong>.
+</p>

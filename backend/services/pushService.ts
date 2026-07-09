@@ -1,27 +1,23 @@
 import webpush from 'web-push';
 import PushSubscription from '../models/PushSubscription';
 import NotificationModel from '../models/Notification';
+import mongoose from 'mongoose';
 
 // ── VAPID lazy initialisation ─────────────────────────────────────────────────
-// We set VAPID details on first use so a missing key doesn't crash startup.
 let _vapidInitialised = false;
 
 function ensureVapid(): void {
   if (_vapidInitialised) return;
-
   const publicKey  = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   const mailto     = process.env.VAPID_MAILTO;
-
   if (!publicKey || !privateKey || !mailto) {
-    throw new Error('VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_MAILTO must all be set in .env');
+    throw new Error('VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_MAILTO must all be set');
   }
-
   webpush.setVapidDetails(mailto, publicKey, privateKey);
   _vapidInitialised = true;
 }
 
-// ── Push payload type ─────────────────────────────────────────────────────────
 interface PushPayload {
   title: string;
   body:  string;
@@ -29,7 +25,6 @@ interface PushPayload {
   sound?: 'default' | 'chime' | 'bell' | 'ding' | 'silent';
 }
 
-// ── Shared push sender ────────────────────────────────────────────────────────
 async function sendToSubscriptions(
   subscriptions: Awaited<ReturnType<typeof PushSubscription.find>>,
   payload: PushPayload,
@@ -39,20 +34,16 @@ async function sendToSubscriptions(
   await Promise.all(
     subscriptions.map(async (sub) => {
       try {
-        const subscriptionPayload = {
-          ...payload,
-          sound: sub.soundPreference || 'default',
-        };
+        const subscriptionPayload = { ...payload, sound: sub.soundPreference || 'default' };
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } },
           JSON.stringify(subscriptionPayload),
         );
-        console.log(`[pushService] ✅ Push sent → ${sub.endpoint.slice(0, 60)}…`);
       } catch (err: any) {
         const status: number = err?.statusCode ?? err?.status ?? 0;
         if (status === 410 || status === 404) {
           staleEndpoints.push(sub.endpoint);
-          console.log(`[pushService] Removing stale subscription (${status}): ${sub.endpoint.slice(0, 60)}…`);
+          console.log(`[pushService] Removing stale subscription (${status})`);
         } else {
           console.error('[pushService] Failed to send push notification:', err);
         }
@@ -72,56 +63,47 @@ async function sendToSubscriptions(
 // ── Public helpers ────────────────────────────────────────────────────────────
 
 /**
- * Send a push notification to every subscribed device for a given customer phone.
- * Expired subscriptions (410 / 404) are automatically cleaned up.
+ * Send push to a customer identified by phone.
+ * Scoped to the tenant so a phone number can exist in multiple tenants.
  */
 export async function sendPushToPhone(
-  phone:   string,
+  phone: string,
   payload: PushPayload,
+  tenantId: string,
 ): Promise<void> {
-  if (!phone) {
-    console.warn('[pushService] Skipping push — no phone number provided');
-    return;
-  }
-
-  try { ensureVapid(); } catch (err) {
-    console.error('[pushService] VAPID init failed:', err);
-    return;
-  }
+  if (!phone) { console.warn('[pushService] Skipping — no phone'); return; }
+  try { ensureVapid(); } catch (err) { console.error('[pushService] VAPID init failed:', err); return; }
 
   let subscriptions;
   try {
-    subscriptions = await PushSubscription.find({ customerPhone: phone, role: 'customer' });
-  } catch (err) {
-    console.error('[pushService] Failed to query subscriptions:', err);
-    return;
-  }
+    subscriptions = await PushSubscription.find({
+      tenantId: new mongoose.Types.ObjectId(tenantId),
+      customerPhone: phone,
+      role: 'customer',
+    });
+  } catch (err) { console.error('[pushService] Failed to query subscriptions:', err); return; }
 
-  if (subscriptions.length === 0) {
-    console.log(`[pushService] No push subscriptions found for phone ${phone}`);
-    return;
-  }
-
+  if (subscriptions.length === 0) return;
   await sendToSubscriptions(subscriptions, payload);
 }
 
 /**
- * Send a push notification to ALL subscribed admin devices (or filtered by employeeId).
- * Used to alert the admin when a new booking comes in.
+ * Send push to all admin devices for the given tenant.
+ * Persists a Notification doc scoped to the tenant.
  */
 export async function sendPushToAdmins(
   payload: PushPayload,
-  employeeId?: string
+  tenantId: string,
+  employeeId?: string,
 ): Promise<void> {
-  try { ensureVapid(); } catch (err) {
-    console.error('[pushService] VAPID init failed:', err);
-    return;
-  }
+  try { ensureVapid(); } catch (err) { console.error('[pushService] VAPID init failed:', err); return; }
 
-  // Save notification to MongoDB
+  const tenantOid = new mongoose.Types.ObjectId(tenantId);
+
   try {
     const notif = new NotificationModel({
-      recipientId: 'admin',
+      tenantId: tenantOid,
+      recipientId: tenantId,   // admin recipientId = tenantId string
       recipientType: 'admin',
       title: payload.title,
       body: payload.body,
@@ -129,56 +111,39 @@ export async function sendPushToAdmins(
       sound: payload.sound || 'default',
     });
     const saved = await notif.save();
-    // Inject DB ID as unique tag into payload
-    payload = {
-      ...payload,
-      id: saved._id.toString(),
-    } as any;
+    payload = { ...payload, id: saved._id.toString() } as any;
   } catch (err) {
     console.error('[pushService] Failed to write admin notification to DB:', err);
   }
 
   let subscriptions;
   try {
-    const query: any = { role: 'admin' };
-    if (employeeId) {
-      query.employeeId = employeeId;
-    }
+    const query: any = { tenantId: tenantOid, role: 'admin' };
+    if (employeeId) query.employeeId = employeeId;
     subscriptions = await PushSubscription.find(query);
-  } catch (err) {
-    console.error('[pushService] Failed to query admin subscriptions:', err);
-    return;
-  }
+  } catch (err) { console.error('[pushService] Failed to query admin subscriptions:', err); return; }
 
-  if (subscriptions.length === 0) {
-    console.log('[pushService] No matching admin push subscriptions registered');
-    return;
-  }
-
+  if (subscriptions.length === 0) return;
   await sendToSubscriptions(subscriptions, payload);
 }
 
 /**
- * Send a push notification to a specific attendant's subscribed devices.
- * Used to notify an attendant when a booking assigned to them is confirmed/cancelled.
+ * Send push to a specific attendant's subscribed devices.
+ * Persists a Notification doc scoped to the tenant.
  */
 export async function sendPushToAttendant(
   attendantId: string,
   payload: PushPayload,
+  tenantId: string,
 ): Promise<void> {
-  if (!attendantId) {
-    console.warn('[pushService] Skipping push — no attendantId provided');
-    return;
-  }
+  if (!attendantId) { console.warn('[pushService] Skipping — no attendantId'); return; }
+  try { ensureVapid(); } catch (err) { console.error('[pushService] VAPID init failed:', err); return; }
 
-  try { ensureVapid(); } catch (err) {
-    console.error('[pushService] VAPID init failed:', err);
-    return;
-  }
+  const tenantOid = new mongoose.Types.ObjectId(tenantId);
 
-  // Save notification to MongoDB
   try {
     const notif = new NotificationModel({
+      tenantId: tenantOid,
       recipientId: attendantId,
       recipientType: 'attendant',
       title: payload.title,
@@ -187,27 +152,16 @@ export async function sendPushToAttendant(
       sound: payload.sound || 'default',
     });
     const saved = await notif.save();
-    // Inject DB ID as unique tag into payload
-    payload = {
-      ...payload,
-      id: saved._id.toString(),
-    } as any;
+    payload = { ...payload, id: saved._id.toString() } as any;
   } catch (err) {
     console.error('[pushService] Failed to write attendant notification to DB:', err);
   }
 
   let subscriptions;
   try {
-    subscriptions = await PushSubscription.find({ attendantId, role: 'attendant' });
-  } catch (err) {
-    console.error('[pushService] Failed to query attendant subscriptions:', err);
-    return;
-  }
+    subscriptions = await PushSubscription.find({ tenantId: tenantOid, attendantId, role: 'attendant' });
+  } catch (err) { console.error('[pushService] Failed to query attendant subscriptions:', err); return; }
 
-  if (subscriptions.length === 0) {
-    console.log(`[pushService] No push subscriptions found for attendant ${attendantId}`);
-    return;
-  }
-
+  if (subscriptions.length === 0) return;
   await sendToSubscriptions(subscriptions, payload);
 }
