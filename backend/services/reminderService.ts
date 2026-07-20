@@ -13,7 +13,7 @@ import { sendWhatsAppReminder } from './whatsappService';
  * shared across all tenants — per-tenant sender config is a future task.
  */
 export function startReminderScheduler(): void {
-  cron.schedule('0 6 * * *', async () => {
+  cron.schedule('0 9 * * *', async () => {
     console.log('[reminderService] 🔔 Running daily reminder job...');
 
     const tomorrow = DateTime.now().setZone('Africa/Nairobi').plus({ days: 1 }).toFormat('yyyy-MM-dd');
