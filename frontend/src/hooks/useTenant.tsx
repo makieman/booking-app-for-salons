@@ -20,16 +20,21 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [error, setError] = useState<string | null>(null);
 
   // Parse path-based route:
-  // e.g. /flo-sisterlocks        -> slug = flo-sisterlocks, view = customer
+  // e.g. /                       -> slug = flo-sisterlocks, view = customer (default salon)
+  //      /flo-sisterlocks        -> slug = flo-sisterlocks, view = customer
+  //      /select                 -> slug = null, view = select
   //      /flo-sisterlocks/admin  -> slug = flo-sisterlocks, view = admin
   //      /flo-sisterlocks/staff  -> slug = flo-sisterlocks, view = staff
   //      /register               -> slug = null, view = register
-  //      /                       -> slug = null, view = select
   const parseUrl = () => {
     const path = window.location.pathname;
     const segments = path.split('/').filter(Boolean);
 
     if (segments.length === 0) {
+      return { slug: 'flo-sisterlocks', view: 'customer' as const };
+    }
+
+    if (segments[0] === 'select') {
       return { slug: null, view: 'select' as const };
     }
 
@@ -38,12 +43,12 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     if (segments[0] === 'owner') {
-      const storedSlug = localStorage.getItem('ownerTenantSlug');
+      const storedSlug = localStorage.getItem('ownerTenantSlug') || 'flo-sisterlocks';
       return { slug: storedSlug, view: 'admin' as const };
     }
 
     if (segments[0] === 'staff') {
-      const storedSlug = localStorage.getItem('staffTenantSlug');
+      const storedSlug = localStorage.getItem('staffTenantSlug') || 'flo-sisterlocks';
       return { slug: storedSlug, view: 'staff' as const };
     }
 
@@ -120,7 +125,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const navigate = (view: 'customer' | 'admin' | 'staff' | 'register' | 'select', newSlug?: string) => {
     let path = '/';
-    const slug = newSlug || route.slug;
+    const slug = newSlug || route.slug || 'flo-sisterlocks';
 
     if (newSlug) {
       if (view === 'admin') {
@@ -133,7 +138,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (view === 'register') {
       path = '/register';
     } else if (view === 'select') {
-      path = '/';
+      path = '/select';
     } else if (view === 'admin') {
       path = '/owner';
     } else if (view === 'staff') {
