@@ -1,7 +1,6 @@
 # Salon Booking System
 
-| Customer booking flow | Admin dashboard |
-
+| Customer booking flow | Admin dashboard
 
 
 Staff members can log in using their own credentials to view their personal dashboard, track their daily and upcoming schedules, and mark appointments as complete.
