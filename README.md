@@ -206,8 +206,6 @@ Requires a staff username and personal PIN.
 | Time | Luxon (timezone-safe slot calculation) |
 | Hosting | Render (single web service, monorepo) |
 
----
-
 ## Project structure
 
 ```
