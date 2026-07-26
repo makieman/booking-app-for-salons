@@ -5,7 +5,7 @@
 
 Staff members can log in using their own credentials to view their personal dashboard, track their daily and upcoming schedules, and mark appointments as complete.
 
-The app works as a **Progressive Web App (PWA)** — it can be installed on any phone like a native app, (with a fallback UI), and receives push notifications without needing a native app store.
+The app works as a **Progressive Web App (PWA)** — it can be installed on any phone like a native app, and receives push notifications without needing a native app store.
 
 ---
 
