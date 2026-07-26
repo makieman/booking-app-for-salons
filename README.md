@@ -183,8 +183,6 @@ Requires a staff username and personal PIN.
 - Lists only bookings assigned to the logged-in staff member.
 - Provides a one-tap **Done** action to mark active appointments as completed.
 
----
-
 ## PWA features
 
 - Installable on iOS/Android/desktop via browser prompt
