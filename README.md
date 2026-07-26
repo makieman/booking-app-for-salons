@@ -90,7 +90,7 @@ The app works as a **Progressive Web App (PWA)** — it can be installed on any 
   username:     string    // Unique login username
   pinHash:      string    // Bcrypt hashed 4-6 digit PIN
   serviceIds:   ObjectId[] → Service // Services this attendant is qualified to do
-  isActive:     boolean   // Allows soft deletion/deactivation
+  isActive:     boolean   
   createdAt:    Date
   updatedAt:    Date
 }
