@@ -160,7 +160,6 @@ The customer goes through 6 sequential steps, each animated with Framer Motion:
 5. **Contact** — name, phone, email (email used for automated confirmation updates)
 6. **Confirmation** — booking reference, appointment summary with assigned stylist
 
-**Offline behaviour**: If the device is offline, a banner appears and the "Finalize Booking" button is disabled. Services fall back to cached mock data so the UI remains interactive and functional.
 
 ---
 
