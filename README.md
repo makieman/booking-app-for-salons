@@ -7,7 +7,6 @@ Staff members can log in using their own credentials to view their personal dash
 
 The app works as a **Progressive Web App (PWA)** — it can be installed on any phone like a native app, and receives push notifications without needing a native app store.
 
----
 
 ## System Design
 
