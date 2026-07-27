@@ -142,7 +142,6 @@ createBooking()
 | `GET` | `/api/admin/bookings?status=` | All bookings with optional status filter (Owner-only) |
 | `PATCH` | `/api/admin/bookings/:id` | Confirm or cancel a booking (Owner-only) |
 | `POST` | `/api/push/subscribe` | Register a push subscription |
-| `GET` | `/api/health` | Health check |
 
 ---
 
