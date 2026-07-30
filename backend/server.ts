@@ -11,6 +11,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load environment variables before importing routes that depend on process.env
+dotenv.config({ path: path.resolve(__dirname, '.env') });
+
 // Routes
 import serviceRoutes from './routes/serviceRoutes';
 import bookingRoutes from './routes/bookingRoutes';
@@ -23,9 +26,6 @@ import attendantRoutes from './routes/attendantRoutes';
 import tenantRoutes from './routes/tenantRoutes';
 import { startReminderScheduler } from './services/reminderService';
 import { resolveTenant } from './middleware/resolveTenant';
-
-// Load environment variables from .env file
-dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 import Tenant from './models/Tenant';
 import Attendant from './models/Attendant';
