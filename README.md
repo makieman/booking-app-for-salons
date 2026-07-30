@@ -5,9 +5,8 @@
 
 Staff members can log in using their own credentials to view their personal dashboard, track their daily and upcoming schedules, and mark appointments as complete.
 
-The app works as a **Progressive Web App (PWA)** — it can be installed on any phone like a native app, works offline (with a fallback UI), and receives push notifications without needing a native app store.
+The app works as a **Progressive Web App (PWA)** — it can be installed on any phone like a native app, and receives push notifications without needing a native app store.
 
----
 
 ## System Design
 
@@ -90,7 +89,7 @@ The app works as a **Progressive Web App (PWA)** — it can be installed on any 
   username:     string    // Unique login username
   pinHash:      string    // Bcrypt hashed 4-6 digit PIN
   serviceIds:   ObjectId[] → Service // Services this attendant is qualified to do
-  isActive:     boolean   // Allows soft deletion/deactivation
+  isActive:     boolean   
   createdAt:    Date
   updatedAt:    Date
 }
@@ -143,7 +142,6 @@ createBooking()
 | `GET` | `/api/admin/bookings?status=` | All bookings with optional status filter (Owner-only) |
 | `PATCH` | `/api/admin/bookings/:id` | Confirm or cancel a booking (Owner-only) |
 | `POST` | `/api/push/subscribe` | Register a push subscription |
-| `GET` | `/api/health` | Health check |
 
 ---
 
@@ -162,7 +160,6 @@ The customer goes through 6 sequential steps, each animated with Framer Motion:
 5. **Contact** — name, phone, email (email used for automated confirmation updates)
 6. **Confirmation** — booking reference, appointment summary with assigned stylist
 
-**Offline behaviour**: If the device is offline, a banner appears and the "Finalize Booking" button is disabled. Services fall back to cached mock data so the UI remains interactive and functional.
 
 ---
 
@@ -182,8 +179,6 @@ Requires a staff username and personal PIN.
 - Features three tailored tabs: **Today** | **Upcoming** | **Completed**.
 - Lists only bookings assigned to the logged-in staff member.
 - Provides a one-tap **Done** action to mark active appointments as completed.
-
----
 
 ## PWA features
 
@@ -207,8 +202,6 @@ Requires a staff username and personal PIN.
 | PWA | Workbox (via `vite-plugin-pwa`) |
 | Time | Luxon (timezone-safe slot calculation) |
 | Hosting | Render (single web service, monorepo) |
-
----
 
 ## Project structure
 
