@@ -268,6 +268,35 @@ export default function App() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // 1. Wait state: If tenant resolution is still in progress, wait.
+    if (tenantLoading) {
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+
+    // 2. Outage/Error handling: If tenant resolution failed with an error, fall back to mock data
+    if (tenantError) {
+      setServices(FALLBACK_SERVICES);
+      setApiError('Unable to connect to server. Showing offline data.');
+      setIsLoading(false);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+
+    // 3. Un-tenanted routes: If tenant is null and no error (e.g. /select or /register screen)
+    if (!tenant) {
+      setIsLoading(false);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+
+    // 4. Active tenant resolved: proceed with live API fetches
     const fetchInitialData = async () => {
       try {
         setIsLoading(true);
@@ -293,10 +322,12 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [isAdmin]);
+  }, [tenantLoading, tenant?._id, tenantError, isAdmin]);
 
   // Fetch slots when date, service, or attendant changes
   useEffect(() => {
+    if (tenantLoading || !tenant) return;
+
     const fetchSlots = async () => {
       if (!selectedService || !selectedDate) return;
 
@@ -318,10 +349,12 @@ export default function App() {
     if (activeStep === 'time') {
       fetchSlots();
     }
-  }, [selectedDate, selectedService, selectedAttendant, activeStep]);
+  }, [tenantLoading, tenant?._id, selectedDate, selectedService, selectedAttendant, activeStep]);
 
   // Fetch attendants when entering the attendant step
   useEffect(() => {
+    if (tenantLoading || !tenant) return;
+
     const fetchAttendants = async () => {
       if (!selectedService) return;
       try {
@@ -335,7 +368,7 @@ export default function App() {
     if (activeStep === 'attendant') {
       fetchAttendants();
     }
-  }, [activeStep, selectedService]);
+  }, [tenantLoading, tenant?._id, activeStep, selectedService]);
 
 
   const handleDateSelect = (date: string) => {
@@ -1782,6 +1815,8 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
 
   // Always load services on mount so they're available in the Staff tab's service picker
   useEffect(() => {
+    if (!tenant) return;
+
     api.getServices()
       .then(data => {
         setServices(data);
@@ -1798,10 +1833,12 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
         setEditDurations(durations);
       })
       .catch(console.error);
-  }, []);
+  }, [tenant?._id]);
 
   // Fetch pending bookings when tab opens
   useEffect(() => {
+    if (!tenant) return;
+
     if (activeTab === 'pending') {
       setLoadingPending(true);
       api.getAdminBookings('pending')
@@ -1836,7 +1873,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
         .catch(console.error)
         .finally(() => setLoadingStaff(false));
     }
-  }, [activeTab, ownerPinConfirmed]);
+  }, [tenant?._id, activeTab, ownerPinConfirmed, ownerPin]);
 
   const handleStatusUpdate = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
     setActionLoading(bookingId);
@@ -2826,6 +2863,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
 // ── AttendantView ────────────────────────────────────────────────────────────
 
 function AttendantView({ session }: { session: { _id: string; name: string; token: string } }) {
+  const { tenant, loading: tenantLoading } = useTenant();
   const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'completed'>('today');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2836,6 +2874,8 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
   const todayStr = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
+    if (tenantLoading || !tenant) return;
+
     const load = async () => {
       setLoading(true);
       try {
@@ -2856,7 +2896,7 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
       }
     };
     load();
-  }, [activeTab, session.token]);
+  }, [tenantLoading, tenant?._id, activeTab, session.token]);
 
   const handleMarkComplete = async (bookingId: string) => {
     setMarkingId(bookingId);
