@@ -495,7 +495,10 @@ export async function loginOwner(data: {
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || 'Login failed');
+    const err = new Error(errorData.error || 'Login failed') as any;
+    err.remainingAttempts = errorData.remainingAttempts ?? null;
+    err.lockoutMinutes    = errorData.lockoutMinutes    ?? null;
+    throw err;
   }
   return res.json();
 }
@@ -585,6 +588,64 @@ export async function uploadBrandingFavicon(token: string, file: File): Promise<
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to upload favicon');
+  }
+  return res.json();
+}
+
+// ── Owner Password Management ────────────────────────────────────────────────
+
+/** Change the logged-in owner's password (requires valid Bearer token). */
+export async function changeOwnerPassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ message: string }> {
+  const token = localStorage.getItem('ownerToken');
+  const res = await fetch(`${API_BASE}/auth/owner/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to change password');
+  }
+  return res.json();
+}
+
+/** Request a password reset email (PUBLIC — always succeeds on the API). */
+export async function forgotOwnerPassword(
+  slug: string,
+  email: string,
+): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/auth/owner/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, email }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to send reset email');
+  }
+  return res.json();
+}
+
+/** Set a new password using the one-time token from the reset email. */
+export async function resetOwnerPassword(
+  slug: string,
+  token: string,
+  newPassword: string,
+): Promise<{ message: string; token: string; tenant: any }> {
+  const res = await fetch(`${API_BASE}/auth/owner/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, token, newPassword }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to reset password');
   }
   return res.json();
 }

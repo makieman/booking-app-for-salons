@@ -240,3 +240,29 @@ export async function sendAdminNewBookingAlert(
     replyTo,
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// sendPasswordResetEmail
+// Sends the owner a password-reset link. Uses the password_reset.hbs template.
+// resetUrl: the full URL including the token & slug query params.
+// ════════════════════════════════════════════════════════════════════════════
+export async function sendPasswordResetEmail(
+  tenant: ITenant,
+  resetUrl: string,
+): Promise<void> {
+  const html = renderTemplate('password_reset', {
+    salonName: tenant.name,
+    ownerEmail: tenant.ownerEmail,
+    resetUrl,
+    expiresInMinutes: 60,
+  });
+
+  const { from } = getEmailHeaders(tenant);
+
+  await sendEmail({
+    to: tenant.ownerEmail,
+    subject: `🔐 Reset your ${tenant.name} admin password`,
+    html,
+    from,
+  });
+}
