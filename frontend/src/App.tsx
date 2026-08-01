@@ -44,6 +44,23 @@ export default function App() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState<string | null>(null);
   const [forgotError, setForgotError] = useState<string | null>(null);
+  // URL Reset Token flow
+  const [urlResetToken, setUrlResetToken] = useState<string | null>(null);
+  const [urlResetSlug, setUrlResetSlug] = useState<string | null>(null);
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('resetToken');
+    const slug = params.get('slug');
+    if (token && slug) {
+      setUrlResetToken(token);
+      setUrlResetSlug(slug);
+    }
+  }, []);
   const [loginSlug, setLoginSlug] = useState(tenantSlug || '');
   const [staffSlug, setStaffSlug] = useState(tenantSlug || '');
 
@@ -696,6 +713,103 @@ export default function App() {
             onDismiss={() => setShowNotificationPrompt(false)}
           />
         )}
+
+        {/* ── Password Reset Overlay (when opened via email link) ── */}
+        <AnimatePresence>
+          {urlResetToken && urlResetSlug && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[300] flex items-center justify-center bg-brand-black/70 backdrop-blur-md px-4"
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-brand-white w-full max-w-sm border-2 border-brand-black p-8 rounded-2xl space-y-6"
+              >
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-brand-gray-400">Security</p>
+                  <h2 className="text-2xl font-serif font-black uppercase tracking-tight">Set New Password</h2>
+                  <p className="text-[11px] font-bold text-brand-gray-500">Salon ID: <span className="text-brand-black">{urlResetSlug}</span></p>
+                </div>
+
+                <form
+                  onSubmit={async e => {
+                    e.preventDefault();
+                    setResetError(null);
+                    if (resetNewPassword !== resetConfirmPassword) {
+                      setResetError('Passwords do not match');
+                      return;
+                    }
+                    if (resetNewPassword.length < 8) {
+                      setResetError('Password must be at least 8 characters');
+                      return;
+                    }
+                    setResetLoading(true);
+                    try {
+                      const result = await api.resetOwnerPassword(urlResetSlug, urlResetToken, resetNewPassword);
+                      localStorage.setItem('ownerToken', result.token);
+                      localStorage.setItem('ownerTenantSlug', result.tenant.slug);
+                      setOwnerToken(result.token);
+                      api.setApiTenantSlug(result.tenant.slug);
+                      api.setApiAuthToken(result.token);
+                      setTenant(result.tenant);
+                      setUserMode('owner');
+                      setUrlResetToken(null);
+                      setUrlResetSlug(null);
+                      // Clear URL search params
+                      window.history.replaceState({}, document.title, window.location.pathname);
+                      navigate('admin', result.tenant.slug);
+                    } catch (err: any) {
+                      setResetError(err.message || 'Failed to reset password');
+                    } finally {
+                      setResetLoading(false);
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-gray-600">New Password</label>
+                    <input
+                      type="password"
+                      required
+                      minLength={8}
+                      value={resetNewPassword}
+                      onChange={e => { setResetNewPassword(e.target.value); setResetError(null); }}
+                      placeholder="8+ characters"
+                      className="w-full border-b-2 border-brand-gray-200 focus:border-brand-black focus:outline-none py-2.5 font-medium text-sm bg-transparent"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Confirm Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={resetConfirmPassword}
+                      onChange={e => { setResetConfirmPassword(e.target.value); setResetError(null); }}
+                      placeholder="••••••••"
+                      className="w-full border-b-2 border-brand-gray-200 focus:border-brand-black focus:outline-none py-2.5 font-medium text-sm bg-transparent"
+                    />
+                  </div>
+
+                  {resetError && (
+                    <p className="text-[11px] font-black uppercase tracking-widest text-red-500">{resetError}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="w-full py-4 text-xs font-black uppercase tracking-widest bg-brand-black text-white hover:bg-brand-gray-700 transition-all disabled:opacity-50"
+                  >
+                    {resetLoading ? 'Updating Password...' : 'Save New Password & Log In'}
+                  </button>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Login Modal (Owner + Staff tabs) ───────────────── */}
         <AnimatePresence>
