@@ -11,6 +11,7 @@ import { useAdminPushNotifications } from './hooks/useAdminPushNotifications';
 import { useAttendantPushNotifications } from './hooks/useAttendantPushNotifications';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import { useTenant } from './hooks/useTenant';
+import { SalonDashboard } from './components/SalonDashboard';
 
 /** Formats a service price as a fixed price or a range.
  *  e.g. formatPrice(2000)        → "KES 2,000"
@@ -1961,15 +1962,30 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
 
 function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, ownerToken, triggerToast }: { bookings: Booking[], ownerPin?: string, ownerToken: string, triggerToast: (msg: string, type?: 'success' | 'error') => void }) {
   const { tenant } = useTenant();
-  const [activeTab, setActiveTab] = useState<'ledger' | 'pending' | 'services' | 'staff' | 'settings'>('ledger');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'ledger' | 'pending' | 'services' | 'staff' | 'settings'>('dashboard');
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   const [confirmedBookings, setConfirmedBookings] = useState<Booking[]>(initialBookings);
+  const [allTenantBookings, setAllTenantBookings] = useState<Booking[]>(initialBookings);
   const [services, setServices] = useState<Service[]>([]);
   const [attendants, setAttendants] = useState<Attendant[]>([]);
   const [loadingPending, setLoadingPending] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Always load all tenant bookings on mount for Analytics Dashboard
+  useEffect(() => {
+    if (!tenant) return;
+    api.getAdminBookings()
+      .then(data => {
+        setAllTenantBookings(data);
+        const pending = data.filter((b: Booking) => b.status === 'pending');
+        const confirmed = data.filter((b: Booking) => b.status === 'confirmed');
+        setPendingBookings(pending);
+        setConfirmedBookings(confirmed);
+      })
+      .catch(console.error);
+  }, [tenant?._id]);
 
   // Admin push notifications
   const adminPush = useAdminPushNotifications();
@@ -2131,7 +2147,8 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
     }
   };
 
-  const tabs: { key: 'ledger' | 'pending' | 'services' | 'staff' | 'settings'; label: string }[] = [
+  const tabs: { key: 'dashboard' | 'ledger' | 'pending' | 'services' | 'staff' | 'settings'; label: string }[] = [
+    { key: 'dashboard', label: 'Dashboard' },
     { key: 'ledger', label: 'Ledger' },
     { key: 'pending', label: 'Pending' },
     { key: 'services', label: 'Services' },
@@ -2208,37 +2225,31 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
       </nav>
 
       <div className="flex-1 overflow-y-auto px-0 sm:px-8 py-6 sm:py-10 space-y-8 sm:space-y-12 scrollbar-hide">
+        {/* ── TAB 0: Analytics Dashboard ───────────────────── */}
+        {activeTab === 'dashboard' && (
+          <SalonDashboard
+            bookings={allTenantBookings}
+            pendingCount={pendingBookings.length}
+            onNavigateTab={tab => setActiveTab(tab)}
+          />
+        )}
         {/* ── TAB 1: Daily Ledger ─────────────────────────── */}
         {activeTab === 'ledger' && (
           <>
-            <header className="space-y-6 px-4 sm:px-0">
-              <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-6">
-                <div className="space-y-1">
-                  <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-none uppercase">Studio <br />Management</h2>
-                  <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[11px] sm:text-[12px] pt-1 sm:pt-2">
-                    Operations // {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between sm:justify-start gap-4 border-t border-brand-gray-100 pt-4 sm:border-0 sm:pt-0 sm:text-right">
-                  <div>
-                    <p className="text-[11px] sm:text-[13px] font-black uppercase tracking-widest text-brand-gray-600 mb-0.5 sm:mb-1">Local Time</p>
-                    <p className="text-2xl sm:text-3xl font-black tracking-tighter flex items-center gap-1.5 justify-end">
-                      <Clock size={16} className="text-brand-gray-400 animate-pulse" />
-                      {currentTime}
-                    </p>
-                  </div>
+            <header className="space-y-4 px-4 sm:px-0">
+              <div className="flex items-center justify-between border-b border-brand-gray-100 pb-3">
+                <p className="text-xs sm:text-sm font-black uppercase tracking-[0.2em] text-brand-gray-700">
+                  {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                </p>
+                <div className="flex items-center gap-1.5 text-brand-black">
+                  <Clock size={15} className="text-brand-gray-400 animate-pulse" />
+                  <span className="text-sm sm:text-base font-black tracking-tight">{currentTime}</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <div className="bg-brand-black p-4 sm:p-6 flex flex-col justify-between h-24 sm:h-28 shadow-sm">
-                  <p className="text-[10px] sm:text-[11px] text-white/70 font-black uppercase tracking-[0.2em]">Confirmed Today</p>
-                  <h3 className="text-3xl sm:text-4xl font-black text-white">{sortedToday.length}</h3>
-                </div>
-                <div className="border border-brand-gray-100 bg-white p-4 sm:p-6 flex flex-col justify-between h-24 sm:h-28 shadow-sm">
-                  <p className="text-[10px] sm:text-[11px] text-brand-gray-600 font-black uppercase tracking-[0.2em]">Salon Owner</p>
-                  <h3 className="text-base sm:text-xl font-serif italic text-brand-black truncate">{tenant?.name || 'Flo Sisterlocks'}</h3>
-                </div>
+              <div className="bg-brand-black px-5 py-4 flex items-center justify-between shadow-sm rounded-lg text-white">
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-white/70">Confirmed Today</p>
+                <h3 className="text-2xl font-black text-white">{sortedToday.length}</h3>
               </div>
             </header>
 
