@@ -1,35 +1,35 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Jost:wght@300;400;500;600;700&family=Inter:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-serif: "Playfair Display", serif;
-  --font-sans: "Jost", "Inter", sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", sans-serif;
   
   --color-primary: #B08968;
   --color-accent: #E6D3C3;
   --color-bg-salon: #FAF7F3;
-  --color-text-dark: #1F1F1F;
-  --color-text-sub: #6B6B6B;
+  --color-text-dark: #111111;
+  --color-text-sub: #3A3A3A;
 
-  --color-brand-black: #1F1F1F;
+  --color-brand-black: #111111;
   --color-brand-white: #FAF7F3;
   --color-brand-gray-50: #FAF7F3;
-  --color-brand-gray-100: #E6D3C3;
-  --color-brand-gray-200: #E6D3C3;
+  --color-brand-gray-100: #E2D7CB;
+  --color-brand-gray-200: #D4C5B5;
   --color-brand-gray-300: #B08968;
-  --color-brand-gray-400: #6B6B6B;
-  --color-brand-gray-500: #6B6B6B;
-  --color-brand-gray-600: #6B6B6B;
-  --color-brand-gray-700: #1F1F1F;
-  --color-brand-gray-800: #1F1F1F;
-  --color-brand-gray-900: #1F1F1F;
+  --color-brand-gray-400: #555555;
+  --color-brand-gray-500: #3A3A3A;
+  --color-brand-gray-600: #252525;
+  --color-brand-gray-700: #181818;
+  --color-brand-gray-800: #111111;
+  --color-brand-gray-900: #0A0A0A;
   /* Aliasing for easier replacement */
   --color-brand-cream: #FAF7F3;
   --color-brand-sage: #B08968;
-  --color-brand-charcoal: #1F1F1F;
+  --color-brand-charcoal: #111111;
   --color-brand-surface: #FAF7F3;
-  --color-brand-muted: #6B6B6B;
-  --color-brand-border: #E6D3C3;
+  --color-brand-muted: #4A4A4A;
+  --color-brand-border: #D4C5B5;
 
   --shadow-luxury: 0 20px 40px -15px rgba(0, 0, 0, 0.04);
 
