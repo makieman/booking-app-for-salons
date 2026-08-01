@@ -36,6 +36,14 @@ export default function App() {
   const [ownerPassword, setOwnerPassword] = useState('');
   const [ownerLoginLoading, setOwnerLoginLoading] = useState(false);
   const [ownerLoginError, setOwnerLoginError] = useState<string | null>(null);
+  const [ownerLoginRemainingAttempts, setOwnerLoginRemainingAttempts] = useState<number | null>(null);
+  const [ownerLoginLockoutMinutes, setOwnerLoginLockoutMinutes] = useState<number | null>(null);
+  // Forgot password
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [forgotError, setForgotError] = useState<string | null>(null);
   const [loginSlug, setLoginSlug] = useState(tenantSlug || '');
   const [staffSlug, setStaffSlug] = useState(tenantSlug || '');
 
@@ -58,6 +66,8 @@ export default function App() {
     if (!loginSlug) return;
     setOwnerLoginLoading(true);
     setOwnerLoginError(null);
+    setOwnerLoginRemainingAttempts(null);
+    setOwnerLoginLockoutMinutes(null);
     try {
       const result = await api.loginOwner({
         slug: loginSlug,
@@ -77,6 +87,8 @@ export default function App() {
       navigate('admin', result.tenant.slug);
     } catch (err: any) {
       setOwnerLoginError(err.message || 'Invalid credentials');
+      setOwnerLoginRemainingAttempts(err.remainingAttempts ?? null);
+      setOwnerLoginLockoutMinutes(err.lockoutMinutes ?? null);
     } finally {
       setOwnerLoginLoading(false);
     }
@@ -760,14 +772,80 @@ export default function App() {
                           className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors"
                         />
                       </div>
+                      {/* ── Error / Attempt feedback ── */}
                       {ownerLoginError && (
-                        <p className="text-[11px] font-black uppercase tracking-widest text-red-500">
-                          {ownerLoginError}
-                        </p>
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-black uppercase tracking-widest text-red-500">
+                            {ownerLoginError}
+                          </p>
+                          {ownerLoginRemainingAttempts !== null && ownerLoginRemainingAttempts > 0 && (
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">
+                              ⚠ {ownerLoginRemainingAttempts} attempt{ownerLoginRemainingAttempts === 1 ? '' : 's'} remaining before lockout
+                            </p>
+                          )}
+                          {ownerLoginLockoutMinutes !== null && (
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">
+                              🔒 Try again in {ownerLoginLockoutMinutes} minute{ownerLoginLockoutMinutes === 1 ? '' : 's'}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {/* ── Forgot Password ── */}
+                      {!showForgotPassword ? (
+                        <button
+                          type="button"
+                          onClick={() => { setShowForgotPassword(true); setForgotMessage(null); setForgotError(null); }}
+                          className="text-[10px] font-black uppercase tracking-widest text-brand-gray-500 hover:text-brand-black transition-colors text-left"
+                        >
+                          Forgot password?
+                        </button>
+                      ) : (
+                        <div className="space-y-3 border border-brand-gray-100 p-4 rounded-sm bg-brand-gray-50">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600">Password Reset</p>
+                          <p className="text-[10px] text-brand-gray-500 leading-relaxed">Enter the email address for this salon account. We'll send a reset link.</p>
+                          <input
+                            type="email"
+                            placeholder="owner@example.com"
+                            value={forgotEmail}
+                            onChange={e => { setForgotEmail(e.target.value); setForgotError(null); }}
+                            className="w-full border-b-2 border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-medium text-sm bg-transparent transition-colors"
+                          />
+                          {forgotError && <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider">{forgotError}</p>}
+                          {forgotMessage && <p className="text-[10px] font-bold text-green-600 uppercase tracking-wider">{forgotMessage}</p>}
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={forgotLoading || !forgotEmail || !loginSlug}
+                              onClick={async () => {
+                                setForgotLoading(true);
+                                setForgotError(null);
+                                try {
+                                  const r = await api.forgotOwnerPassword(loginSlug, forgotEmail);
+                                  setForgotMessage(r.message);
+                                  setForgotEmail('');
+                                } catch (err: any) {
+                                  setForgotError(err.message || 'Failed to send reset email');
+                                } finally {
+                                  setForgotLoading(false);
+                                }
+                              }}
+                              className="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest bg-brand-black text-white hover:bg-brand-gray-700 disabled:opacity-40 transition-all"
+                            >
+                              {forgotLoading ? 'Sending...' : 'Send Reset Link'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setShowForgotPassword(false); setForgotEmail(''); setForgotMessage(null); setForgotError(null); }}
+                              className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest border border-brand-gray-200 hover:border-brand-black transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
                       )}
                       <button
                         type="submit"
-                        disabled={ownerLoginLoading}
+                        disabled={ownerLoginLoading || ownerLoginLockoutMinutes !== null}
                         className="w-full py-4 text-xs font-black uppercase tracking-widest bg-brand-black text-white hover:bg-brand-gray-700 transition-all active:scale-95 disabled:opacity-50"
                       >
                         {ownerLoginLoading ? 'Signing In...' : 'Sign In as Owner'}
@@ -814,8 +892,8 @@ export default function App() {
                         </motion.div>
                         {staffPinError && (
                           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                            className="text-[11px] font-black uppercase tracking-widest text-red-500">
-                            Invalid credentials
+                            className="text-[11px] font-black uppercase tracking-widest text-red-500 space-y-1">
+                            <span className="block">Invalid credentials</span>
                           </motion.p>
                         )}
                         {/* Number pad */}
@@ -3410,6 +3488,111 @@ function SettingsTab({ ownerToken }: { ownerToken: string }) {
           </div>
         </div>
       </div>
+
+      {/* ── Change Password ─────────────────────────────────────────────── */}
+      <ChangePasswordCard ownerToken={ownerToken} />
+
+    </div>
+  );
+}
+
+// ── ChangePasswordCard ────────────────────────────────────────────────────────
+
+function ChangePasswordCard({ ownerToken }: { ownerToken: string }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await api.changeOwnerPassword(currentPassword, newPassword);
+      setSuccess(result.message || 'Password changed successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to change password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 px-4 sm:px-0 pt-8 pb-4 border-t border-brand-gray-100 mt-4">
+      <div>
+        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-brand-gray-500">Security</h3>
+        <h2 className="text-2xl font-serif font-black tracking-tight leading-tight uppercase mt-1">Change Password</h2>
+        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-gray-400 mt-1">Update your admin login password</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="max-w-md space-y-5">
+        <div className="space-y-2">
+          <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Current Password</label>
+          <input
+            type="password"
+            required
+            value={currentPassword}
+            onChange={e => { setCurrentPassword(e.target.value); setError(null); }}
+            placeholder="••••••••"
+            className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">New Password</label>
+          <input
+            type="password"
+            required
+            minLength={8}
+            value={newPassword}
+            onChange={e => { setNewPassword(e.target.value); setError(null); }}
+            placeholder="8+ characters"
+            className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Confirm New Password</label>
+          <input
+            type="password"
+            required
+            value={confirmPassword}
+            onChange={e => { setConfirmPassword(e.target.value); setError(null); }}
+            placeholder="••••••••"
+            className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors"
+          />
+        </div>
+
+        {error && (
+          <p className="text-[11px] font-black uppercase tracking-widest text-red-500">{error}</p>
+        )}
+        {success && (
+          <p className="text-[11px] font-black uppercase tracking-widest text-green-600">{success}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="py-4 px-8 text-xs font-black uppercase tracking-widest bg-brand-black text-white hover:bg-brand-gray-700 transition-all active:scale-95 disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Update Password'}
+        </button>
+      </form>
     </div>
   );
 }

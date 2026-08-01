@@ -1,14 +1,17 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Attendant from '../models/Attendant';
 import Tenant, { RESERVED_TENANT_SLUGS } from '../models/Tenant';
 import Service from '../models/Service';
+import { sendPasswordResetEmail } from '../services/emailService';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MAX_FAILED_ATTEMPTS = 5;
-const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const LOCK_DURATION_MS    = 15 * 60 * 1000; // 15 minutes
+const RESET_TOKEN_TTL_MS  = 60 * 60 * 1000; // 1 hour
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +27,16 @@ function isValidEmail(email: string): boolean {
 
 function isValidSlug(slug: string): boolean {
   return /^[a-z0-9-]+$/.test(slug);
+}
+
+/** SHA-256 hash of a raw token string — what we store in the DB */
+function hashToken(raw: string): string {
+  return crypto.createHash('sha256').update(raw).digest('hex');
+}
+
+/** Minutes remaining on a lockout, rounded up */
+function lockoutMinutesRemaining(lockUntil: Date): number {
+  return Math.ceil((lockUntil.getTime() - Date.now()) / 60_000);
 }
 
 // ── Default services seeded for every new tenant ──────────────────────────────
@@ -133,6 +146,8 @@ export const registerTenant = async (req: Request, res: Response) => {
 // ════════════════════════════════════════════════════════════════════════════
 // POST /api/auth/owner/login  (PUBLIC — no tenant resolution applied)
 // Validates slug + email + password. Returns JWT { tenantId, role: 'owner' }.
+// Tracks failed attempts and locks the owner account after MAX_FAILED_ATTEMPTS.
+// Responses include `remainingAttempts` on failure and `lockoutMinutes` on lock.
 // ════════════════════════════════════════════════════════════════════════════
 export const loginOwner = async (req: Request, res: Response) => {
   try {
@@ -148,12 +163,55 @@ export const loginOwner = async (req: Request, res: Response) => {
 
     const tenant = await Tenant.findOne({ slug: slug.toLowerCase().trim(), isActive: true });
 
-    // Constant-time compare even when tenant not found
+    // Constant-time compare even when tenant not found (prevents timing-based enumeration)
     const hashToCompare = tenant?.ownerPasswordHash ?? '$2b$10$invalidhashpaddingtomakeitconstanttime';
     const isMatch = await bcrypt.compare(password, hashToCompare);
 
-    if (!tenant || !isMatch) {
+    if (!tenant) {
+      // Tenant not found — return generic error with no attempt info (no account to lock)
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // ── Lockout check (before testing password, so locked accounts can't brute-force) ──
+    if (tenant.isOwnerLocked()) {
+      const mins = lockoutMinutesRemaining(tenant.ownerLockUntil as Date);
+      return res.status(429).json({
+        error: `Account temporarily locked. Try again in ${mins} minute${mins === 1 ? '' : 's'}.`,
+        lockoutMinutes: mins,
+      });
+    }
+
+    if (!isMatch) {
+      const attempts = (tenant.ownerFailedLoginAttempts ?? 0) + 1;
+      const updates: Record<string, unknown> = { ownerFailedLoginAttempts: attempts };
+
+      if (attempts >= MAX_FAILED_ATTEMPTS) {
+        updates.ownerLockUntil = new Date(Date.now() + LOCK_DURATION_MS);
+        console.warn(`[authController] Owner "${tenant.slug}" locked after ${attempts} failed attempts`);
+      }
+
+      await Tenant.updateOne({ _id: tenant._id }, { $set: updates });
+
+      const remaining = MAX_FAILED_ATTEMPTS - attempts;
+      if (remaining > 0) {
+        return res.status(401).json({
+          error: 'Invalid credentials',
+          remainingAttempts: remaining,
+        });
+      }
+
+      return res.status(429).json({
+        error: 'Too many failed attempts. Account locked for 15 minutes.',
+        lockoutMinutes: 15,
+      });
+    }
+
+    // ── Success: reset lockout state ──────────────────────────────────────
+    if (tenant.ownerFailedLoginAttempts > 0 || tenant.ownerLockUntil) {
+      await Tenant.updateOne(
+        { _id: tenant._id },
+        { $set: { ownerFailedLoginAttempts: 0, ownerLockUntil: null } },
+      );
     }
 
     const token = jwt.sign(
@@ -207,10 +265,10 @@ export const loginAttendant = async (req: Request, res: Response) => {
 
     // ── Account lockout check ───────────────────────────────────────────────
     if (attendant.isLocked()) {
-      const remainingMs = (attendant.lockUntil as Date).getTime() - Date.now();
-      const remainingMin = Math.ceil(remainingMs / 60_000);
+      const mins = lockoutMinutesRemaining(attendant.lockUntil as Date);
       return res.status(429).json({
-        error: `Account temporarily locked. Try again in ${remainingMin} minute${remainingMin === 1 ? '' : 's'}.`,
+        error: `Account temporarily locked. Try again in ${mins} minute${mins === 1 ? '' : 's'}.`,
+        lockoutMinutes: mins,
       });
     }
 
@@ -233,7 +291,8 @@ export const loginAttendant = async (req: Request, res: Response) => {
       }
 
       return res.status(429).json({
-        error: 'Account temporarily locked due to too many failed attempts. Try again in 15 minutes.',
+        error: 'Too many failed attempts. Account locked for 15 minutes.',
+        lockoutMinutes: 15,
       });
     }
 
@@ -267,5 +326,185 @@ export const loginAttendant = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[authController] loginAttendant error:', error);
     return res.status(500).json({ error: 'Login failed' });
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// POST /api/auth/owner/change-password  (PROTECTED — requireOwnerAuth)
+// Allows a logged-in owner to change their password.
+// Requires: currentPassword, newPassword.
+// ════════════════════════════════════════════════════════════════════════════
+export const changeOwnerPassword = async (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword?: string;
+      newPassword?: string;
+    };
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'newPassword must be at least 8 characters' });
+    }
+
+    // req.tenant is populated by resolveTenant; req.owner is populated by requireOwnerAuth
+    const tenant = await Tenant.findById(req.owner!.tenantId);
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, tenant.ownerPasswordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Prevent reusing the same password
+    const isSame = await bcrypt.compare(newPassword, tenant.ownerPasswordHash);
+    if (isSame) {
+      return res.status(400).json({ error: 'New password must be different from your current password' });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await Tenant.updateOne({ _id: tenant._id }, { $set: { ownerPasswordHash: newHash } });
+
+    console.log(`[authController] ✅ Owner password changed for tenant: ${tenant.slug}`);
+    return res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('[authController] changeOwnerPassword error:', error);
+    return res.status(500).json({ error: 'Failed to change password' });
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// POST /api/auth/owner/forgot-password  (PUBLIC)
+// Generates a one-time reset token, stores its SHA-256 hash, and emails the
+// raw token to the owner. Always returns 200 to prevent email enumeration.
+// Body: { slug, email }
+// ════════════════════════════════════════════════════════════════════════════
+export const forgotOwnerPassword = async (req: Request, res: Response) => {
+  // Always return 200 regardless of outcome — prevents email enumeration
+  const SAFE_RESPONSE = { message: 'If that account exists, a password reset email has been sent.' };
+
+  try {
+    const { slug, email } = req.body as { slug?: string; email?: string };
+
+    if (!slug || !email) {
+      return res.status(400).json({ error: 'slug and email are required' });
+    }
+
+    const tenant = await Tenant.findOne({
+      slug: slug.toLowerCase().trim(),
+      ownerEmail: email.toLowerCase().trim(),
+      isActive: true,
+    });
+
+    if (!tenant) {
+      // Silently succeed — do not reveal whether the account exists
+      return res.json(SAFE_RESPONSE);
+    }
+
+    // Generate a cryptographically secure 48-byte token (URL-safe base64)
+    const rawToken = crypto.randomBytes(48).toString('hex');
+    const tokenHash = hashToken(rawToken);
+    const expires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+    await Tenant.updateOne(
+      { _id: tenant._id },
+      { $set: { ownerPasswordResetTokenHash: tokenHash, ownerPasswordResetExpires: expires } },
+    );
+
+    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:5173').replace(/\/$/, '');
+    const resetUrl = `${frontendUrl}?resetToken=${rawToken}&slug=${tenant.slug}`;
+
+    // Fire-and-forget — email failure must not crash this endpoint
+    sendPasswordResetEmail(tenant, resetUrl).catch(err =>
+      console.error('[authController] forgotOwnerPassword — email send failed:', err),
+    );
+
+    console.log(`[authController] 🔐 Password reset requested for tenant: ${tenant.slug}`);
+    return res.json(SAFE_RESPONSE);
+  } catch (error) {
+    console.error('[authController] forgotOwnerPassword error:', error);
+    // Still return safe response on unexpected errors
+    return res.json(SAFE_RESPONSE);
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// POST /api/auth/owner/reset-password  (PUBLIC)
+// Validates the raw reset token against the stored hash, checks expiry,
+// sets the new password, clears the token, and returns a new JWT.
+// Body: { slug, token, newPassword }
+// ════════════════════════════════════════════════════════════════════════════
+export const resetOwnerPassword = async (req: Request, res: Response) => {
+  try {
+    const { slug, token, newPassword } = req.body as {
+      slug?: string;
+      token?: string;
+      newPassword?: string;
+    };
+
+    if (!slug || !token || !newPassword) {
+      return res.status(400).json({ error: 'slug, token, and newPassword are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'newPassword must be at least 8 characters' });
+    }
+
+    const tokenHash = hashToken(token);
+
+    const tenant = await Tenant.findOne({
+      slug: slug.toLowerCase().trim(),
+      ownerPasswordResetTokenHash: tokenHash,
+      isActive: true,
+    });
+
+    if (!tenant) {
+      return res.status(400).json({ error: 'Invalid or expired reset link' });
+    }
+
+    // Check token expiry
+    if (!tenant.ownerPasswordResetExpires || tenant.ownerPasswordResetExpires < new Date()) {
+      return res.status(400).json({ error: 'Reset link has expired. Please request a new one.' });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+
+    await Tenant.updateOne(
+      { _id: tenant._id },
+      {
+        $set:   { ownerPasswordHash: newHash },
+        $unset: { ownerPasswordResetTokenHash: '', ownerPasswordResetExpires: '' },
+      },
+    );
+
+    console.log(`[authController] ✅ Password reset completed for tenant: ${tenant.slug}`);
+
+    // Issue a new JWT so the owner is immediately logged in after reset
+    const jwtToken = jwt.sign(
+      { tenantId: tenant._id.toString(), role: 'owner' },
+      getJwtSecret(),
+      { expiresIn: '7d' },
+    );
+
+    return res.json({
+      message: 'Password reset successfully',
+      token: jwtToken,
+      tenant: {
+        _id: tenant._id,
+        name: tenant.name,
+        slug: tenant.slug,
+        timezone: tenant.timezone,
+        workingHours: tenant.workingHours,
+        branding: tenant.branding,
+        plan: tenant.plan,
+      },
+    });
+  } catch (error) {
+    console.error('[authController] resetOwnerPassword error:', error);
+    return res.status(500).json({ error: 'Failed to reset password' });
   }
 };

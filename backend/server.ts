@@ -159,11 +159,13 @@ async function startServer(): Promise<void> {
   });
 
   // ── Tenant Resolution ───────────────────────────────────
-  // Applied to every /api route EXCEPT the three public endpoints below.
+  // Applied to every /api route EXCEPT the public endpoints below.
   // The skip-list must stay in sync with authRoutes.ts.
   const PUBLIC_PATHS = [
     '/api/auth/tenant/register',
     '/api/auth/owner/login',
+    '/api/auth/owner/forgot-password',
+    '/api/auth/owner/reset-password',
     '/api/health',
   ];
   app.use('/api', (req, res, next) => {

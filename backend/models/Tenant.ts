@@ -42,6 +42,20 @@ export interface ITenant extends Document {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+
+  // ── Owner lockout (mirrors attendant lockout pattern) ──────────────────────
+  /** Consecutive failed owner login attempts — resets on success */
+  ownerFailedLoginAttempts: number;
+  /** Owner account locked until this date (null = not locked) */
+  ownerLockUntil?: Date | null;
+  /** Returns true if the owner account is currently locked out */
+  isOwnerLocked(): boolean;
+
+  // ── Password reset ─────────────────────────────────────────────────────────
+  /** SHA-256 hash of the one-time reset token — stored; raw token is emailed */
+  ownerPasswordResetTokenHash?: string | null;
+  /** Expiry date for the reset token (1 hour from generation) */
+  ownerPasswordResetExpires?: Date | null;
 }
 
 const TenantSchema: Schema = new Schema(
@@ -92,9 +106,20 @@ const TenantSchema: Schema = new Schema(
     supportEmail: { type: String },
     plan:     { type: String, enum: ['free', 'paid'], default: 'free' },
     isActive: { type: Boolean, default: true, index: true },
+    // ── Owner lockout ────────────────────────────────────────────────────────
+    ownerFailedLoginAttempts: { type: Number, default: 0 },
+    ownerLockUntil:           { type: Date, default: null },
+    // ── Password reset ───────────────────────────────────────────────────────
+    ownerPasswordResetTokenHash: { type: String, default: null },
+    ownerPasswordResetExpires:   { type: Date, default: null },
   },
   { timestamps: true },
 );
+
+// Virtual: check if the owner account is currently locked
+TenantSchema.methods.isOwnerLocked = function (): boolean {
+  return !!(this.ownerLockUntil && this.ownerLockUntil > new Date());
+};
 
 export const RESERVED_TENANT_SLUGS = RESERVED_SLUGS;
 export default mongoose.model<ITenant>('Tenant', TenantSchema);
