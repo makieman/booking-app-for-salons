@@ -1301,10 +1301,7 @@ export default function App() {
                         <span className="text-sm font-black uppercase tracking-[0.2em]">Previous</span>
                       </button>
                       <div className="space-y-8">
-                        <div className="space-y-2">
-                          <h2 className="text-4xl font-serif font-black tracking-tight leading-none">Choose<br />Artist</h2>
-                          <div className="w-12 h-1 bg-brand-black"></div>
-                        </div>
+                        <h2 className="text-4xl font-serif font-black tracking-tight leading-none">Choose Artist</h2>
                         <div className="flex flex-col gap-3">
                           {/* "Any Available" option */}
                           <button
@@ -1479,7 +1476,7 @@ export default function App() {
                           </div>
                           <div className="space-y-8">
                             <div className="space-y-2 group">
-                              <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Identification</label>
+                              <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Full Name</label>
                               <div className="relative">
                                 <input
                                   type="text"
@@ -1491,7 +1488,7 @@ export default function App() {
                               </div>
                             </div>
                             <div className="space-y-2 group">
-                              <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Telecommunication</label>
+                              <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Phone Number</label>
                               <div className="relative">
                                 <input
                                   type="tel"
@@ -1503,7 +1500,7 @@ export default function App() {
                               </div>
                             </div>
                             <div className="space-y-2 group">
-                              <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Electronic Mail</label>
+                              <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Email</label>
                               <div className="relative">
                                 <input
                                   type="email"
