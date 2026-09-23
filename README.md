@@ -30,7 +30,7 @@ The app works as a **Progressive Web App (PWA)** — it can be installed on any 
                                              │  • Booking           │
                                              │  • Service           │
                                              │  • Attendant         │
-                                             │  • PushSubscription  │
+                                             │  • PushSubscriptions │
                                              └──────────────────────┘
                                                         │
                               ┌─────────────────────────┼─────────────────────────┐
