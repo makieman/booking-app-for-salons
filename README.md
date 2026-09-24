@@ -64,7 +64,7 @@ The app works as a **Progressive Web App (PWA)** — it can be installed on any 
   startTime:    string                // HH:mm
   endTime:      string                // HH:mm  (calculated from service duration)
   status:       'pending' | 'confirmed' | 'cancelled'
-  completed:    boolean               // tracks if slot has been serviced
+  completed:    boolean               // tracks if slot has been service
   createdAt:    Date
   updatedAt:    Date
 }
