@@ -1,6 +1,8 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import multerStorageCloudinary from 'multer-storage-cloudinary';
 import multer from 'multer';
+
+const CloudinaryStorage = (multerStorageCloudinary as any).CloudinaryStorage || multerStorageCloudinary;
 
 // Cloudinary automatically picks up process.env.CLOUDINARY_URL or process.env.CLOUDINARY_API_KEY configurations.
 // But we will explicitly check to avoid silent failures.
