@@ -10,7 +10,7 @@ import {
   sendBookingCancelledToCustomer,
 } from '../services/emailService';
 import { sendPushToPhone, sendPushToAdmins, sendPushToAttendant } from '../services/pushService';
-import { sendWhatsAppBookingReceived, sendWhatsAppBookingCancelled } from '../services/whatsappService';
+import { sendWhatsAppBookingReceived, sendWhatsAppBookingCancelled, sendWhatsAppRescheduled } from '../services/whatsappService';
 
 /**
  * POST /api/bookings
@@ -276,6 +276,7 @@ export const rescheduleBookingCustomer = async (req: Request, res: Response) => 
     const tenantIdStr = tenantId.toString();
 
     void sendBookingRequestReceived(req.tenant!, booking, service, attendantName);
+    void sendWhatsAppRescheduled(booking, service, attendantName);
     void sendPushToPhone(booking.phone, {
       title: '📅 Appointment Rescheduled (Pending Approval)',
       body: `Your appointment was rescheduled to ${booking.date} at ${booking.startTime} (previously ${prevDate} @ ${prevTime}).`,
