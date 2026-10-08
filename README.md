@@ -198,6 +198,7 @@ Requires a staff username and personal PIN.
 | Database | MongoDB via Mongoose |
 | Email | Resend |
 | Push | Web Push API (VAPID) |
+| WhatsApp | Meta Cloud API (interactive buttons, templates, HMAC webhooks) |
 | PWA | Workbox (via `vite-plugin-pwa`) |
 | Time | Luxon (timezone-safe slot calculation) |
 | Hosting | Render (single web service, monorepo) |
@@ -262,3 +263,35 @@ The app is deployed on **Render** as a single web service. The Express backend s
 # render.yaml
 buildCommand: npm install && npm run build   # installs + builds frontend
 startCommand: npm start                       # starts Express
+```
+
+---
+
+## WhatsApp Cloud API & Inbound Webhooks
+
+The platform integrates directly with Meta's official WhatsApp Business Cloud API to support automated customer appointment notifications and interactive two-way messaging.
+
+### Features
+- **Outbound Template Notifications**: Automated dispatch for appointment bookings, reminders, cancellations, and reschedules (`booking_rescheduled`).
+- **Interactive Quick-Reply Buttons**: Customers can interact directly in WhatsApp with one-tap quick-reply buttons:
+  - **Confirm**: Sets the pending booking status to confirmed.
+  - **Cancel**: Marks the appointment as cancelled and frees up the slot.
+  - **Reschedule**: Evaluates attendant schedules and returns the next 3 available slots via `slotService`.
+- **HMAC Signature Verification**: Every inbound POST request validates the `X-Hub-Signature-256` header against `WHATSAPP_APP_SECRET`.
+- **Multi-Tenant Routing**: Since Meta webhooks do not pass custom frontend headers (no `X-Tenant-Slug`), inbound payloads resolve the target salon tenant via `metadata.phone_number_id` stored on the `Tenant` document.
+
+### Webhook Verification Handshake
+Meta validates webhook endpoints with a GET challenge request:
+```
+GET /api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=<WHATSAPP_WEBHOOK_TOKEN>&hub.challenge=<CHALLENGE>
+```
+The server validates the token and echoes the challenge back with a 200 OK status.
+
+### Testing Webhooks Locally
+A test CLI script is available to test both the handshake and simulate button payloads:
+```bash
+node test-whatsapp-webhook.mjs --verify
+node test-whatsapp-webhook.mjs --simulate-confirm --phone 254712345678
+node test-whatsapp-webhook.mjs --simulate-reschedule --phone 254712345678
+```
+
