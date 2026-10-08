@@ -24,6 +24,7 @@ import notificationRoutes from './routes/notificationRoutes';
 import authRoutes from './routes/authRoutes';
 import attendantRoutes from './routes/attendantRoutes';
 import tenantRoutes from './routes/tenantRoutes';
+import whatsappRoutes from './routes/whatsappRoutes';
 import { startReminderScheduler } from './services/reminderService';
 import { resolveTenant } from './middleware/resolveTenant';
 
@@ -167,12 +168,19 @@ async function startServer(): Promise<void> {
     '/api/auth/owner/forgot-password',
     '/api/auth/owner/reset-password',
     '/api/health',
+    // WhatsApp Cloud API webhook — Meta sends no X-Tenant-Slug
+    '/api/whatsapp/webhook',
   ];
   app.use('/api', (req, res, next) => {
     const fullPath = '/api' + req.path;
     if (PUBLIC_PATHS.includes(fullPath)) return next();
     return resolveTenant(req, res, next);
   });
+
+  // ── WhatsApp Cloud API webhook (no tenant middleware) ────────────────────
+  // Registered here — after DB is ready but before resolveTenant is applied
+  // to all other routes — so Meta's GET verification + POST deliveries work.
+  app.use('/api/whatsapp', whatsappRoutes);
 
   // Single-tenant auto-seed removed.
   // New tenants receive default services via POST /api/auth/tenant/register.
