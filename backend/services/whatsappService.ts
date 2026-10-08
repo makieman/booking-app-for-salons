@@ -88,6 +88,47 @@ async function sendTemplate(opts: SendTemplateOpts): Promise<boolean> {
   }
 }
 
+// ── Free-text sender (24-hour customer-service window only) ──────────────────
+
+/**
+ * Send a plain-text message to a phone number.
+ * Only works within the 24-hour customer-initiated messaging window.
+ * Use templates (sendTemplate) for proactive outbound messages.
+ */
+export async function sendWhatsAppFreeText(to: string, text: string): Promise<boolean> {
+  const normalized = normalizeKenyanPhone(to);
+  if (!normalized) return false;
+
+  const config = getConfig();
+  if (!config) return false;
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: normalized,
+    type: 'text',
+    text: { body: text },
+  };
+
+  try {
+    const response = await fetch(config.url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${config.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json() as any;
+    if (!response.ok) {
+      console.error('[whatsappService] ❌ Free-text send error:', JSON.stringify(data?.error ?? data));
+      return false;
+    }
+    console.log(`[whatsappService] ✅ Free-text → ${normalized} | msgId: ${data?.messages?.[0]?.id}`);
+    return true;
+  } catch (err) {
+    console.error('[whatsappService] ❌ Free-text network error:', err);
+    return false;
+  }
+}
+
 // ── Formatters ───────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
@@ -154,6 +195,25 @@ export async function sendWhatsAppReminder(booking: IBooking, service: IService,
       { type: 'text', text: booking.customerName },
       { type: 'text', text: serviceName },
       { type: 'text', text: formatTime(booking.startTime) },
+    ]}],
+  });
+}
+
+export async function sendWhatsAppRescheduled(
+  booking: IBooking,
+  service: IService,
+  attendantName?: string,
+): Promise<void> {
+  const serviceName = attendantName ? `${service.name} with ${attendantName}` : service.name;
+  await sendTemplate({
+    to: booking.phone,
+    templateName: 'booking_rescheduled',
+    components: [{ type: 'body', parameters: [
+      { type: 'text', text: booking.customerName },
+      { type: 'text', text: serviceName },
+      { type: 'text', text: formatDate(booking.date) },
+      { type: 'text', text: formatTime(booking.startTime) },
+      { type: 'text', text: booking.reference },
     ]}],
   });
 }
