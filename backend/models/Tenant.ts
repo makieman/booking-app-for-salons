@@ -31,8 +31,15 @@ export interface ITenant extends Document {
     primaryColor?: string;
     emailFromName?: string;     // e.g. "Flo Sisterlocks" — display name only
     emailReplyTo?: string;
-    whatsappSenderNumber?: string;
+    whatsappSenderNumber?: string; // Display phone number (e.g. '254712345678')
   };
+  /**
+   * Meta's numeric phone_number_id (e.g. '106540352242922').
+   * Used to resolve which tenant owns an inbound Cloud API webhook message.
+   * Stored top-level (not in branding) so we can apply a sparse unique index.
+   * Never returned to public-facing API responses.
+   */
+  whatsappPhoneNumberId?: string;
   locale: 'en' | 'sw';
   mpesaTillNumber?: string;
   mpesaPaybillNumber?: string;
@@ -104,6 +111,11 @@ const TenantSchema: Schema = new Schema(
     mpesaPaybillNumber: { type: String },
     supportPhone: { type: String },
     supportEmail: { type: String },
+    /**
+     * Meta's numeric phone_number_id for inbound Cloud API webhook routing.
+     * sparse: true so tenants without WhatsApp don't collide on the unique index.
+     */
+    whatsappPhoneNumberId: { type: String, default: null },
     plan:     { type: String, enum: ['free', 'paid'], default: 'free' },
     isActive: { type: Boolean, default: true, index: true },
     // ── Owner lockout ────────────────────────────────────────────────────────
@@ -115,6 +127,10 @@ const TenantSchema: Schema = new Schema(
   },
   { timestamps: true },
 );
+
+// Sparse unique index: only enforces uniqueness for documents that have this
+// field set — tenants without WhatsApp don't interfere with each other.
+TenantSchema.index({ whatsappPhoneNumberId: 1 }, { unique: true, sparse: true });
 
 // Virtual: check if the owner account is currently locked
 TenantSchema.methods.isOwnerLocked = function (): boolean {
