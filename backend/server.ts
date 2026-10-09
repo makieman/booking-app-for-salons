@@ -14,6 +14,7 @@ const __dirname = path.dirname(__filename);
 // Load environment variables before importing routes that depend on process.env
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
+
 // Routes
 import serviceRoutes from './routes/serviceRoutes';
 import bookingRoutes from './routes/bookingRoutes';
@@ -133,7 +134,14 @@ async function startServer(): Promise<void> {
 
   // ── Middleware ────────────────────────────────────────────
   app.use(cors());          // Allow cross-origin requests from the frontend
-  app.use(express.json());  // Parse JSON request bodies
+  // Parse JSON and keep req.rawBody buffer for HMAC signature verification (e.g. Meta WhatsApp)
+  app.use(
+    express.json({
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    })
+  );
 
   // ── Database ─────────────────────────────────────────────
   await connectDB();
