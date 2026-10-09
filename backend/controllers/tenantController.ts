@@ -54,12 +54,15 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
       mpesaPaybillNumber,
       supportPhone,
       supportEmail,
+      whatsappPhoneNumberId,
     } = req.body;
 
     const tenant = await Tenant.findById(req.tenant!._id);
     if (!tenant) {
       return res.status(404).json({ error: 'Tenant not found' });
     }
+
+    if (whatsappPhoneNumberId !== undefined) tenant.whatsappPhoneNumberId = whatsappPhoneNumberId;
 
     if (name !== undefined) tenant.name = name;
     if (timezone !== undefined) tenant.timezone = timezone;

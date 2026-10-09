@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch server.ts",
-    "start": "node --import tsx server.ts"
+    "start": "node --import tsx server.ts",
+    "link-whatsapp": "node scripts/link-whatsapp.mjs"
   },
   "dependencies": {
     "@types/bcrypt": "^6.0.0",
