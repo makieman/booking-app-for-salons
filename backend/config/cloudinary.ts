@@ -4,12 +4,17 @@ import multer from 'multer';
 
 const CloudinaryStorage = (multerStorageCloudinary as any).CloudinaryStorage || multerStorageCloudinary;
 
-// Cloudinary automatically picks up process.env.CLOUDINARY_URL or process.env.CLOUDINARY_API_KEY configurations.
-// But we will explicitly check to avoid silent failures.
-const cloudinaryUrl = process.env.CLOUDINARY_URL;
-const cloudinaryApiKey = process.env.CLOUDINARY_API_KEY;
-if (!cloudinaryUrl && !cloudinaryApiKey) {
-  console.warn('⚠️  Neither CLOUDINARY_URL nor CLOUDINARY_API_KEY is set in environment variables. Image uploads will fail.');
+// Cloudinary supports either a single CLOUDINARY_URL or separate credentials.
+if (process.env.CLOUDINARY_URL) {
+  // Automatically configured by Cloudinary SDK from CLOUDINARY_URL
+} else if (process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET && process.env.CLOUDINARY_CLOUD_NAME) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+} else {
+  console.warn('⚠️  Neither CLOUDINARY_URL nor CLOUDINARY_API_KEY/SECRET is set in environment variables. Image uploads will fail.');
 }
 
 const storage = new CloudinaryStorage({
