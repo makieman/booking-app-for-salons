@@ -59,56 +59,80 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
 
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
-    const service = booking.serviceId as unknown as InstanceType<typeof Service>;
-    const attendantName =
-      booking.attendantId && typeof booking.attendantId === 'object'
-        ? (booking.attendantId as unknown as IAttendant).name
-        : undefined;
+    let groupBookings = [booking];
+    if (booking.groupId) {
+      await Booking.updateMany(
+        { tenantId: req.tenant!._id, groupId: booking.groupId },
+        { status }
+      );
+      groupBookings = await Booking.find({ tenantId: req.tenant!._id, groupId: booking.groupId })
+        .populate('serviceId')
+        .populate('attendantId', 'name')
+        .sort({ groupOrder: 1 });
+    }
 
     const tenantIdStr = req.tenant!._id.toString();
 
+    const combinedName = groupBookings
+      .map(b => `${(b.serviceId as any)?.name ?? 'Service'} with ${(b.attendantId as any)?.name ?? 'Staff'}`)
+      .join(' & ');
+
+    const syntheticService = {
+      _id: (booking.serviceId as any)._id,
+      name: combinedName,
+      price: groupBookings.reduce((sum, b) => sum + (b.price || (b.serviceId as any)?.price || 0), 0),
+    } as any;
+
     if (status === 'confirmed') {
-      void sendBookingConfirmedToCustomer(req.tenant!, booking, service as any, attendantName);
-      void sendWhatsAppBookingConfirmed(booking, service as any, attendantName);
+      void sendBookingConfirmedToCustomer(req.tenant!, booking, syntheticService, undefined);
+      void sendWhatsAppBookingConfirmed(booking, syntheticService, undefined);
       void sendPushToPhone(booking.phone, {
         title: '✅ Appointment Confirmed!',
-        body: `See you on ${booking.date} at ${booking.startTime}${attendantName ? ` with ${attendantName}` : ''}. Please arrive 5–10 mins early.`,
+        body: `See you on ${booking.date} at ${booking.startTime} for ${combinedName}. Please arrive 5–10 mins early.`,
         url: '/',
       }, tenantIdStr);
-      if (booking.attendantId) {
-        void sendPushToAttendant(
-          (booking.attendantId as any)._id?.toString() || booking.attendantId.toString(),
-          {
-            title: '✅ Booking Confirmed',
-            body: `You have a confirmed appointment with ${booking.customerName} on ${booking.date} at ${booking.startTime}.`,
-            url: '/attendant',
-          },
-          tenantIdStr
-        );
+
+      for (const b of groupBookings) {
+        const attId = (b.attendantId as any)?._id?.toString() || b.attendantId?.toString();
+        if (attId) {
+          void sendPushToAttendant(
+            attId,
+            {
+              title: '✅ Booking Confirmed',
+              body: `You have a confirmed appointment with ${b.customerName} on ${b.date} at ${b.startTime} for ${(b.serviceId as any)?.name}.`,
+              url: '/attendant',
+            },
+            tenantIdStr
+          );
+        }
       }
     } else if (status === 'cancelled') {
-      void sendBookingCancelledToCustomer(req.tenant!, booking, service as any, attendantName);
-      void sendWhatsAppBookingCancelled(booking, service as any);
+      void sendBookingCancelledToCustomer(req.tenant!, booking, syntheticService, undefined);
+      void sendWhatsAppBookingCancelled(booking, syntheticService);
       void sendPushToPhone(booking.phone, {
         title: '❌ Booking Cancelled',
-        body: `Your booking on ${booking.date} has been cancelled. Call 0721 530 120 to rebook.`,
+        body: `Your booking for ${combinedName} on ${booking.date} has been cancelled.`,
         url: '/',
       }, tenantIdStr);
       void sendPushToAdmins({
         title: '❌ Booking Cancelled by Admin',
-        body: `Booking for ${booking.customerName} on ${booking.date} has been cancelled.`,
+        body: `Booking for ${booking.customerName} (${combinedName}) on ${booking.date} has been cancelled.`,
         url: '/admin',
       }, tenantIdStr);
-      if (booking.attendantId) {
-        void sendPushToAttendant(
-          (booking.attendantId as any)._id?.toString() || booking.attendantId.toString(),
-          {
-            title: '❌ Booking Cancelled',
-            body: `The appointment for ${booking.customerName} on ${booking.date} has been cancelled.`,
-            url: '/attendant',
-          },
-          tenantIdStr
-        );
+
+      for (const b of groupBookings) {
+        const attId = (b.attendantId as any)?._id?.toString() || b.attendantId?.toString();
+        if (attId) {
+          void sendPushToAttendant(
+            attId,
+            {
+              title: '❌ Booking Cancelled',
+              body: `The appointment for ${b.customerName} on ${b.date} at ${b.startTime} has been cancelled.`,
+              url: '/attendant',
+            },
+            tenantIdStr
+          );
+        }
       }
     }
 
