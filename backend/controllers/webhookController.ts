@@ -142,7 +142,8 @@ export const verifyWebhook = (req: Request, res: Response): void => {
 
   if (mode === 'subscribe' && token === expectedToken) {
     console.log('[webhookController] ✅ Webhook verified by Meta');
-    res.status(200).send(challenge);
+    res.setHeader('Content-Type', 'text/plain');
+    res.status(200).send(challenge ?? '');
   } else {
     console.warn('[webhookController] ⚠️ Webhook verification failed — token mismatch');
     res.sendStatus(403);
@@ -154,10 +155,10 @@ export const verifyWebhook = (req: Request, res: Response): void => {
  * Receives inbound messages (and delivery receipts we can ignore).
  *
  * Security:
- *  1. Verifies X-Hub-Signature-256 using WHATSAPP_APP_SECRET.
- *  2. Resolves tenant from phone_number_id in payload.
- *  3. Looks up customer's most recent pending/confirmed booking by phone.
- *  4. Routes quick-reply button payloads only.
+ *  1. Verifies X-Hub-Signature-256 using WHATSAPP_APP_SECRET over req.rawBody.
+ *  2. Resolves tenant from phone_number_id in payload via Tenant.whatsappPhoneNumberId.
+ *  3. Scopes customer booking lookups strictly by tenantId.
+ *  4. Routes quick-reply button payloads.
  */
 export const handleIncomingMessage = async (req: Request, res: Response): Promise<void> => {
   // ── 1. HMAC-SHA256 signature verification ────────────────────────────────
@@ -175,24 +176,23 @@ export const handleIncomingMessage = async (req: Request, res: Response): Promis
     return;
   }
 
-  // Express must expose the raw body for HMAC verification.
-  // We rely on express.json() having parsed it already and the rawBody
-  // being re-serialised here. For production, configure express to save
-  // req.rawBody via a verify callback on the json middleware.
-  const rawBody = JSON.stringify(req.body);
+  const rawBody: Buffer = (req as any).rawBody || Buffer.from(JSON.stringify(req.body));
   const expectedSig = 'sha256=' + crypto
     .createHmac('sha256', appSecret)
-    .update(rawBody, 'utf8')
+    .update(rawBody)
     .digest('hex');
 
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+  const sigBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSig);
+
+  if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
     console.warn('[webhookController] ⚠️ Signature mismatch — possible spoofed request');
     res.sendStatus(401);
     return;
   }
 
-  // Always respond 200 immediately so Meta doesn't retry.
-  res.sendStatus(200);
+  // Always respond 200 immediately so Meta doesn't retry or back off.
+  res.status(200).send('EVENT_RECEIVED');
 
   // ── 2. Parse payload ──────────────────────────────────────────────────────
   const body = req.body as WaWebhookBody;
