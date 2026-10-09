@@ -17,6 +17,9 @@ import type { IAttendant } from './Attendant';
 export interface IBooking extends Document {
   tenantId: mongoose.Types.ObjectId;
   reference: string;
+  groupId?: string;   // Unique group identifier linking multi-service segments
+  groupOrder?: number; // 1 for first service, 2 for second service, etc. (defaults to 1)
+  price?: number;     // Historical price snapshot for this segment
   customerName: string;
   phone: string;
   email?: string;     // Customer email for notifications (optional — not all legacy bookings have it)
@@ -35,8 +38,11 @@ export interface IBooking extends Document {
 const BookingSchema: Schema = new Schema(
   {
     tenantId:  { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, index: true },
-    // reference is no longer globally unique — scoped per-tenant via compound index below
+    // reference is shared across segments in a multi-service booking
     reference: { type: String, required: true, index: true },
+    groupId:   { type: String, required: false, index: true },
+    groupOrder: { type: Number, required: false, default: 1 },
+    price:     { type: Number, required: false },
     customerName: { type: String, required: true },
     phone: { type: String, required: true },
     email: { type: String, required: false },  // Optional — used for email notifications
@@ -55,12 +61,13 @@ const BookingSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-// Compound unique: reference is unique within a tenant, not globally
-BookingSchema.index({ tenantId: 1, reference: 1 }, { unique: true });
+// Compound unique: (tenantId, reference, groupOrder) ensures distinct segments within a group
+BookingSchema.index({ tenantId: 1, reference: 1, groupOrder: 1 }, { unique: true });
 
 // Performance indexes for common query patterns
 BookingSchema.index({ tenantId: 1, date: 1 });
 BookingSchema.index({ tenantId: 1, status: 1 });
+BookingSchema.index({ tenantId: 1, groupId: 1 });
 BookingSchema.index({ tenantId: 1, attendantId: 1, date: 1 });
 BookingSchema.index({ tenantId: 1, attendantId: 1, status: 1 });
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight } from 'lucide-react';
-import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession } from './types';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
 import { InstallPrompt } from './components/InstallPrompt';
@@ -169,12 +169,57 @@ export default function App() {
     }
   }, [toast]);
 
-  // Booking State
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  // Multi-Service Booking State
+  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
+  const [serviceAttendants, setServiceAttendants] = useState<Record<string, Attendant | null>>({});
+  const [serviceAttendantsMap, setServiceAttendantsMap] = useState<Record<string, Attendant[]>>({});
+  const [multiSlotOptions, setMultiSlotOptions] = useState<MultiSlotOption[]>([]);
+
+  // Backward-compatibility aliases
+  const selectedService = selectedServices[0] || null;
+  const setSelectedService = (s: Service | null) => {
+    if (!s) setSelectedServices([]);
+    else setSelectedServices([s]);
+  };
+
+  const selectedAttendant = selectedServices[0] ? (serviceAttendants[selectedServices[0]._id] ?? null) : null;
+  const setSelectedAttendant = (att: Attendant | null) => {
+    if (selectedServices[0]) {
+      setServiceAttendants(prev => ({ ...prev, [selectedServices[0]._id]: att }));
+    }
+  };
+
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [selectedAttendant, setSelectedAttendant] = useState<Attendant | null>(null); // null = "Any Available"
   const [attendants, setAttendants] = useState<Attendant[]>([]);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+
+  const handleToggleService = (service: Service) => {
+    setSelectedServices(prev => {
+      const exists = prev.some(s => s._id === service._id);
+      if (exists) {
+        return prev.filter(s => s._id !== service._id);
+      }
+      if (prev.length >= MAX_SERVICES) {
+        triggerToast(`You can select up to ${MAX_SERVICES} services`, 'error');
+        return prev;
+      }
+      return [...prev, service];
+    });
+  };
+
+  const handleSwapServices = () => {
+    if (selectedServices.length === 2) {
+      setSelectedServices([selectedServices[1], selectedServices[0]]);
+    }
+  };
+
+  const totalServiceDuration = useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + s.duration, 0);
+  }, [selectedServices]);
+
+  const totalServicePrice = useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + s.price, 0);
+  }, [selectedServices]);
   const [clientInfo, setClientInfo] = useState({ name: '', phone: '', email: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
@@ -354,51 +399,58 @@ export default function App() {
     };
   }, [tenantLoading, tenant?._id, tenantError, isAdmin]);
 
-  // Fetch slots when date, service, or attendant changes
+  // Fetch slots when date, services, or attendants change
   useEffect(() => {
     if (tenantLoading || !tenant) return;
 
     const fetchSlots = async () => {
-      if (!selectedService || !selectedDate) return;
+      if (selectedServices.length === 0 || !selectedDate) return;
 
       try {
-        // Use per-attendant availability when a specific attendant is chosen;
-        // fall back to global availability for "Any Available" (selectedAttendant === null)
-        const slots = await api.getAvailability(
-          selectedDate,
-          selectedService._id,
-          selectedAttendant?._id ?? null
-        );
-        setTimeSlots(slots);
+        const items = selectedServices.map(s => ({
+          serviceId: s._id,
+          attendantId: serviceAttendants[s._id]?._id ?? null,
+        }));
+
+        const result = await api.getMultiAvailability(selectedDate, items);
+        setTimeSlots(result.slots);
+        setMultiSlotOptions(result.options || []);
       } catch (err) {
-        console.error('Failed to fetch slots', err);
+        console.error('Failed to fetch multi slots, falling back', err);
         setTimeSlots(FALLBACK_TIME_SLOTS);
+        setMultiSlotOptions([]);
       }
     };
 
     if (activeStep === 'time') {
       fetchSlots();
     }
-  }, [tenantLoading, tenant?._id, selectedDate, selectedService, selectedAttendant, activeStep]);
+  }, [tenantLoading, tenant?._id, selectedDate, selectedServices, serviceAttendants, activeStep]);
 
-  // Fetch attendants when entering the attendant step
+  // Fetch attendants for each selected service when entering the attendant step
   useEffect(() => {
     if (tenantLoading || !tenant) return;
 
     const fetchAttendants = async () => {
-      if (!selectedService) return;
+      if (selectedServices.length === 0) return;
       try {
-        const data = await api.getAttendantsForService(selectedService._id);
-        setAttendants(data);
+        const map: Record<string, Attendant[]> = {};
+        for (const s of selectedServices) {
+          const data = await api.getAttendantsForService(s._id);
+          map[s._id] = data;
+        }
+        setServiceAttendantsMap(map);
+        if (selectedServices[0]) {
+          setAttendants(map[selectedServices[0]._id] || []);
+        }
       } catch (err) {
         console.error('Failed to fetch attendants', err);
-        setAttendants([]);
       }
     };
     if (activeStep === 'attendant') {
       fetchAttendants();
     }
-  }, [tenantLoading, tenant?._id, activeStep, selectedService]);
+  }, [tenantLoading, tenant?._id, activeStep, selectedServices]);
 
 
   const handleDateSelect = (date: string) => {
@@ -416,17 +468,19 @@ export default function App() {
   }, [searchQuery, services]);
 
   const handleConfirmBooking = async () => {
-    if (!selectedService || !selectedTime || !clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline) return;
+    if (selectedServices.length === 0 || !selectedTime || !clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline) return;
 
     try {
       const newBooking = await api.createBooking({
         customerName: clientInfo.name,
         phone: clientInfo.phone,
         email: clientInfo.email,
-        serviceId: selectedService._id,
         date: selectedDate,
         startTime: selectedTime,
-        attendantId: selectedAttendant?._id ?? null,
+        items: selectedServices.map(s => ({
+          serviceId: s._id,
+          attendantId: serviceAttendants[s._id]?._id ?? null,
+        })),
       });
 
       setCreatedBooking(newBooking);
@@ -440,8 +494,9 @@ export default function App() {
 
   const resetFlow = () => {
     setActiveStep('service');
-    setSelectedService(null);
-    setSelectedAttendant(null);
+    setSelectedServices([]);
+    setServiceAttendants({});
+    setMultiSlotOptions([]);
     setSelectedTime(null);
     setSelectedDate(new Date().toISOString().split('T')[0]);
     setClientInfo({ name: '', phone: '', email: '' });
@@ -453,6 +508,7 @@ export default function App() {
     setReschedulingBooking(null);
     setCancellingBookingId(null);
   };
+
 
   const handleNotificationNavigate = (url: string) => {
     if (url.startsWith('/attendant')) {
@@ -1215,14 +1271,20 @@ export default function App() {
                             <ServiceSelectionCardSkeleton key={i} />
                           ))
                         ) : filteredServices.length > 0 ? (
-                          filteredServices.map(service => (
-                            <ServiceSelectionCard
-                              key={service._id}
-                              service={service}
-                              isSelected={selectedService?._id === service._id}
-                              onSelect={() => setSelectedService(service)}
-                            />
-                          ))
+                          filteredServices.map(service => {
+                            const selectedIndex = selectedServices.findIndex(s => s._id === service._id);
+                            const isSelected = selectedIndex !== -1;
+                            const selectionOrder = isSelected ? selectedIndex + 1 : null;
+                            return (
+                              <ServiceSelectionCard
+                                key={service._id}
+                                service={service}
+                                isSelected={isSelected}
+                                selectionOrder={selectionOrder}
+                                onSelect={() => handleToggleService(service)}
+                              />
+                            );
+                          })
                         ) : (
                           <div className="py-12 text-center border border-dashed border-[#E6D3C3] rounded-2xl bg-white">
                             <p className="text-[#6B6B6B] text-sm">No services found matching your criteria.</p>
@@ -1230,20 +1292,47 @@ export default function App() {
                         )}
                       </div>
                       <AnimatePresence>
-                        {selectedService && (
+                        {selectedServices.length > 0 && (
                           <motion.div
                             initial={{ opacity: 0, y: 50, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 50, scale: 0.95 }}
                             transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-                            className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-8 z-50"
+                            className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-50"
                           >
-                            <button
-                              onClick={() => setActiveStep('date')}
-                              className="w-full bg-[#B08968] text-white py-4.5 rounded-full font-semibold uppercase tracking-wider text-sm shadow-2xl hover:bg-[#9c7554] active:scale-[0.98] transition-all cursor-pointer"
-                            >
-                              Continue
-                            </button>
+                            <div className="bg-[#1F1F1F] text-white p-4.5 rounded-2xl shadow-2xl border border-white/10 backdrop-blur-md space-y-3">
+                              {selectedServices.length === 2 && (
+                                <div className="flex items-center justify-between text-xs border-b border-white/10 pb-2.5">
+                                  <span className="text-white/80 truncate pr-2">
+                                    <strong className="text-white">1st:</strong> {selectedServices[0].name} ➔ <strong className="text-white">2nd:</strong> {selectedServices[1].name}
+                                  </span>
+                                  <button
+                                    onClick={handleSwapServices}
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white font-medium transition-colors cursor-pointer shrink-0"
+                                    title="Swap which service comes first"
+                                  >
+                                    <ArrowUpDown size={12} />
+                                    <span>Swap Order</span>
+                                  </button>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-xs text-white/60 uppercase tracking-wider font-semibold">
+                                    {selectedServices.length === 1 ? '1 Service Selected' : '2 Services Selected'}
+                                  </p>
+                                  <p className="text-sm font-bold text-white mt-0.5">
+                                    KES {totalServicePrice.toLocaleString()} • {Math.floor(totalServiceDuration / 60) > 0 ? `${Math.floor(totalServiceDuration / 60)}h ` : ''}{totalServiceDuration % 60 > 0 ? `${totalServiceDuration % 60}m` : ''}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => setActiveStep('date')}
+                                  className="bg-[#B08968] text-white px-5 py-2.5 rounded-full font-semibold text-xs uppercase tracking-wider hover:bg-[#9c7554] active:scale-95 transition-all cursor-pointer shadow-lg"
+                                >
+                                  {selectedServices.length === 1 ? 'Continue (1)' : 'Continue (2)'}
+                                </button>
+                              </div>
+                            </div>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -1270,11 +1359,18 @@ export default function App() {
 
                         <div className="border-t border-brand-gray-100 pt-8 flex items-center justify-between">
                           <div className="space-y-1">
-                            <p className="text-[11px] uppercase tracking-widest font-bold text-brand-gray-400">Selected Selection</p>
-                            <p className="font-serif italic text-2xl">{selectedService?.name}</p>
+                            <p className="text-[11px] uppercase tracking-widest font-bold text-brand-gray-400">Selected Services ({selectedServices.length})</p>
+                            <p className="font-serif italic text-xl leading-tight">
+                              {selectedServices.map(s => s.name).join(' + ')}
+                            </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-lg font-black tracking-tighter">{selectedService ? formatPrice(selectedService.price, selectedService.priceMax) : ''}</p>
+                            <p className="text-lg font-black tracking-tighter">
+                              KES {totalServicePrice.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-brand-gray-500 font-medium">
+                              {Math.floor(totalServiceDuration / 60) > 0 ? `${Math.floor(totalServiceDuration / 60)}h ` : ''}{totalServiceDuration % 60 > 0 ? `${totalServiceDuration % 60}m` : ''}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1301,80 +1397,179 @@ export default function App() {
                         <span className="text-sm font-black uppercase tracking-[0.2em]">Previous</span>
                       </button>
                       <div className="space-y-8">
-                        <h2 className="text-4xl font-serif font-black tracking-tight leading-none">Choose Artist</h2>
-                        <div className="flex flex-col gap-3">
-                          {/* "Any Available" option */}
-                          <button
-                            onClick={() => setSelectedAttendant(null)}
-                            className={`flex items-center justify-between p-6 border-2 transition-all duration-300 rounded-xl ${selectedAttendant === null
-                                ? 'bg-brand-black text-white border-brand-black'
-                                : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
-                              }`}
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm font-serif italic border-2 ${selectedAttendant === null ? 'border-white/40 bg-white/10 text-white' : 'border-brand-gray-200 text-brand-gray-400'
-                                }`}>
-                                ✦
-                              </div>
-                              <div className="text-left">
-                                <p className="font-serif italic text-xl leading-none">Any Available</p>
-                                <p className={`text-[11px] font-black uppercase tracking-widest mt-1 ${selectedAttendant === null ? 'text-white/70' : 'text-brand-gray-400'
-                                  }`}>First available slot</p>
-                              </div>
-                            </div>
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedAttendant === null ? 'border-white bg-white' : 'border-brand-gray-200'
-                              }`}>
-                              {selectedAttendant === null && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
-                            </div>
-                          </button>
-
-                          {/* Per-attendant cards */}
-                          {attendants.map(attendant => {
-                            const isSelected = selectedAttendant?._id === attendant._id;
-                            const initials = attendant.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
-                            return (
-                              <button
-                                key={attendant._id}
-                                onClick={() => setSelectedAttendant(attendant)}
-                                className={`flex items-center justify-between p-6 border-2 transition-all duration-300 rounded-xl ${isSelected
-                                    ? 'bg-brand-black text-white border-brand-black'
-                                    : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
-                                  }`}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm font-serif italic border-2 ${isSelected ? 'border-white/40 bg-white/10 text-white' : 'border-brand-gray-200 text-brand-black'
-                                    }`}>
-                                    {initials}
-                                  </div>
-                                  <div className="text-left">
-                                    <p className="font-serif italic text-xl leading-none">{attendant.name}</p>
-                                    <p className={`text-[11px] font-black uppercase tracking-widest mt-1 ${isSelected ? 'text-white/70' : 'text-brand-gray-400'
-                                      }`}>Certified Artist</p>
-                                  </div>
-                                </div>
-                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-white bg-white' : 'border-brand-gray-200 group-hover:border-brand-black'
-                                  }`}>
-                                  {isSelected && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
-                                </div>
-                              </button>
-                            );
-                          })}
-
-                          {attendants.length === 0 && (
-                            <div className="py-8 text-center border border-brand-gray-100 font-serif italic text-brand-gray-300">
-                              Loading artists...
-                            </div>
-                          )}
+                        <div>
+                          <h2 className="text-4xl font-serif font-black tracking-tight leading-none">Choose Artist</h2>
+                          <p className="text-xs text-[#6B6B6B] mt-2">
+                            {selectedServices.length > 1
+                              ? 'Select a stylist for each service or leave as "Any Available".'
+                              : 'Select your preferred stylist or choose any available artist.'}
+                          </p>
                         </div>
+
+                        {selectedServices.length <= 1 ? (
+                          <div className="flex flex-col gap-3">
+                            {/* "Any Available" option */}
+                            <button
+                              onClick={() => setSelectedAttendant(null)}
+                              className={`flex items-center justify-between p-6 border-2 transition-all duration-300 rounded-xl ${selectedAttendant === null
+                                  ? 'bg-brand-black text-white border-brand-black'
+                                  : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
+                                }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm font-serif italic border-2 ${selectedAttendant === null ? 'border-white/40 bg-white/10 text-white' : 'border-brand-gray-200 text-brand-gray-400'
+                                  }`}>
+                                  ✦
+                                </div>
+                                <div className="text-left">
+                                  <p className="font-serif italic text-xl leading-none">Any Available</p>
+                                  <p className={`text-[11px] font-black uppercase tracking-widest mt-1 ${selectedAttendant === null ? 'text-white/70' : 'text-brand-gray-400'
+                                    }`}>First available slot</p>
+                                </div>
+                              </div>
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedAttendant === null ? 'border-white bg-white' : 'border-brand-gray-200'
+                                }`}>
+                                {selectedAttendant === null && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
+                              </div>
+                            </button>
+
+                            {/* Per-attendant cards */}
+                            {attendants.map(attendant => {
+                              const isSelected = selectedAttendant?._id === attendant._id;
+                              const initials = attendant.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+                              return (
+                                <button
+                                  key={attendant._id}
+                                  onClick={() => setSelectedAttendant(attendant)}
+                                  className={`flex items-center justify-between p-6 border-2 transition-all duration-300 rounded-xl ${isSelected
+                                      ? 'bg-brand-black text-white border-brand-black'
+                                      : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
+                                    }`}
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm font-serif italic border-2 ${isSelected ? 'border-white/40 bg-white/10 text-white' : 'border-brand-gray-200 text-brand-black'
+                                      }`}>
+                                      {initials}
+                                    </div>
+                                    <div className="text-left">
+                                      <p className="font-serif italic text-xl leading-none">{attendant.name}</p>
+                                      <p className={`text-[11px] font-black uppercase tracking-widest mt-1 ${isSelected ? 'text-white/70' : 'text-brand-gray-400'
+                                        }`}>Certified Artist</p>
+                                    </div>
+                                  </div>
+                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-white bg-white' : 'border-brand-gray-200 group-hover:border-brand-black'
+                                    }`}>
+                                    {isSelected && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
+                                  </div>
+                                </button>
+                              );
+                            })}
+
+                            {attendants.length === 0 && (
+                              <div className="py-8 text-center border border-brand-gray-100 font-serif italic text-brand-gray-300">
+                                Loading artists...
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-10">
+                            {selectedServices.map((svc, idx) => {
+                              const curAttendant = serviceAttendants[svc._id] ?? null;
+                              const qualifiedList = serviceAttendantsMap[svc._id] || [];
+
+                              return (
+                                <div key={svc._id} className="space-y-4 bg-[#FAF7F3] p-5 rounded-2xl border border-[#E6D3C3]">
+                                  <div className="flex items-center justify-between border-b border-[#E6D3C3] pb-2.5">
+                                    <div>
+                                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#B08968] text-white">
+                                        Service {idx + 1}
+                                      </span>
+                                      <h3 className="font-bold text-[15px] text-[#1F1F1F] mt-1">
+                                        {svc.name}
+                                      </h3>
+                                    </div>
+                                    <span className="text-xs text-[#6B6B6B] font-medium">
+                                      {svc.duration > 60 ? `${Math.round(svc.duration / 60)} hrs` : `${svc.duration} min`}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-col gap-2.5">
+                                    {/* Any Available option */}
+                                    <button
+                                      onClick={() => setServiceAttendants(prev => ({ ...prev, [svc._id]: null }))}
+                                      className={`flex items-center justify-between p-4 border transition-all duration-300 rounded-xl cursor-pointer ${curAttendant === null
+                                          ? 'bg-[#1F1F1F] text-white border-[#1F1F1F] shadow-sm'
+                                          : 'bg-white border-[#E6D3C3] hover:border-[#B08968] text-[#1F1F1F]'
+                                        }`}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${curAttendant === null ? 'bg-white/20 text-white' : 'bg-[#FAF7F3] text-[#6B6B6B]'}`}>
+                                          ✦
+                                        </div>
+                                        <div className="text-left">
+                                          <p className="font-semibold text-sm leading-tight">Any Available</p>
+                                          <p className={`text-[10px] ${curAttendant === null ? 'text-white/70' : 'text-[#6B6B6B]'}`}>
+                                            First available artist
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${curAttendant === null ? 'border-white bg-white' : 'border-[#E6D3C3]'}`}>
+                                        {curAttendant === null && <CheckCircle2 size={12} strokeWidth={3} className="text-[#1F1F1F]" />}
+                                      </div>
+                                    </button>
+
+                                    {/* Qualified attendants */}
+                                    {qualifiedList.map(attendant => {
+                                      const isSelected = curAttendant?._id === attendant._id;
+                                      const initials = attendant.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+                                      return (
+                                        <button
+                                          key={attendant._id}
+                                          onClick={() => setServiceAttendants(prev => ({ ...prev, [svc._id]: attendant }))}
+                                          className={`flex items-center justify-between p-4 border transition-all duration-300 rounded-xl cursor-pointer ${isSelected
+                                              ? 'bg-[#1F1F1F] text-white border-[#1F1F1F] shadow-sm'
+                                              : 'bg-white border-[#E6D3C3] hover:border-[#B08968] text-[#1F1F1F]'
+                                            }`}
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${isSelected ? 'bg-white/20 text-white' : 'bg-[#FAF7F3] text-[#1F1F1F]'}`}>
+                                              {initials}
+                                            </div>
+                                            <div className="text-left">
+                                              <p className="font-semibold text-sm leading-tight">{attendant.name}</p>
+                                              <p className={`text-[10px] ${isSelected ? 'text-white/70' : 'text-[#6B6B6B]'}`}>
+                                                Certified Stylist
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'border-white bg-white' : 'border-[#E6D3C3]'}`}>
+                                            {isSelected && <CheckCircle2 size={12} strokeWidth={3} className="text-[#1F1F1F]" />}
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+
+                                    {qualifiedList.length === 0 && (
+                                      <div className="py-4 text-center border border-dashed border-[#E6D3C3] rounded-xl text-xs text-[#6B6B6B]">
+                                        Loading certified artists for this service...
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => setActiveStep('time')}
                         className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all hover:tracking-[0.4em] active:scale-[0.98]"
                       >
-                        {selectedAttendant ? `Continue with ${selectedAttendant.name}` : 'Continue — Any Artist'}
+                        Continue to Time Slots
                       </button>
                     </motion.div>
                   )}
+
 
                   {activeStep === 'time' && (
                     <motion.div
@@ -1396,11 +1591,13 @@ export default function App() {
                               {new Date(selectedDate).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
                             </p>
                           </div>
-                          {/* Show chosen attendant in time step header */}
+                          {/* Show chosen attendant(s) in time step header */}
                           <div className="text-right">
                             <p className="text-[13px] text-brand-gray-600 uppercase font-bold tracking-widest mb-1">Artist</p>
                             <p className="font-serif italic text-xl leading-none">
-                              {selectedAttendant ? selectedAttendant.name : 'Any'}
+                              {selectedServices.length > 1
+                                ? selectedServices.map((s, i) => `${i + 1}. ${serviceAttendants[s._id]?.name || 'Any'}`).join(' • ')
+                                : (selectedAttendant ? selectedAttendant.name : 'Any')}
                             </p>
                           </div>
                         </div>
@@ -1428,6 +1625,39 @@ export default function App() {
                               </div>
                             )}
                           </div>
+
+                          {selectedTime && (
+                            <div className="bg-[#FAF7F3] border border-[#E6D3C3] rounded-2xl p-5 space-y-3">
+                              <p className="text-xs font-bold uppercase tracking-wider text-[#6B6B6B]">
+                                Appointment Schedule Preview
+                              </p>
+                              {(() => {
+                                const selectedOpt = multiSlotOptions.find(o => o.time === selectedTime);
+                                if (selectedOpt && selectedOpt.segments.length > 0) {
+                                  return (
+                                    <div className="space-y-2">
+                                      {selectedOpt.segments.map((seg, idx) => {
+                                        const svc = selectedServices.find(s => s._id === seg.serviceId);
+                                        return (
+                                          <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-[#E6D3C3]/40 last:border-b-0">
+                                            <span className="font-semibold text-[#1F1F1F]">
+                                              {idx + 1}. {svc?.name} ({seg.startTime} – {seg.endTime})
+                                            </span>
+                                            <span className="text-[#6B6B6B] font-medium">with {seg.attendantName}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <p className="text-xs text-[#1F1F1F]">
+                                    Starts at <strong>{selectedTime}</strong> ({totalServiceDuration} min)
+                                  </p>
+                                );
+                              })()}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <button
@@ -1456,16 +1686,21 @@ export default function App() {
                       <div className="space-y-10">
                         <section className="bg-brand-gray-50 p-8 flex items-center justify-between">
                           <div className="space-y-1">
-                            <div className="space-y-1">
-                              <p className="text-[13px] uppercase font-black tracking-widest text-brand-gray-600">Appointment Detail</p>
-                              <p className="font-serif italic text-2xl leading-none">{selectedService?.name}</p>
-                              <p className="text-xs font-bold text-brand-black/40 mt-2">
-                                {new Date(selectedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {selectedTime}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-2xl font-black tracking-tighter">{selectedService ? formatPrice(selectedService.price, selectedService.priceMax) : ''}</p>
-                            </div>
+                            <p className="text-[13px] uppercase font-black tracking-widest text-brand-gray-600">Appointment Detail</p>
+                            <p className="font-serif italic text-2xl leading-none">
+                              {selectedServices.map(s => s.name).join(' + ')}
+                            </p>
+                            <p className="text-xs font-bold text-brand-black/40 mt-2">
+                              {new Date(selectedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {selectedTime}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-black tracking-tighter">
+                              KES {totalServicePrice.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-brand-gray-500 font-medium">
+                              {Math.floor(totalServiceDuration / 60) > 0 ? `${Math.floor(totalServiceDuration / 60)}h ` : ''}{totalServiceDuration % 60 > 0 ? `${totalServiceDuration % 60}m` : ''}
+                            </p>
                           </div>
                         </section>
 
@@ -1547,18 +1782,22 @@ export default function App() {
                         </div>
                         <div className="space-y-6">
                           <div className="flex justify-between items-center">
-                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Artist</span>
+                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Artist(s)</span>
                             <span className="font-serif italic text-lg leading-none">
-                              {selectedAttendant ? selectedAttendant.name : 'Any Available'}
+                              {selectedServices.map(s => serviceAttendants[s._id]?.name || 'Any Available').join(', ')}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Service</span>
-                            <span className="font-black text-sm leading-none uppercase">{selectedService?.name}</span>
+                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Services</span>
+                            <span className="font-black text-sm leading-none uppercase">
+                              {selectedServices.map(s => s.name).join(' + ')}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Cost</span>
-                            <span className="font-black text-sm leading-none">{selectedService ? formatPrice(selectedService.price, selectedService.priceMax) : ''}</span>
+                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Total Cost</span>
+                            <span className="font-black text-sm leading-none">
+                              KES {totalServicePrice.toLocaleString()}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Time</span>
@@ -1878,7 +2117,18 @@ function ServiceSelectionCardSkeleton() {
   );
 }
 
-function ServiceSelectionCard({ service, isSelected, onSelect }: { service: Service, isSelected: boolean, onSelect: () => void, key?: React.Key }) {
+function ServiceSelectionCard({
+  service,
+  isSelected,
+  selectionOrder,
+  onSelect,
+}: {
+  service: Service;
+  isSelected: boolean;
+  selectionOrder?: number | null;
+  onSelect: () => void;
+  key?: React.Key;
+}) {
   return (
     <motion.div
       whileTap={{ scale: 0.99 }}
@@ -1892,7 +2142,14 @@ function ServiceSelectionCard({ service, isSelected, onSelect }: { service: Serv
         <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#B08968]" />
       )}
       <div className="flex-1">
-        <h3 className="font-sans font-medium text-[16px] text-[#1F1F1F] leading-tight transition-transform duration-300">{service.name}</h3>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="font-sans font-medium text-[16px] text-[#1F1F1F] leading-tight transition-transform duration-300">{service.name}</h3>
+          {selectionOrder && (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white ${selectionOrder === 1 ? 'bg-[#B08968]' : 'bg-[#5E503F]'}`}>
+              {selectionOrder === 1 ? '1st Service' : '2nd Service'}
+            </span>
+          )}
+        </div>
         <p className="mt-1.5 text-xs text-[#6B6B6B]">
           {service.duration > 60 ? `${Math.round(service.duration / 60)} hrs` : `${service.duration} min`}
         </p>
@@ -1906,6 +2163,7 @@ function ServiceSelectionCard({ service, isSelected, onSelect }: { service: Serv
     </motion.div>
   );
 }
+
 
 function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, onDateSelect: (d: string) => void }) {
   const dates = useMemo(() => {

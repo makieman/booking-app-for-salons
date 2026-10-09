@@ -6,7 +6,7 @@
  * configure your reverse proxy (nginx, etc.) to handle this.
  */
 
-import type { Attendant, Booking } from '../types';
+import type { Attendant, Booking, MultiSlotOption } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -104,17 +104,18 @@ export async function getBookings(date?: string) {
 }
 
 /**
- * Creates a new booking.
+ * Creates a new booking (single or multi-service).
  * Endpoint: POST /api/bookings
  */
 export async function createBooking(data: {
   customerName: string;
   phone: string;
   email?: string;
-  serviceId: string;
   date: string;
   startTime: string;
+  serviceId?: string;
   attendantId?: string | null;
+  items?: Array<{ serviceId: string; attendantId?: string | null }>;
 }) {
   const res = await fetch(`${API_BASE}/bookings`, {
     method: 'POST',
@@ -142,6 +143,30 @@ export async function getAvailability(date: string, serviceId: string, attendant
   if (!res.ok) throw new Error('Failed to fetch availability');
   return res.json();
 }
+
+/**
+ * Fetches available time slots and resolved segment details for multi-service sequence.
+ * Endpoint: POST /api/availability/multi
+ */
+export async function getMultiAvailability(
+  date: string,
+  items: Array<{ serviceId: string; attendantId?: string | null }>
+): Promise<{
+  slots: string[];
+  options: MultiSlotOption[];
+}> {
+  const res = await fetch(`${API_BASE}/availability/multi`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, items }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch multi-service availability');
+  }
+  return res.json();
+}
+
 
 /**
  * Fetches slots across ALL active attendants for the "Any Available" option.

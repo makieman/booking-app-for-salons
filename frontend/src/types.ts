@@ -35,9 +35,14 @@ export interface TimeSlot {
 
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
+export const MAX_SERVICES = 2;
+
 export interface Booking {
   _id: string;                    // MongoDB ObjectId
   reference?: string;             // Unique booking reference (LMN-XXXXX)
+  groupId?: string;               // Group identifier linking multi-service segments
+  groupOrder?: number;            // 1, 2, etc.
+  price?: number;                 // Historical price snapshot for this segment
   serviceId: string | Service;    // Can be populated or just an ID
   /** Populated attendant or ObjectId string. null = unassigned / "any" */
   attendantId?: string | Attendant | null;
@@ -49,6 +54,25 @@ export interface Booking {
   endTime: string;    // HH:mm
   status: BookingStatus;
   createdAt?: string;
+}
+
+export interface SelectedServiceItem {
+  service: Service;
+  attendant: Attendant | null; // null = "Any Available"
+}
+
+export interface MultiSlotSegment {
+  serviceId: string;
+  attendantId: string;
+  attendantName: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface MultiSlotOption {
+  time: string;
+  endTime: string;
+  segments: MultiSlotSegment[];
 }
 
 /** Booking steps — 'attendant' is inserted between 'date' and 'time', 'lookup' is standalone */
