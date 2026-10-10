@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -12,6 +12,8 @@ import { useAttendantPushNotifications } from './hooks/useAttendantPushNotificat
 import { useNotificationSound } from './hooks/useNotificationSound';
 import { useTenant } from './hooks/useTenant';
 import { SalonDashboard } from './components/SalonDashboard';
+import { AdminPortal } from './components/AdminPortal';
+import { CustomerAccountModal } from './components/CustomerAccountModal';
 
 /** Formats a service price as a fixed price or a range.
  *  e.g. formatPrice(2000)        → "KES 2,000"
@@ -29,7 +31,7 @@ export default function App() {
   const [renderError, setRenderError] = useState<Error | null>(null);
 
   // ── Tenant Context and Routing ──────────────────────────────────────────
-  const { tenant, loading: tenantLoading, error: tenantError, tenantSlug, viewMode, navigate, setTenant } = useTenant();
+  const { tenant, loading: tenantLoading, error: tenantError, tenantSlug, viewMode, bookingRef, navigate, setTenant } = useTenant();
 
   // ── Owner Token Session ──────────────────────────────────────────────────
   const [ownerToken, setOwnerToken] = useState<string | null>(localStorage.getItem('ownerToken'));
@@ -220,7 +222,23 @@ export default function App() {
   const totalServicePrice = useMemo(() => {
     return selectedServices.reduce((sum, s) => sum + s.price, 0);
   }, [selectedServices]);
-  const [clientInfo, setClientInfo] = useState({ name: '', phone: '', email: '' });
+  const [clientInfo, setClientInfo] = useState(() => {
+    try {
+      const saved = localStorage.getItem('customerProfile');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            name: parsed.name || '',
+            phone: parsed.phone || '',
+            email: parsed.email || '',
+          };
+        }
+      }
+    } catch {}
+    return { name: '', phone: '', email: '' };
+  });
+  const [showCustomerAccountModal, setShowCustomerAccountModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
@@ -236,6 +254,43 @@ export default function App() {
       confirmationHeadingRef.current?.focus();
     }
   }, [activeStep]);
+
+  // Auto-restore confirmation screen when ?ref=... is in URL or saved in localStorage
+  useEffect(() => {
+    const refToRestore = bookingRef || (!createdBooking && activeStep === 'service' ? localStorage.getItem('lastBookingReference') : null);
+    if (!refToRestore) return;
+
+    if (!createdBooking || createdBooking.reference !== refToRestore) {
+      api.lookupBookings({ reference: refToRestore })
+        .then(results => {
+          if (results && results.length > 0) {
+            const found = results[0];
+            setCreatedBooking(found);
+            if (found.date) setSelectedDate(found.date);
+            if (found.startTime) setSelectedTime(found.startTime);
+            if (found.customerName || found.phone || found.email) {
+              setClientInfo({
+                name: found.customerName || '',
+                phone: found.phone || '',
+                email: found.email || '',
+              });
+            }
+            if (typeof found.serviceId === 'object' && found.serviceId) {
+              setSelectedServices([found.serviceId as Service]);
+            }
+            if (!bookingRef) {
+              const url = new URL(window.location.href);
+              url.searchParams.set('ref', refToRestore);
+              window.history.replaceState({}, '', url.toString());
+            }
+            setActiveStep('confirmation');
+          }
+        })
+        .catch(err => {
+          console.warn('[App] Failed to auto-restore booking reference:', err);
+        });
+    }
+  }, [bookingRef]);
 
   // Lookup Booking State
   const [lookupQuery, setLookupQuery] = useState('');
@@ -510,8 +565,23 @@ export default function App() {
       try {
         if (newBooking?.reference) {
           localStorage.setItem('lastBookingReference', newBooking.reference);
+          const refsRaw = localStorage.getItem('customerBookingRefs');
+          const refsList: string[] = refsRaw ? JSON.parse(refsRaw) : [];
+          if (!refsList.includes(newBooking.reference)) {
+            refsList.unshift(newBooking.reference);
+            localStorage.setItem('customerBookingRefs', JSON.stringify(refsList.slice(0, 50)));
+          }
         }
+        localStorage.setItem('customerProfile', JSON.stringify(clientInfo));
       } catch {}
+      // Sync URL with ?ref=... so a page refresh immediately restores the confirmation screen
+      if (newBooking?.reference) {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set('ref', newBooking.reference);
+          window.history.pushState({}, '', url.toString());
+        } catch {}
+      }
       setActiveStep('confirmation');
       setTimeout(() => setShowNotificationPrompt(true), 800);
     } catch (err: any) {
@@ -526,7 +596,16 @@ export default function App() {
     setMultiSlotOptions([]);
     setSelectedTime(null);
     setSelectedDate(new Date().toISOString().split('T')[0]);
-    setClientInfo({ name: '', phone: '', email: '' });
+    try {
+      const saved = localStorage.getItem('customerProfile');
+      if (saved) {
+        setClientInfo(JSON.parse(saved));
+      } else {
+        setClientInfo({ name: '', phone: '', email: '' });
+      }
+    } catch {
+      setClientInfo({ name: '', phone: '', email: '' });
+    }
     setShowNotificationPrompt(false);
     setCreatedBooking(null);
     setCopiedReference(false);
@@ -535,6 +614,16 @@ export default function App() {
     setLookupError(null);
     setReschedulingBooking(null);
     setCancellingBookingId(null);
+    // Clear ?ref= from URL and localStorage so starting a new booking starts cleanly
+    try {
+      localStorage.removeItem('lastBookingReference');
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('ref') || url.searchParams.has('reference')) {
+        url.searchParams.delete('ref');
+        url.searchParams.delete('reference');
+        window.history.pushState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    } catch {}
   };
 
   // ── Confirmation Screen Helpers & Action Handlers ─────────────────────────
@@ -586,6 +675,35 @@ export default function App() {
           setLookupLoading(false);
         });
     }
+  };
+
+  const handleViewBookingDetails = (reference: string) => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('ref', reference);
+      window.history.pushState({}, '', url.toString());
+    } catch {}
+    api.lookupBookings({ reference }).then(results => {
+      if (results && results.length > 0) {
+        const b = results[0];
+        setCreatedBooking(b);
+        if (b.date) setSelectedDate(b.date);
+        if (b.startTime) setSelectedTime(b.startTime);
+        if (b.customerName || b.phone || b.email) {
+          setClientInfo({
+            name: b.customerName || clientInfo.name,
+            phone: b.phone || clientInfo.phone,
+            email: b.email || clientInfo.email,
+          });
+        }
+        if (typeof b.serviceId === 'object' && b.serviceId) {
+          setSelectedServices([b.serviceId as Service]);
+        }
+        setActiveStep('confirmation');
+      }
+    }).catch(err => {
+      console.error('Failed to view booking details:', err);
+    });
   };
 
   const whatsAppUrl = useMemo(() => {
@@ -652,20 +770,16 @@ export default function App() {
 
 
   const handleNotificationNavigate = (url: string) => {
-    if (url.startsWith('/attendant')) {
+    if (url.startsWith('/attendant') || url.startsWith('/staff')) {
       if (attendantSession) {
         setUserMode('attendant');
-      } else {
-        setLoginTab('staff');
-        setShowPinModal(true);
       }
+      navigate('staff', tenantSlug || undefined);
     } else if (url.startsWith('/admin') || url.startsWith('/owner')) {
-      if (ownerSessionPin === ADMIN_PIN) {
+      if (ownerToken) {
         setUserMode('owner');
-      } else {
-        setLoginTab('owner');
-        setShowPinModal(true);
       }
+      navigate('admin', tenantSlug || undefined);
     } else {
       setUserMode('customer');
       const bookingMatch = url.match(/\/bookings\/([A-Za-z0-9-]+)/);
@@ -913,6 +1027,19 @@ export default function App() {
           />
         )}
 
+        <CustomerAccountModal
+          isOpen={showCustomerAccountModal}
+          onClose={() => setShowCustomerAccountModal(false)}
+          clientInfo={clientInfo}
+          onUpdateClientInfo={info => setClientInfo(info)}
+          onViewBookingDetails={handleViewBookingDetails}
+          onRescheduleBooking={b => {
+            handleStartReschedule(b);
+            setActiveStep('lookup');
+          }}
+          formatPrice={formatPrice}
+        />
+
         {/* ── Password Reset Overlay (when opened via email link) ── */}
         <AnimatePresence>
           {urlResetToken && urlResetSlug && (
@@ -1010,271 +1137,6 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* ── Login Modal (Owner + Staff tabs) ───────────────── */}
-        <AnimatePresence>
-          {showPinModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[200] flex items-center justify-center bg-brand-black/60 backdrop-blur-sm"
-              onClick={() => setShowPinModal(false)}
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 20, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.96 }}
-                onClick={e => e.stopPropagation()}
-                className="bg-brand-white w-[88%] max-w-xs border-2 border-brand-black overflow-hidden rounded-2xl"
-              >
-                {/* Modal Header */}
-                <div className="px-8 pt-8 pb-4 space-y-1">
-                  <p className="text-[10px] font-black uppercase tracking-[0.4em] text-brand-gray-400">Studio Access</p>
-                  <h2 className="text-3xl font-serif italic tracking-tight leading-none">Sign In</h2>
-                </div>
-
-                {/* Tab Switcher */}
-                <div className="flex border-b border-brand-gray-100 mx-8">
-                  {(['owner', 'staff'] as const).map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => { setLoginTab(tab); setPin(''); setPinError(false); setStaffPin(''); setStaffPinError(false); }}
-                      className={`py-3 flex-1 text-[11px] font-black uppercase tracking-[0.2em] relative transition-colors ${loginTab === tab ? 'text-brand-black' : 'text-brand-gray-400'
-                        }`}
-                    >
-                      {tab === 'owner' ? 'Owner' : 'Staff'}
-                      {loginTab === tab && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-black" />}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="px-8 py-6 space-y-6">
-                  {loginTab === 'owner' ? (
-                    <form onSubmit={handleOwnerLoginSubmit} className="space-y-5">
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Salon ID (Slug)</label>
-                        <input
-                          type="text"
-                          required
-                          value={loginSlug}
-                          onChange={e => { setLoginSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setOwnerLoginError(null); }}
-                          placeholder="e.g. flo-sisterlocks"
-                          disabled={!!tenantSlug}
-                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors disabled:opacity-60"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Owner Email</label>
-                        <input
-                          type="email"
-                          required
-                          value={ownerEmail}
-                          onChange={e => { setOwnerEmail(e.target.value); setOwnerLoginError(null); }}
-                          placeholder="owner@example.com"
-                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Password</label>
-                        <input
-                          type="password"
-                          required
-                          value={ownerPassword}
-                          onChange={e => { setOwnerPassword(e.target.value); setOwnerLoginError(null); }}
-                          placeholder="••••••••"
-                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors"
-                        />
-                      </div>
-                      {/* ── Error / Attempt feedback ── */}
-                      {ownerLoginError && (
-                        <div className="space-y-1">
-                          <p className="text-[11px] font-black uppercase tracking-widest text-red-500">
-                            {ownerLoginError}
-                          </p>
-                          {ownerLoginRemainingAttempts !== null && ownerLoginRemainingAttempts > 0 && (
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600">
-                              ⚠ {ownerLoginRemainingAttempts} attempt{ownerLoginRemainingAttempts === 1 ? '' : 's'} remaining before lockout
-                            </p>
-                          )}
-                          {ownerLoginLockoutMinutes !== null && (
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">
-                              🔒 Try again in {ownerLoginLockoutMinutes} minute{ownerLoginLockoutMinutes === 1 ? '' : 's'}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      {/* ── Forgot Password ── */}
-                      {!showForgotPassword ? (
-                        <button
-                          type="button"
-                          onClick={() => { setShowForgotPassword(true); setForgotMessage(null); setForgotError(null); }}
-                          className="text-[10px] font-black uppercase tracking-widest text-brand-gray-500 hover:text-brand-black transition-colors text-left"
-                        >
-                          Forgot password?
-                        </button>
-                      ) : (
-                        <div className="space-y-3 border border-brand-gray-100 p-4 rounded-sm bg-brand-gray-50">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600">Password Reset</p>
-                          <p className="text-[10px] text-brand-gray-500 leading-relaxed">Enter the email address for this salon account. We'll send a reset link.</p>
-                          <input
-                            type="email"
-                            placeholder="owner@example.com"
-                            value={forgotEmail}
-                            onChange={e => { setForgotEmail(e.target.value); setForgotError(null); }}
-                            className="w-full border-b-2 border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-medium text-sm bg-transparent transition-colors"
-                          />
-                          {forgotError && <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider">{forgotError}</p>}
-                          {forgotMessage && <p className="text-[10px] font-bold text-green-600 uppercase tracking-wider">{forgotMessage}</p>}
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              disabled={forgotLoading || !forgotEmail || !loginSlug}
-                              onClick={async () => {
-                                setForgotLoading(true);
-                                setForgotError(null);
-                                try {
-                                  const r = await api.forgotOwnerPassword(loginSlug, forgotEmail);
-                                  setForgotMessage(r.message);
-                                  setForgotEmail('');
-                                } catch (err: any) {
-                                  setForgotError(err.message || 'Failed to send reset email');
-                                } finally {
-                                  setForgotLoading(false);
-                                }
-                              }}
-                              className="flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest bg-brand-black text-white hover:bg-brand-gray-700 disabled:opacity-40 transition-all"
-                            >
-                              {forgotLoading ? 'Sending...' : 'Send Reset Link'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => { setShowForgotPassword(false); setForgotEmail(''); setForgotMessage(null); setForgotError(null); }}
-                              className="px-4 py-2.5 text-[10px] font-black uppercase tracking-widest border border-brand-gray-200 hover:border-brand-black transition-all"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      <button
-                        type="submit"
-                        disabled={ownerLoginLoading || ownerLoginLockoutMinutes !== null}
-                        className="w-full py-4 text-xs font-black uppercase tracking-widest bg-brand-black text-white hover:bg-brand-gray-700 transition-all active:scale-95 disabled:opacity-50"
-                      >
-                        {ownerLoginLoading ? 'Signing In...' : 'Sign In as Owner'}
-                      </button>
-                    </form>
-                  ) : (
-                    /* ── Staff Login ── */
-                    <div className="space-y-5">
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Salon ID (Slug)</label>
-                        <input
-                          type="text"
-                          required
-                          value={staffSlug}
-                          onChange={e => { setStaffSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setStaffPinError(false); }}
-                          placeholder="e.g. flo-sisterlocks"
-                          disabled={!!tenantSlug}
-                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-medium text-sm bg-transparent transition-colors disabled:opacity-60"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">Username</label>
-                        <input
-                          type="text"
-                          value={staffUsername}
-                          onChange={e => setStaffUsername(e.target.value)}
-                          placeholder="your username"
-                          autoCapitalize="none"
-                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-3 font-black text-sm bg-transparent transition-colors tracking-wider"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-brand-gray-600">PIN</label>
-                        {/* Mini PIN dot display */}
-                        <motion.div
-                          animate={staffPinError ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
-                          transition={{ duration: 0.4 }}
-                          className="flex gap-3"
-                        >
-                          {[0, 1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className={`w-3 h-3 border-2 transition-all duration-200 ${i < staffPin.length ? 'bg-brand-black border-brand-black' : 'bg-transparent border-brand-gray-200'
-                              }`} />
-                          ))}
-                        </motion.div>
-                        {staffPinError && (
-                          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                            className="text-[11px] font-black uppercase tracking-widest text-red-500 space-y-1">
-                            <span className="block">Invalid credentials</span>
-                          </motion.p>
-                        )}
-                        {/* Number pad */}
-                        <div className="grid grid-cols-3 gap-2 pt-1">
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                            <button key={n}
-                              onClick={() => {
-                                if (staffPin.length >= 6) return;
-                                setStaffPin(p => p + String(n));
-                                setStaffPinError(false);
-                              }}
-                              className="py-3 text-lg font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
-                            >{n}</button>
-                          ))}
-                          <button onClick={() => { setStaffPin(''); setStaffPinError(false); }}
-                            className="py-3 text-[10px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black transition-all text-brand-gray-500"
-                          >Clear</button>
-                          <button onClick={() => {
-                            if (staffPin.length >= 6) return;
-                            setStaffPin(p => p + '0');
-                            setStaffPinError(false);
-                          }}
-                            className="py-3 text-lg font-black border border-brand-gray-100 hover:border-brand-black hover:bg-brand-gray-50 transition-all active:scale-95"
-                          >0</button>
-                          <button onClick={() => { setStaffPin(p => p.slice(0, -1)); setStaffPinError(false); }}
-                            className="py-3 text-[10px] font-black uppercase tracking-widest border border-brand-gray-100 hover:border-brand-black transition-all text-brand-gray-500"
-                          >⌫</button>
-                        </div>
-                      </div>
-                      <button
-                        disabled={staffLoginLoading || !staffUsername || staffPin.length < 4 || !staffSlug}
-                        onClick={async () => {
-                          setStaffLoginLoading(true);
-                          setStaffPinError(false);
-                          try {
-                            api.setApiTenantSlug(staffSlug);
-                            const result = await api.loginAttendant(staffUsername, staffPin);
-                            localStorage.setItem('attendantToken', result.token);
-                            localStorage.setItem('staffTenantSlug', staffSlug);
-                            setAttendantSession({ _id: result.attendant._id, name: result.attendant.name, token: result.token });
-                            setUserMode('attendant');
-                            setShowPinModal(false);
-                            setStaffUsername('');
-                            setStaffPin('');
-                            navigate('staff', staffSlug);
-                          } catch (err: any) {
-                            setStaffPinError(true);
-                            setStaffPin('');
-                            const errMsg = err.message || '';
-                            if (errMsg.includes('Failed to fetch') || errMsg.includes('fetch') || errMsg.includes('Network') || errMsg.includes('503') || errMsg.includes('Service')) {
-                              alert(`Connection Error: Could not connect to the backend server. Make sure the server is running on http://localhost:5000.\n\nDetails: ${errMsg}`);
-                            }
-                          } finally {
-                            setStaffLoginLoading(false);
-                          }
-                        }}
-                        className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 rounded-[10px]"
-                      >
-                        {staffLoginLoading ? 'Signing in...' : 'Sign In'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <header className="px-4 sm:px-8 py-6 sm:py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100">
           <div className="flex items-center gap-5 cursor-pointer group" onClick={resetFlow}>
             <div className="h-16 w-16 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
@@ -1289,6 +1151,13 @@ export default function App() {
               <div className="hidden sm:flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-brand-black" />
                 <span className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-gray-600">{attendantSession.name}</span>
+              </div>
+            )}
+            {/* Show admin badge when in owner mode */}
+            {userMode === 'owner' && (
+              <div className="hidden sm:flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-gray-600">Admin Portal</span>
               </div>
             )}
           </div>
@@ -1313,52 +1182,103 @@ export default function App() {
                 <Search size={18} />
               </button>
             )}
-            <a href={`tel:${tenant?.supportPhone || "0721530120"}`} className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
-              <Phone size={18} />
-            </a>
+            {userMode === 'customer' && (
+              <a href={`tel:${tenant?.supportPhone || "0721530120"}`} className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
+                <Phone size={18} />
+              </a>
+            )}
+            {userMode === 'customer' && (
+              <button
+                type="button"
+                onClick={() => setShowCustomerAccountModal(true)}
+                title="My Account & Bookings"
+                aria-label="My Account & Bookings"
+                className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500 relative"
+              >
+                <User size={18} />
+                {clientInfo.name && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-brand-white" />
+                )}
+              </button>
+            )}
             <NotificationCenter 
               onNavigate={handleNotificationNavigate} 
               token={attendantSession?.token || ownerToken || undefined} 
               ownerPin={ownerSessionPin} 
             />
-            <button
-              onClick={() => {
-                if (userMode === 'owner' || (userMode === 'attendant' && attendantSession)) {
-                  if (userMode === 'attendant') {
-                    localStorage.removeItem('attendantToken');
-                    setAttendantSession(null);
-                  } else {
-                    localStorage.removeItem('ownerToken');
-                    setOwnerToken(null);
-                  }
-                  api.setApiAuthToken(null);
-                  setUserMode('customer');
-                  navigate('customer');
-                } else {
-                  setPin('');
-                  setPinError(false);
-                  setStaffPin('');
-                  setStaffPinError(false);
-                  setStaffUsername('');
-                  setLoginTab('owner');
-                  setOwnerEmail('');
-                  setOwnerPassword('');
-                  setOwnerLoginError(null);
-                  setShowPinModal(true);
-                }
-              }}
-              className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500"
-            >
-              {userMode === 'owner' ? <LayoutDashboard size={18} /> : userMode === 'attendant' ? <User size={18} /> : <Shield size={18} />}
-            </button>
+            {userMode !== 'customer' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate('customer', tenantSlug || undefined)}
+                  title="View Live Salon"
+                  className="px-3.5 py-2 text-xs font-black uppercase tracking-wider rounded-full bg-brand-gray-50 border border-brand-gray-200 hover:bg-brand-black hover:text-white transition-all"
+                >
+                  Live Salon
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (userMode === 'attendant') {
+                      localStorage.removeItem('attendantToken');
+                      setAttendantSession(null);
+                      navigate('staff', tenantSlug || undefined);
+                    } else {
+                      localStorage.removeItem('ownerToken');
+                      setOwnerToken(null);
+                      navigate('admin', tenantSlug || undefined);
+                    }
+                    api.setApiAuthToken(null);
+                  }}
+                  title="Sign Out"
+                  className="p-3 bg-brand-gray-50 rounded-full hover:bg-red-600 hover:text-white transition-all duration-300"
+                >
+                  <LogOut size={16} />
+                </button>
+              </>
+            )}
           </div>
         </header>
 
         <main className="flex-1 flex flex-col">
-          {userMode === 'owner' ? (
-            <AdminView bookings={bookings} ownerPin={ownerSessionPin} ownerToken={ownerToken!} triggerToast={triggerToast} />
-          ) : userMode === 'attendant' && attendantSession ? (
-            <AttendantView session={attendantSession} />
+          {viewMode === 'admin' ? (
+            ownerToken ? (
+              <AdminView bookings={bookings} ownerPin={ownerSessionPin} ownerToken={ownerToken} triggerToast={triggerToast} />
+            ) : (
+              <AdminPortal
+                initialTab="owner"
+                onOwnerLoginSuccess={(token, t) => {
+                  setOwnerToken(token);
+                  setTenant(t);
+                  setUserMode('owner');
+                  navigate('admin', t.slug);
+                }}
+                onStaffLoginSuccess={(session) => {
+                  setAttendantSession(session);
+                  setUserMode('attendant');
+                  navigate('staff');
+                }}
+              />
+            )
+          ) : viewMode === 'staff' ? (
+            attendantSession ? (
+              <AttendantView session={attendantSession} />
+            ) : (
+              <AdminPortal
+                initialTab="staff"
+                onOwnerLoginSuccess={(token, t) => {
+                  setOwnerToken(token);
+                  setTenant(t);
+                  setUserMode('owner');
+                  navigate('admin', t.slug);
+                }}
+                onStaffLoginSuccess={(session) => {
+                  setAttendantSession(session);
+                  setUserMode('attendant');
+                  navigate('staff');
+                }}
+              />
+            )
           ) : (
             <div className="flex-1 flex flex-col">
               {activeStep !== 'confirmation' && activeStep !== 'lookup' && (
@@ -2021,7 +1941,7 @@ export default function App() {
 
                       {/* 4. Details Card */}
                       <div className="bg-brand-gray-50 w-full p-6 sm:p-8 text-left space-y-6 border-2 border-brand-black rounded-xl">
-                        <div className="border-b border-brand-black/10 pb-4 flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+                        <div className="border-b border-brand-black/10 pb-4 flex flex-row items-center justify-between gap-3">
                           <div>
                             <span className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500 block">
                               Scheduled Date & Time
@@ -2030,8 +1950,8 @@ export default function App() {
                               {confirmationFriendlyDate}
                             </p>
                           </div>
-                          <div className="sm:text-right">
-                            <span className="inline-block px-3 py-1 bg-brand-black text-white rounded text-xs font-mono font-bold tracking-wider">
+                          <div className="shrink-0 text-right">
+                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-brand-black text-white text-xs font-mono font-bold tracking-wider border-2 border-brand-black transition-all duration-300 hover:bg-brand-white hover:text-brand-black cursor-default select-none shadow-sm hover:shadow-md">
                               {confirmationTimeRange}
                             </span>
                           </div>
@@ -2370,6 +2290,17 @@ export default function App() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </div>
+
+              {/* Staff & Admin portal footer link */}
+              <div className="pt-6 pb-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => navigate('admin', tenantSlug || undefined)}
+                  className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-400 hover:text-brand-black transition-colors cursor-pointer"
+                >
+                  Staff & Admin Portal →
+                </button>
               </div>
             </div>
           )}
