@@ -8,8 +8,14 @@ interface TenantContextProps {
   error: string | null;
   tenantSlug: string | null;
   viewMode: 'customer' | 'admin' | 'staff' | 'register' | 'select';
+  bookingRef: string | null;
+  queryParams: URLSearchParams;
   setTenant: (tenant: Tenant | null) => void;
-  navigate: (view: 'customer' | 'admin' | 'staff' | 'register' | 'select', newSlug?: string) => void;
+  navigate: (
+    view: 'customer' | 'admin' | 'staff' | 'register' | 'select',
+    newSlug?: string,
+    params?: Record<string, string>
+  ) => void;
 }
 
 const TenantContext = createContext<TenantContextProps | undefined>(undefined);
@@ -19,43 +25,67 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Parse path-based route:
-  // e.g. /                       -> slug = flo-sisterlocks, view = customer (default salon)
+  // Parse path-based route and query params:
+  // e.g. /                       -> slug = flo-sisterlocks, view = customer
+  //      /?ref=LMN-XXXXX         -> slug = flo-sisterlocks, view = customer, bookingRef = LMN-XXXXX
   //      /flo-sisterlocks        -> slug = flo-sisterlocks, view = customer
   //      /select                 -> slug = null, view = select
-  //      /flo-sisterlocks/admin  -> slug = flo-sisterlocks, view = admin
-  //      /flo-sisterlocks/staff  -> slug = flo-sisterlocks, view = staff
   //      /register               -> slug = null, view = register
+  //      /admin                  -> slug = storedSlug || flo-sisterlocks, view = admin
+  //      /:slug/admin            -> slug = :slug, view = admin
+  //      /staff                  -> slug = storedSlug || flo-sisterlocks, view = staff
+  //      /:slug/staff            -> slug = :slug, view = staff
   const parseUrl = () => {
     const path = window.location.pathname;
+    const search = window.location.search;
+    const queryParams = new URLSearchParams(search);
+    const bookingRef = queryParams.get('ref') || queryParams.get('reference') || null;
+
     const segments = path.split('/').filter(Boolean);
 
     if (segments.length === 0) {
-      return { slug: 'flo-sisterlocks', view: 'customer' as const };
+      const storedSlug = localStorage.getItem('lastTenantSlug') || 'flo-sisterlocks';
+      return { slug: storedSlug, view: 'customer' as const, bookingRef, queryParams };
     }
 
-    if (segments[0] === 'select') {
-      return { slug: null, view: 'select' as const };
+    const first = segments[0];
+
+    if (first === 'select') {
+      return { slug: null, view: 'select' as const, bookingRef, queryParams };
     }
 
-    if (segments[0] === 'register') {
-      return { slug: null, view: 'register' as const };
+    if (first === 'register') {
+      return { slug: null, view: 'register' as const, bookingRef, queryParams };
     }
 
-    if (segments[0] === 'owner') {
-      const storedSlug = localStorage.getItem('ownerTenantSlug') || 'flo-sisterlocks';
-      return { slug: storedSlug, view: 'admin' as const };
+    if (first === 'admin' || first === 'owner') {
+      const storedSlug = localStorage.getItem('ownerTenantSlug') || localStorage.getItem('lastTenantSlug') || 'flo-sisterlocks';
+      return { slug: storedSlug, view: 'admin' as const, bookingRef, queryParams };
     }
 
-    if (segments[0] === 'staff') {
-      const storedSlug = localStorage.getItem('staffTenantSlug') || 'flo-sisterlocks';
-      return { slug: storedSlug, view: 'staff' as const };
+    if (first === 'staff' || first === 'attendant') {
+      const storedSlug = localStorage.getItem('staffTenantSlug') || localStorage.getItem('lastTenantSlug') || 'flo-sisterlocks';
+      return { slug: storedSlug, view: 'staff' as const, bookingRef, queryParams };
     }
 
-    const slug = segments[0];
+    // Check nested routes: e.g. /:slug/admin, /:slug/staff
+    const slug = first;
+    if (segments.length > 1) {
+      const sub = segments[1];
+      if (sub === 'admin' || sub === 'owner') {
+        localStorage.setItem('ownerTenantSlug', slug);
+        return { slug, view: 'admin' as const, bookingRef, queryParams };
+      }
+      if (sub === 'staff' || sub === 'attendant') {
+        localStorage.setItem('staffTenantSlug', slug);
+        return { slug, view: 'staff' as const, bookingRef, queryParams };
+      }
+    }
+
+    localStorage.setItem('lastTenantSlug', slug);
     const view = 'customer' as const;
 
-    return { slug, view };
+    return { slug, view, bookingRef, queryParams };
   };
 
   const [route, setRoute] = useState(parseUrl());
@@ -123,9 +153,13 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     fetchTenant();
   }, [route.slug]);
 
-  const navigate = (view: 'customer' | 'admin' | 'staff' | 'register' | 'select', newSlug?: string) => {
+  const navigate = (
+    view: 'customer' | 'admin' | 'staff' | 'register' | 'select',
+    newSlug?: string,
+    params?: Record<string, string>
+  ) => {
     let path = '/';
-    const slug = newSlug || route.slug || 'flo-sisterlocks';
+    const slug = newSlug || route.slug || localStorage.getItem('lastTenantSlug') || 'flo-sisterlocks';
 
     if (newSlug) {
       if (view === 'admin') {
@@ -140,11 +174,18 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else if (view === 'select') {
       path = '/select';
     } else if (view === 'admin') {
-      path = '/owner';
+      path = slug ? `/${slug}/admin` : '/admin';
     } else if (view === 'staff') {
-      path = '/staff';
-    } else if (slug) {
+      path = slug ? `/${slug}/staff` : '/staff';
+    } else if (slug && slug !== 'flo-sisterlocks') {
       path = `/${slug}`;
+    } else {
+      path = '/';
+    }
+
+    if (params && Object.keys(params).length > 0) {
+      const qs = new URLSearchParams(params).toString();
+      path += `?${qs}`;
     }
 
     window.history.pushState({}, '', path);
@@ -158,6 +199,8 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       error,
       tenantSlug: route.slug,
       viewMode: route.view,
+      bookingRef: route.bookingRef,
+      queryParams: route.queryParams,
       setTenant,
       navigate
     }}>
