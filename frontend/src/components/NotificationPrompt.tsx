@@ -5,11 +5,18 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 interface NotificationPromptProps {
   customerPhone: string;
   onDismiss:     () => void;
+  title?:        string;
+  description?:  string;
 }
 
 type Step = 'prompt' | 'success' | 'denied';
 
-export function NotificationPrompt({ customerPhone, onDismiss }: NotificationPromptProps) {
+export function NotificationPrompt({
+  customerPhone,
+  onDismiss,
+  title = 'Stay in the Loop',
+  description = 'Get notified the moment your booking is approved or updated.',
+}: NotificationPromptProps) {
   const { permission, isSubscribed, isLoading, subscribe } = usePushNotifications();
   const [step, setStep] = useState<Step>('prompt');
 
@@ -46,10 +53,10 @@ export function NotificationPrompt({ customerPhone, onDismiss }: NotificationPro
                 Notifications
               </p>
               <h3 className="font-serif italic text-xl font-black tracking-tight leading-tight">
-                Stay in the Loop
+                {title}
               </h3>
               <p className="text-xs text-brand-gray-500 mt-1.5 leading-relaxed">
-                Get notified the moment Flo confirms or updates your appointment.
+                {description}
               </p>
             </div>
           </div>
@@ -88,7 +95,7 @@ export function NotificationPrompt({ customerPhone, onDismiss }: NotificationPro
               All Set
             </p>
             <p className="font-black text-sm tracking-tight">
-              You'll be notified the moment your booking is updated.
+              You'll be notified when your booking is approved or updated.
             </p>
           </div>
         </div>

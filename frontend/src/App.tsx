@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -227,12 +227,34 @@ export default function App() {
   // Created booking (for real reference rendering on confirmation screen)
   const [createdBooking, setCreatedBooking] = useState<Booking | null>(null);
 
+  // Confirmation screen state & accessibility ref
+  const [copiedReference, setCopiedReference] = useState(false);
+  const confirmationHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (activeStep === 'confirmation') {
+      confirmationHeadingRef.current?.focus();
+    }
+  }, [activeStep]);
+
   // Lookup Booking State
   const [lookupQuery, setLookupQuery] = useState('');
   const [lookupType, setLookupType] = useState<'reference' | 'phone'>('reference');
   const [lookupResults, setLookupResults] = useState<Booking[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeStep === 'lookup' && !lookupQuery) {
+      try {
+        const saved = localStorage.getItem('lastBookingReference');
+        if (saved) {
+          setLookupQuery(saved);
+          setLookupType('reference');
+        }
+      } catch {}
+    }
+  }, [activeStep, lookupQuery]);
 
   // Customer Cancellation
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
@@ -485,6 +507,11 @@ export default function App() {
 
       setCreatedBooking(newBooking);
       setBookings(prev => [...prev, newBooking]);
+      try {
+        if (newBooking?.reference) {
+          localStorage.setItem('lastBookingReference', newBooking.reference);
+        }
+      } catch {}
       setActiveStep('confirmation');
       setTimeout(() => setShowNotificationPrompt(true), 800);
     } catch (err: any) {
@@ -502,12 +529,126 @@ export default function App() {
     setClientInfo({ name: '', phone: '', email: '' });
     setShowNotificationPrompt(false);
     setCreatedBooking(null);
+    setCopiedReference(false);
     setLookupQuery('');
     setLookupResults([]);
     setLookupError(null);
     setReschedulingBooking(null);
     setCancellingBookingId(null);
   };
+
+  // ── Confirmation Screen Helpers & Action Handlers ─────────────────────────
+  const handleCopyReference = async () => {
+    const ref = createdBooking?.reference;
+    if (!ref) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(ref);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = ref;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopiedReference(true);
+      setTimeout(() => setCopiedReference(false), 2000);
+    } catch {
+      setCopiedReference(true);
+      setTimeout(() => setCopiedReference(false), 2000);
+    }
+  };
+
+  const handleCheckBookingStatus = (ref?: string) => {
+    const referenceToSearch = ref || createdBooking?.reference || '';
+    setLookupType('reference');
+    setLookupQuery(referenceToSearch);
+    setLookupError(null);
+    setLookupResults([]);
+    setActiveStep('lookup');
+    if (referenceToSearch) {
+      try {
+        localStorage.setItem('lastBookingReference', referenceToSearch);
+      } catch {}
+      setLookupLoading(true);
+      api.lookupBookings({ reference: referenceToSearch })
+        .then(results => {
+          setLookupResults(results);
+          if (results.length === 0) {
+            setLookupError('No bookings found matching your search.');
+          }
+        })
+        .catch((err: any) => {
+          setLookupError(err?.message || 'Failed to search bookings.');
+        })
+        .finally(() => {
+          setLookupLoading(false);
+        });
+    }
+  };
+
+  const whatsAppUrl = useMemo(() => {
+    const rawPhone = tenant?.supportPhone;
+    if (!rawPhone || !rawPhone.trim()) return null;
+
+    let digits = rawPhone.replace(/\D/g, '');
+    if (!digits) return null;
+
+    if (digits.startsWith('0')) {
+      digits = '254' + digits.slice(1);
+    } else if (!digits.startsWith('254') && digits.length === 9) {
+      digits = '254' + digits;
+    } else if (!digits.startsWith('254')) {
+      digits = '254' + digits;
+    }
+
+    const bookingRef = createdBooking?.reference;
+    const message = bookingRef
+      ? `Hello, I'm reaching out regarding my booking request #${bookingRef}.`
+      : `Hello, I'm reaching out regarding my booking request.`;
+
+    return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+  }, [tenant?.supportPhone, createdBooking?.reference]);
+
+  const confirmationFriendlyDate = useMemo(() => {
+    const raw = createdBooking?.date || selectedDate;
+    if (!raw) return '';
+    try {
+      const d = new Date(raw.includes('T') ? raw : `${raw}T00:00:00`);
+      if (isNaN(d.getTime())) return raw;
+      return d.toLocaleDateString('en-GB', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return raw;
+    }
+  }, [createdBooking?.date, selectedDate]);
+
+  const confirmationTimeRange = useMemo(() => {
+    const start = createdBooking?.startTime || selectedTime || '';
+    if (!start) return '';
+    if (createdBooking?.endTime) {
+      return `${start} – ${createdBooking.endTime}`;
+    }
+    const matchedOpt = multiSlotOptions.find(o => o.time === selectedTime);
+    if (matchedOpt?.endTime) {
+      return `${start} – ${matchedOpt.endTime}`;
+    }
+    if (totalServiceDuration > 0) {
+      const parts = start.split(':').map(Number);
+      if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        const totalMinutes = parts[0] * 60 + parts[1] + totalServiceDuration;
+        const endH = Math.floor(totalMinutes / 60) % 24;
+        const endM = totalMinutes % 60;
+        return `${start} – ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+      }
+    }
+    return start;
+  }, [createdBooking?.startTime, createdBooking?.endTime, selectedTime, multiSlotOptions, totalServiceDuration]);
 
 
   const handleNotificationNavigate = (url: string) => {
@@ -768,6 +909,7 @@ export default function App() {
           <NotificationPrompt
             customerPhone={clientInfo.phone}
             onDismiss={() => setShowNotificationPrompt(false)}
+            description="Get notified when your booking is approved or updated."
           />
         )}
 
@@ -1153,7 +1295,18 @@ export default function App() {
           <div className="flex items-center gap-3">
             {userMode === 'customer' && activeStep !== 'lookup' && (
               <button
-                onClick={() => setActiveStep('lookup')}
+                onClick={() => {
+                  if (!lookupQuery) {
+                    try {
+                      const saved = localStorage.getItem('lastBookingReference');
+                      if (saved) {
+                        setLookupQuery(saved);
+                        setLookupType('reference');
+                      }
+                    } catch {}
+                  }
+                  setActiveStep('lookup');
+                }}
                 title="Lookup your bookings"
                 className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500"
               >
@@ -1765,59 +1918,241 @@ export default function App() {
                       key="confirmation"
                       initial={{ opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="flex flex-col items-center justify-center py-12 text-center space-y-12"
+                      className="flex flex-col items-center justify-center py-8 sm:py-12 text-center space-y-8 sm:space-y-10 max-w-xl mx-auto"
                     >
-                      <div className="space-y-4">
-                        <h2 className="text-5xl font-serif font-black tracking-tight leading-none uppercase">Confirmed</h2>
-                        <div className="w-20 h-1.5 bg-brand-black mx-auto"></div>
-                        <p className="text-brand-gray-400 font-bold tracking-[0.1em] text-sm max-w-[240px] mx-auto pt-4 leading-relaxed">
-                          YOUR APPOINTMENT AT THE STUDIO HAS BEEN SUCCESSFULLY LOGGED.
+                      {/* 1. Heading, Status Badge & Subtitle */}
+                      <div className="space-y-3">
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
+                          <span>Pending approval</span>
+                        </div>
+
+                        <h2
+                          ref={confirmationHeadingRef}
+                          tabIndex={-1}
+                          className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none"
+                        >
+                          Request received
+                        </h2>
+                        <div className="w-16 h-1 bg-brand-black mx-auto" aria-hidden="true" />
+                        <p className="text-brand-gray-500 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+                          The salon will review your request shortly.
                         </p>
                       </div>
 
-                      <div className="bg-brand-gray-50 w-full p-10 text-left space-y-8 border-2 border-brand-black rounded-xl">
-                        <div className="flex justify-between items-baseline border-b border-brand-black/10 pb-6">
-                          <p className="text-[13px] uppercase tracking-[0.4em] font-black text-brand-gray-600">Service Ref</p>
-                          <p className="font-black text-xs uppercase italic">#{createdBooking?.reference || 'LMN-PENDING'}</p>
+                      {/* 3. Prominent Reference */}
+                      <div className="w-full bg-brand-white border-2 border-brand-black rounded-xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-sm">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.3em] font-black text-brand-gray-500">
+                            Booking Reference
+                          </p>
+                          <p className="text-2xl sm:text-3xl font-mono font-black tracking-wider text-brand-black mt-0.5">
+                            #{createdBooking?.reference || 'PENDING'}
+                          </p>
                         </div>
-                        <div className="space-y-6">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Artist(s)</span>
-                            <span className="font-serif italic text-lg leading-none">
-                              {selectedServices.map(s => serviceAttendants[s._id]?.name || 'Any Available').join(', ')}
+                        <button
+                          type="button"
+                          onClick={handleCopyReference}
+                          className="inline-flex items-center justify-center gap-2 self-start sm:self-auto px-4 py-2.5 rounded-lg border-2 border-brand-black bg-brand-white hover:bg-brand-black hover:text-white transition-all text-xs font-black uppercase tracking-widest active:scale-95 shadow-sm"
+                          aria-label={copiedReference ? 'Reference copied to clipboard' : 'Copy reference to clipboard'}
+                        >
+                          {copiedReference ? (
+                            <>
+                              <Check size={14} className="text-emerald-600 sm:group-hover:text-white" aria-hidden="true" />
+                              <span>Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={14} aria-hidden="true" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* 2. What happens next */}
+                      <div className="w-full bg-brand-gray-50 border-2 border-brand-black/15 rounded-xl p-6 sm:p-7 text-left space-y-4">
+                        <div className="flex items-center gap-2 border-b border-brand-black/10 pb-3">
+                          <Clock size={16} className="text-brand-gray-600" aria-hidden="true" />
+                          <h3 className="text-xs font-black uppercase tracking-[0.25em] text-brand-gray-700">
+                            What happens next
+                          </h3>
+                        </div>
+
+                        <ol className="space-y-3.5 text-xs sm:text-sm text-brand-gray-600">
+                          <li className="flex items-start gap-3">
+                            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                              1
+                            </span>
+                            <div className="pt-0.5 leading-relaxed">
+                              <span className="font-bold text-brand-black">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                              2
+                            </span>
+                            <div className="pt-0.5 leading-relaxed">
+                              We'll email you a confirmation{clientInfo.email || createdBooking?.email ? (
+                                <>
+                                  {' '}at{' '}
+                                  <strong className="text-brand-black underline decoration-brand-black/30 break-all">
+                                    {createdBooking?.email || clientInfo.email}
+                                  </strong>
+                                </>
+                              ) : null}{' '}
+                              once approved (please check your spam folder).
+                            </div>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                              3
+                            </span>
+                            <div className="pt-0.5 leading-relaxed">
+                              If notifications are enabled, you'll also get a notification when it's approved.
+                            </div>
+                          </li>
+                        </ol>
+                      </div>
+
+                      {/* 4. Details Card */}
+                      <div className="bg-brand-gray-50 w-full p-6 sm:p-8 text-left space-y-6 border-2 border-brand-black rounded-xl">
+                        <div className="border-b border-brand-black/10 pb-4 flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+                          <div>
+                            <span className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500 block">
+                              Scheduled Date & Time
+                            </span>
+                            <p className="font-serif font-black text-lg sm:text-xl text-brand-black mt-1">
+                              {confirmationFriendlyDate}
+                            </p>
+                          </div>
+                          <div className="sm:text-right">
+                            <span className="inline-block px-3 py-1 bg-brand-black text-white rounded text-xs font-mono font-bold tracking-wider">
+                              {confirmationTimeRange}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Services</span>
-                            <span className="font-black text-sm leading-none uppercase">
-                              {selectedServices.map(s => s.name).join(' + ')}
-                            </span>
+                        </div>
+
+                        <div className="space-y-4">
+                          <p className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500">
+                            Requested Services ({selectedServices.length > 0 ? selectedServices.length : 1})
+                          </p>
+                          <div className="space-y-3">
+                            {selectedServices.length > 0 ? (
+                              selectedServices.map((service, idx) => {
+                                const selectedOpt = multiSlotOptions.find(o => o.time === selectedTime);
+                                const seg = selectedOpt?.segments?.find(s => s.serviceId === service._id);
+                                const artistName = seg?.attendantName || serviceAttendants[service._id]?.name || 'Any Available';
+                                const serviceTime = seg ? `${seg.startTime} – ${seg.endTime}` : confirmationTimeRange;
+
+                                return (
+                                  <div
+                                    key={service._id || idx}
+                                    className="p-4 bg-brand-white border border-brand-black/10 rounded-lg space-y-2"
+                                  >
+                                    <div className="flex justify-between items-start gap-3">
+                                      <span className="font-black text-sm uppercase text-brand-black leading-snug">
+                                        {service.name}
+                                      </span>
+                                      <span className="font-bold text-xs text-brand-black shrink-0">
+                                        {formatPrice(service.price, service.priceMax)}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <User size={13} className="text-brand-gray-400" />
+                                        <span>Artist: <strong className="text-brand-black font-semibold">{artistName}</strong></span>
+                                      </span>
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <Clock size={13} className="text-brand-gray-400" />
+                                        <span>{serviceTime}</span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="p-4 bg-brand-white border border-brand-black/10 rounded-lg space-y-2">
+                                <div className="flex justify-between items-start gap-3">
+                                  <span className="font-black text-sm uppercase text-brand-black leading-snug">
+                                    {typeof createdBooking?.serviceId === 'object' && createdBooking?.serviceId ? createdBooking.serviceId.name : 'Appointment'}
+                                  </span>
+                                  {createdBooking?.price !== undefined && (
+                                    <span className="font-bold text-xs text-brand-black shrink-0">
+                                      KES {createdBooking.price.toLocaleString()}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <User size={13} className="text-brand-gray-400" />
+                                    <span>
+                                      Artist:{' '}
+                                      <strong className="text-brand-black font-semibold">
+                                        {typeof createdBooking?.attendantId === 'object' && createdBooking?.attendantId
+                                          ? createdBooking.attendantId.name
+                                          : 'Any Available'}
+                                      </strong>
+                                    </span>
+                                  </span>
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Clock size={13} className="text-brand-gray-400" />
+                                    <span>{confirmationTimeRange}</span>
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Total Cost</span>
-                            <span className="font-black text-sm leading-none">
-                              KES {totalServicePrice.toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Time</span>
-                            <span className="font-black text-sm leading-none">{selectedTime}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[13px] uppercase tracking-[0.2em] font-bold text-brand-gray-600">Date</span>
-                            <span className="font-black text-sm leading-none">
-                              {new Date(selectedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()}
-                            </span>
-                          </div>
+                        </div>
+
+                        <div className="border-t border-brand-black/15 pt-5 flex justify-between items-center">
+                          <span className="text-xs uppercase tracking-[0.25em] font-black text-brand-gray-600">
+                            Total Cost
+                          </span>
+                          <span className="font-black text-base sm:text-lg text-brand-black">
+                            KES {(totalServicePrice || createdBooking?.price || 0).toLocaleString()}
+                          </span>
                         </div>
                       </div>
 
-                      <button
-                        onClick={resetFlow}
-                        className="w-full bg-transparent border-2 border-brand-black text-brand-black py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-black hover:text-white"
-                      >
-                        Return to Menu
-                      </button>
+                      {/* 5. Clear Actions */}
+                      <div className="w-full space-y-3 pt-2">
+                        {/* Primary: Check booking status */}
+                        <button
+                          type="button"
+                          onClick={() => handleCheckBookingStatus(createdBooking?.reference)}
+                          className="w-full bg-brand-black text-brand-white py-5 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-brand-gray-800 hover:tracking-[0.3em] active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
+                        >
+                          <Search size={15} />
+                          <span>Check booking status</span>
+                        </button>
+
+                        {/* Secondary: Message us on WhatsApp (hidden if supportPhone missing) */}
+                        {whatsAppUrl && (
+                          <a
+                            href={whatsAppUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full bg-[#25D366] text-white py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-[#20ba59] active:scale-[0.98] shadow-sm flex items-center justify-center gap-2"
+                          >
+                            <MessageCircle size={16} />
+                            <span>Message us on WhatsApp</span>
+                          </a>
+                        )}
+
+                        {/* Tertiary: Book another appointment */}
+                        <button
+                          type="button"
+                          onClick={resetFlow}
+                          className="w-full bg-transparent border-2 border-brand-black/30 text-brand-black py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:border-brand-black hover:bg-brand-black hover:text-white active:scale-[0.98]"
+                        >
+                          Book another appointment
+                        </button>
+                      </div>
                     </motion.div>
                   )}
 
