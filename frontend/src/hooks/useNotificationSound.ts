@@ -15,7 +15,7 @@ export function useNotificationSound() {
       if (event.data?.type !== 'PLAY_NOTIFICATION_SOUND') return;
       const src = SOUND_FILES[event.data.sound] ?? SOUND_FILES.default;
       const audio = new Audio(src);
-      audio.volume = 0.7;
+      audio.volume = 0.8;
       audio.play().catch(() => {
         // Browsers block autoplay without prior user interaction.
         // This is expected if the tab was idle. Ignore silently.
