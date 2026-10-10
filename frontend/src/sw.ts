@@ -19,10 +19,10 @@ clientsClaim();
 // ── Precache all assets injected by VitePWA's injectManifest strategy 
 precacheAndRoute(self.__WB_MANIFEST);
 
-// ── Remove stale precache entries from previous SW versions ─────────────────
+// ── Remove stale precache entries from previous SW versions 
 cleanupOutdatedCaches();
 
-// ── SPA Navigation Route ─────────────────────────────────────────────────────
+// ── SPA Navigation Route
 // Serve index.html for all navigation requests except /api routes.
 // This allows the app to work offline for already-visited routes.
 registerRoute(
