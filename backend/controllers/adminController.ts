@@ -87,7 +87,7 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
       void sendBookingConfirmedToCustomer(req.tenant!, booking, syntheticService, undefined);
       void sendWhatsAppBookingConfirmed(booking, syntheticService, undefined);
       void sendPushToPhone(booking.phone, {
-        title: '✅ Appointment Confirmed!',
+        title: 'Appointment Confirmed!',
         body: `See you on ${booking.date} at ${booking.startTime} for ${combinedName}. Please arrive 5–10 mins early.`,
         url: '/',
       }, tenantIdStr);
