@@ -11,12 +11,12 @@ declare const self: ServiceWorkerGlobalScope;
 import { saveNotification, getNotifications } from './utils/db';
 
 
-// ── Lifecycle: Take control immediately on activation ────────────────────────
+// ── Lifecycle: Take control immediately on activation
 // This ensures users always get the latest version without a manual refresh.
 self.skipWaiting();
 clientsClaim();
 
-// ── Precache all assets injected by VitePWA's injectManifest strategy ────────
+// ── Precache all assets injected by VitePWA's injectManifest strategy 
 precacheAndRoute(self.__WB_MANIFEST);
 
 // ── Remove stale precache entries from previous SW versions ─────────────────
