@@ -181,6 +181,26 @@ export async function getAnyAvailability(date: string, serviceId: string): Promi
   return res.json();
 }
 
+/**
+ * Fetches slot counts for every day of the month.
+ * Endpoint: GET /api/availability/month?month=YYYY-MM&items=...
+ */
+export async function getMonthAvailability(
+  month: string,
+  items: Array<{ serviceId: string; attendantId?: string | null }>
+): Promise<{ counts: Record<string, number> }> {
+  const query = new URLSearchParams({
+    month,
+    items: JSON.stringify(items),
+  });
+  const res = await fetch(`${API_BASE}/availability/month?${query.toString()}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch month availability');
+  }
+  return res.json();
+}
+
 // ── Admin: Bookings ────────────────────────────────────────────────────────
 
 /**
