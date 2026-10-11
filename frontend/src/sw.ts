@@ -110,22 +110,47 @@ self.addEventListener('push', (event: PushEvent) => {
         console.error('[SW] Failed to save notification to IndexedDB:', err);
       }
 
+      // Check for visible window clients before calling showNotification
+      const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const hasVisibleWindow = windowClients.some(
+        (client) => (client as any).visibilityState === 'visible'
+      );
+
+      // Determine silent and vibrate options:
+      // If sound is 'silent': always silent: true and no vibration
+      // If a visible window exists: silent: true so page plays custom audio without OS double sound
+      // If no visible window exists (background / closed): silent: false so OS plays system sound
+      const isSilentPref = sound === 'silent';
+      let notificationSilent: boolean;
+      let notificationVibrate: number[];
+
+      if (isSilentPref) {
+        notificationSilent = true;
+        notificationVibrate = [];
+      } else if (hasVisibleWindow) {
+        notificationSilent = true;
+        notificationVibrate = [100, 50, 100];
+      } else {
+        notificationSilent = false;
+        notificationVibrate = [100, 50, 100];
+      }
+
       // Show the notification
       await self.registration.showNotification(title, {
         body,
         icon:     '/android-chrome-192x192.png',
         badge:    '/favicon-32x32.png',
-        vibrate:  sound === 'silent' ? [] : [100, 50, 100],
+        silent:   notificationSilent,
+        vibrate:  notificationVibrate,
         tag:      notificationId,   // unique tag — prevents silent replacement
         renotify: true,
         data:     { url, sound },
       } as any);
 
-      // Tell any open app window to reload and play sound
-      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      for (const client of clients) {
+      // Tell open app windows to reload and play sound if visible
+      for (const client of windowClients) {
         client.postMessage({ type: 'PUSH_NOTIFICATION_RECEIVED', id: notificationId });
-        if (sound !== 'silent') {
+        if (!isSilentPref && hasVisibleWindow) {
           client.postMessage({ type: 'PLAY_NOTIFICATION_SOUND', sound });
         }
       }

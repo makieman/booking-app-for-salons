@@ -10,6 +10,7 @@ import { NotificationCenter } from './components/NotificationCenter';
 import { useAdminPushNotifications } from './hooks/useAdminPushNotifications';
 import { useAttendantPushNotifications } from './hooks/useAttendantPushNotifications';
 import { useNotificationSound } from './hooks/useNotificationSound';
+import { playNotificationSound } from './utils/notificationSound';
 import { useTenant } from './hooks/useTenant';
 import { SalonDashboard } from './components/SalonDashboard';
 import { AdminPortal } from './components/AdminPortal';
@@ -2254,6 +2255,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
   }, [tenant?._id]);
 
   // Admin push notifications
+  const adminPush = useAdminPushNotifications();
 
   // Add service form state
   const [addForm, setAddForm] = useState({ name: '', duration: '', price: '', priceMax: '', description: '' });
@@ -2524,7 +2526,16 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
                       <option value="ding">Ding 🛎️</option>
                       <option value="silent">Silent 🔇</option>
                     </select>
-
+                    <button
+                      type="button"
+                      disabled={adminPush.soundPreference === 'silent'}
+                      onClick={() => playNotificationSound(adminPush.soundPreference)}
+                      title={adminPush.soundPreference === 'silent' ? 'Sound is set to silent' : 'Test sound'}
+                      className="py-1 px-2 text-[9px] font-black uppercase tracking-wider bg-white border border-brand-gray-200 hover:border-brand-black hover:text-brand-black text-brand-gray-600 rounded-lg flex items-center gap-1 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
+                    >
+                      <Volume2 size={11} />
+                      <span>Test</span>
+                    </button>
                   </div>
                   <p className="text-[9px] text-brand-gray-400 leading-tight">
                     If the app is closed, your phone's notification sound is used. Check your phone's notification settings.
@@ -2614,7 +2625,16 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
                       <option value="ding">Ding 🛎️</option>
                       <option value="silent">Silent 🔇</option>
                     </select>
-
+                    <button
+                      type="button"
+                      disabled={adminPush.soundPreference === 'silent'}
+                      onClick={() => playNotificationSound(adminPush.soundPreference)}
+                      title={adminPush.soundPreference === 'silent' ? 'Sound is set to silent' : 'Test sound'}
+                      className="py-1.5 px-2 text-[9px] font-black uppercase tracking-wider bg-white border border-brand-gray-200 hover:border-brand-black hover:text-brand-black text-brand-gray-600 rounded-lg flex items-center gap-1 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
+                    >
+                      <Volume2 size={11} />
+                      <span>Test</span>
+                    </button>
                   </div>
                   <p className="text-[8px] sm:text-[9px] text-brand-gray-400 max-w-xs leading-snug">
                     If the app is closed, your phone's notification sound is used. Check your phone's notification settings.
@@ -3804,6 +3824,7 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
 
 function SettingsTab({ ownerToken }: { ownerToken: string }) {
   const { tenant, setTenant } = useTenant();
+  const adminPush = useAdminPushNotifications();
   const [name, setName] = useState(tenant?.name || '');
   const [primaryColor, setPrimaryColor] = useState(tenant?.branding?.primaryColor || '#B08968');
   const [emailFromName, setEmailFromName] = useState(tenant?.branding?.emailFromName || '');
@@ -4071,6 +4092,71 @@ function SettingsTab({ ownerToken }: { ownerToken: string }) {
             {saving ? 'Saving...' : 'Save Settings'}
           </button>
         </form>
+
+        {/* Notification Sounds & Alerts Settings Card */}
+        <div className="border border-brand-gray-100 bg-white p-6 sm:p-8 space-y-4 shadow-sm rounded-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-brand-gray-100 gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600">
+                Notification Sounds & Alerts
+              </p>
+              <p className="text-[10px] text-brand-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                In-app audio chime & push preferences
+              </p>
+            </div>
+            {adminPush.permission !== 'unsupported' && (
+              <button
+                type="button"
+                onClick={() => adminPush.isSubscribed ? adminPush.unsubscribe() : adminPush.subscribe()}
+                disabled={adminPush.isLoading}
+                className={`self-start sm:self-auto flex items-center gap-1.5 py-1.5 px-3 text-[10px] font-black uppercase tracking-widest border rounded-lg transition-all ${
+                  adminPush.isSubscribed
+                    ? 'bg-brand-black text-white border-brand-black shadow-sm'
+                    : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
+                }`}
+              >
+                {adminPush.isSubscribed
+                  ? <><Bell size={12} className="text-white animate-bounce" /> <span>Push Enabled</span></>
+                  : <><BellOff size={12} /> <span>Push Disabled</span></>
+                }
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">
+                Sound Preference
+              </label>
+              <div className="flex items-center gap-3">
+                <select
+                  value={adminPush.soundPreference}
+                  onChange={e => adminPush.updateSound(e.target.value)}
+                  className="flex-1 border-b border-brand-gray-200 focus:border-brand-black focus:outline-none py-2 font-bold text-sm bg-transparent cursor-pointer"
+                >
+                  <option value="default">Default 🎵</option>
+                  <option value="chime">Chime ✨</option>
+                  <option value="bell">Bell 🔔</option>
+                  <option value="ding">Ding 🛎️</option>
+                  <option value="silent">Silent 🔇</option>
+                </select>
+                <button
+                  type="button"
+                  disabled={adminPush.soundPreference === 'silent'}
+                  onClick={() => playNotificationSound(adminPush.soundPreference)}
+                  title={adminPush.soundPreference === 'silent' ? 'Sound is set to silent' : 'Test sound'}
+                  className="py-2 px-3.5 text-[10px] font-black uppercase tracking-wider bg-brand-gray-50 border border-brand-gray-200 hover:bg-brand-black hover:text-white text-brand-black rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                >
+                  <Volume2 size={13} />
+                  <span>Test sound</span>
+                </button>
+              </div>
+            </div>
+            <p className="text-[11px] text-brand-gray-500 leading-relaxed">
+              If the app is closed, your phone's notification sound is used. Check your phone's notification settings.
+            </p>
+          </div>
+        </div>
 
         {/* Uploads Panel */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
