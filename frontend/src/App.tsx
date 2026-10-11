@@ -2220,8 +2220,15 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
 }
 
 function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, ownerToken, triggerToast }: { bookings: Booking[], ownerPin?: string, ownerToken: string, triggerToast: (msg: string, type?: 'success' | 'error') => void }) {
-  const { tenant } = useTenant();
+  const { tenant, tenantSlug, navigate } = useTenant();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'ledger' | 'pending' | 'services' | 'staff' | 'settings'>('dashboard');
+
+  const handleSignOut = () => {
+    localStorage.removeItem('ownerToken');
+    api.setApiAuthToken(null);
+    navigate('admin', tenantSlug || undefined);
+    window.location.reload();
+  };
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
   const [confirmedBookings, setConfirmedBookings] = useState<Booking[]>(initialBookings);
   const [allTenantBookings, setAllTenantBookings] = useState<Booking[]>(initialBookings);
@@ -2247,7 +2254,6 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
   }, [tenant?._id]);
 
   // Admin push notifications
-  const adminPush = useAdminPushNotifications();
 
   // Add service form state
   const [addForm, setAddForm] = useState({ name: '', duration: '', price: '', priceMax: '', description: '' });
@@ -2406,19 +2412,150 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
     }
   };
 
-  const tabs: { key: 'dashboard' | 'ledger' | 'pending' | 'services' | 'staff' | 'settings'; label: string }[] = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'ledger', label: 'Ledger' },
-    { key: 'pending', label: 'Pending' },
-    { key: 'services', label: 'Services' },
-    { key: 'staff', label: 'Staff' },
-    { key: 'settings', label: 'Settings' },
+  const tabs: {
+    key: 'dashboard' | 'ledger' | 'pending' | 'services' | 'staff' | 'settings';
+    label: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+  }[] = [
+    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { key: 'ledger', label: 'Ledger', icon: Calendar },
+    { key: 'pending', label: 'Pending', icon: AlertCircle },
+    { key: 'services', label: 'Services', icon: Scissors },
+    { key: 'staff', label: 'Staff', icon: Users },
+    { key: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      {/* Tab Navigation + Admin Notification Toggle */}
-      <nav className="border-b border-brand-gray-100 flex flex-col md:flex-row md:items-center px-4 sm:px-8 py-2 md:py-0 gap-3 md:gap-8 bg-brand-white">
+    <div className="flex-1 flex flex-col min-h-0 relative">
+      {/* Desktop Fixed Left Sidebar (240px wide, visible on lg and above) */}
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 bg-brand-white border-r border-brand-gray-100 flex-col justify-between p-6 z-40 select-none">
+        <div className="space-y-8">
+          {/* Brand & Portal Badge */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-full overflow-hidden border border-brand-gray-100 bg-white flex items-center justify-center shrink-0">
+                <img
+                  src={tenant?.branding?.logoUrl || "/logo-bg.jpg"}
+                  alt={tenant?.name || "Salon Logo"}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="min-w-0">
+                <h1 className="font-serif font-black text-sm tracking-tight text-brand-black truncate">
+                  {tenant?.name || "Salon Portal"}
+                </h1>
+                <span className="inline-block text-[9px] font-black uppercase tracking-[0.2em] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 mt-0.5">
+                  Admin Portal
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation Items */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-400 px-3 pb-1">
+              Menu
+            </p>
+            {tabs.map(tab => {
+              const isActive = activeTab === tab.key;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-black uppercase tracking-[0.15em] transition-all text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-black cursor-pointer ${
+                    isActive
+                      ? 'bg-brand-black text-white shadow-sm'
+                      : 'text-brand-gray-500 hover:text-brand-black hover:bg-brand-gray-100/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon size={16} />
+                    <span>{tab.label}</span>
+                  </div>
+                  {tab.key === 'pending' && pendingBookings.length > 0 && (
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                      isActive ? 'bg-white text-brand-black' : 'bg-red-50 text-red-600 border border-red-200'
+                    }`}>
+                      {pendingBookings.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sidebar Footer: Push Notifications Toggle, Live Salon, Sign Out */}
+        <div className="space-y-3 pt-4 border-t border-brand-gray-100">
+          {adminPush.permission !== 'unsupported' && adminPush.permission !== 'denied' && (
+            <div className="space-y-2 bg-brand-gray-50/70 p-3 rounded-xl border border-brand-gray-100">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-brand-gray-500">Push Alerts</span>
+                <button
+                  type="button"
+                  onClick={() => adminPush.isSubscribed ? adminPush.unsubscribe() : adminPush.subscribe()}
+                  disabled={adminPush.isLoading}
+                  title={adminPush.isSubscribed ? 'Disable notifications' : 'Enable notifications'}
+                  className={`flex items-center gap-1.5 py-1 px-2.5 text-[9px] font-black uppercase tracking-widest border rounded-lg transition-all ${
+                    adminPush.isSubscribed
+                      ? 'bg-brand-black text-white border-brand-black'
+                      : 'text-brand-gray-500 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
+                  }`}
+                >
+                  {adminPush.isSubscribed
+                    ? <><Bell size={11} className="animate-bounce" /> <span>On</span></>
+                    : <><BellOff size={11} /> <span>Off</span></>
+                  }
+                </button>
+              </div>
+              {adminPush.isSubscribed && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={adminPush.soundPreference}
+                      onChange={e => adminPush.updateSound(e.target.value)}
+                      className="flex-1 text-[10px] font-black uppercase tracking-wider border border-brand-gray-200 bg-white py-1 px-2 rounded-lg focus:outline-none focus:border-brand-black cursor-pointer"
+                    >
+                      <option value="default">Default 🎵</option>
+                      <option value="chime">Chime ✨</option>
+                      <option value="bell">Bell 🔔</option>
+                      <option value="ding">Ding 🛎️</option>
+                      <option value="silent">Silent 🔇</option>
+                    </select>
+
+                  </div>
+                  <p className="text-[9px] text-brand-gray-400 leading-tight">
+                    If the app is closed, your phone's notification sound is used. Check your phone's notification settings.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('customer', tenantSlug || undefined)}
+              className="flex-1 py-2.5 px-3 text-[10px] font-black uppercase tracking-wider rounded-xl border border-brand-gray-200 hover:border-brand-black hover:text-brand-black text-brand-gray-600 transition-all text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-black"
+            >
+              Live Salon
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              title="Sign Out"
+              className="p-2.5 border border-brand-gray-200 rounded-xl hover:border-red-600 hover:bg-red-50 text-brand-gray-500 hover:text-red-600 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile Top Tab Navigation + Admin Notification Toggle (<1024px) */}
+      <nav className="lg:hidden border-b border-brand-gray-100 flex flex-col md:flex-row md:items-center px-4 sm:px-8 py-2 md:py-0 gap-3 md:gap-8 bg-brand-white">
         {/* Scrollable Tabs */}
         <div className="flex overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 gap-6 sm:gap-8 flex-nowrap border-b border-brand-gray-50 md:border-b-0">
           {tabs.map(tab => (
@@ -2464,18 +2601,24 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
                 }
               </button>
               {adminPush.isSubscribed && (
-                <div className="flex items-center gap-1">
-                  <select
-                    value={adminPush.soundPreference}
-                    onChange={e => adminPush.updateSound(e.target.value)}
-                    className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest border border-brand-gray-200 bg-white text-brand-black py-2 px-1.5 sm:px-2 focus:border-brand-black focus:outline-none cursor-pointer hover:border-brand-black transition-colors"
-                  >
-                    <option value="default">Default 🎵</option>
-                    <option value="chime">Chime ✨</option>
-                    <option value="bell">Bell 🔔</option>
-                    <option value="ding">Ding 🛎️</option>
-                    <option value="silent">Silent 🔇</option>
-                  </select>
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={adminPush.soundPreference}
+                      onChange={e => adminPush.updateSound(e.target.value)}
+                      className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest border border-brand-gray-200 bg-white text-brand-black py-1.5 px-2 focus:border-brand-black focus:outline-none cursor-pointer hover:border-brand-black transition-colors rounded-lg"
+                    >
+                      <option value="default">Default 🎵</option>
+                      <option value="chime">Chime ✨</option>
+                      <option value="bell">Bell 🔔</option>
+                      <option value="ding">Ding 🛎️</option>
+                      <option value="silent">Silent 🔇</option>
+                    </select>
+
+                  </div>
+                  <p className="text-[8px] sm:text-[9px] text-brand-gray-400 max-w-xs leading-snug">
+                    If the app is closed, your phone's notification sound is used. Check your phone's notification settings.
+                  </p>
                 </div>
               )}
             </div>
@@ -2483,114 +2626,243 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
         )}
       </nav>
 
-      <div className="flex-1 overflow-y-auto px-0 sm:px-8 py-6 sm:py-10 space-y-8 sm:space-y-12 scrollbar-hide">
-        {/* ── TAB 0: Analytics Dashboard ───────────────────── */}
-        {activeTab === 'dashboard' && (
-          <SalonDashboard
-            bookings={allTenantBookings}
-            pendingCount={pendingBookings.length}
-            onNavigateTab={tab => setActiveTab(tab)}
-          />
-        )}
-        {/* ── TAB 1: Daily Ledger ─────────────────────────── */}
-        {activeTab === 'ledger' && (
-          <>
-            <header className="space-y-4 px-4 sm:px-0">
-              <div className="flex items-center justify-between border-b border-brand-gray-100 pb-3">
-                <p className="text-xs sm:text-sm font-black uppercase tracking-[0.2em] text-brand-gray-700">
-                  {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-                </p>
-                <div className="flex items-center gap-1.5 text-brand-black">
-                  <Clock size={15} className="text-brand-gray-400 animate-pulse" />
-                  <span className="text-sm sm:text-base font-black tracking-tight">{currentTime}</span>
-                </div>
-              </div>
+      {/* Main Content Area: Fixed padding & centered container on desktop */}
+      <div className="flex-1 lg:pl-60 overflow-y-auto scrollbar-hide">
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-8 lg:px-10 py-6 sm:py-8 lg:py-10 space-y-8 sm:space-y-12">
+          {/* ── TAB 0: Analytics Dashboard ───────────────────── */}
+          {activeTab === 'dashboard' && (
+            <SalonDashboard
+              bookings={allTenantBookings}
+              pendingCount={pendingBookings.length}
+              onNavigateTab={tab => setActiveTab(tab)}
+              services={services}
+              todayBookings={sortedToday}
+            />
+          )}
 
-              <div className="bg-brand-black px-5 py-4 flex items-center justify-between shadow-sm rounded-lg text-white">
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-white/70">Confirmed Today</p>
-                <h3 className="text-2xl font-black text-white">{sortedToday.length}</h3>
-              </div>
-            </header>
+          {/* ── TAB 1: Daily Ledger ─────────────────────────── */}
+          {activeTab === 'ledger' && (
+            <>
+              {/* Mobile / Tablet Card View (<1024px) */}
+              <div className="lg:hidden space-y-4">
+                <header className="space-y-4 px-4 sm:px-0">
+                  <div className="flex items-center justify-between border-b border-brand-gray-100 pb-3">
+                    <p className="text-xs sm:text-sm font-black uppercase tracking-[0.2em] text-brand-gray-700">
+                      {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                    </p>
+                    <div className="flex items-center gap-1.5 text-brand-black">
+                      <Clock size={15} className="text-brand-gray-400 animate-pulse" />
+                      <span className="text-sm sm:text-base font-black tracking-tight">{currentTime}</span>
+                    </div>
+                  </div>
 
-            <div className="space-y-4 pt-2">
-              {sortedToday.length === 0 ? (
-                <div className="p-16 sm:p-20 text-center border-2 border-dashed border-brand-gray-100 bg-white/50 italic font-serif text-brand-gray-300 shadow-inner">
-                  <p>No confirmed appointments for today.</p>
-                </div>
-              ) : (
-                sortedToday.map((booking, idx) => {
-                  const isPassed = booking.startTime < currentTime;
-                  return (
-                    <motion.div
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      key={booking._id}
-                      className={`p-5 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between border transition-all rounded-xl gap-4 sm:gap-6 group ${isPassed ? 'opacity-35 grayscale border-brand-gray-50 bg-brand-gray-50/50' : 'border-brand-gray-100 hover:border-brand-black hover:shadow-luxury bg-brand-white'}`}
-                    >
-                      <div className="flex flex-col space-y-4 sm:space-y-3">
-                        <div className="flex items-center gap-4 sm:gap-6">
-                          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-brand-black flex-shrink-0 flex items-center justify-center font-black text-white text-xs italic tracking-tighter shadow-md">
-                            {booking.customerName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-serif italic text-xl sm:text-2xl leading-none">{booking.customerName}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <a href={`tel:${booking.phone}`} className="text-[12px] sm:text-[13px] font-black uppercase text-brand-gray-600 tracking-widest hover:text-brand-black transition-colors flex items-center gap-1">
-                                <Phone size={10} />
-                                {booking.phone}
-                              </a>
+                  <div className="bg-brand-black px-5 py-4 flex items-center justify-between shadow-sm rounded-lg text-white">
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-white/70">Confirmed Today</p>
+                    <h3 className="text-2xl font-black text-white">{sortedToday.length}</h3>
+                  </div>
+                </header>
+
+                <div className="space-y-4 pt-2">
+                  {sortedToday.length === 0 ? (
+                    <div className="p-16 sm:p-20 text-center border-2 border-dashed border-brand-gray-100 bg-white/50 italic font-serif text-brand-gray-300 shadow-inner">
+                      <p>No confirmed appointments for today.</p>
+                    </div>
+                  ) : (
+                    sortedToday.map((booking, idx) => {
+                      const isPassed = booking.startTime < currentTime;
+                      return (
+                        <motion.div
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.05 }}
+                          key={booking._id}
+                          className={`p-5 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between border transition-all rounded-xl gap-4 sm:gap-6 group ${isPassed ? 'opacity-35 grayscale border-brand-gray-50 bg-brand-gray-50/50' : 'border-brand-gray-100 hover:border-brand-black hover:shadow-luxury bg-brand-white'}`}
+                        >
+                          <div className="flex flex-col space-y-4 sm:space-y-3">
+                            <div className="flex items-center gap-4 sm:gap-6">
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-brand-black flex-shrink-0 flex items-center justify-center font-black text-white text-xs italic tracking-tighter shadow-md">
+                                {booking.customerName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-serif italic text-xl sm:text-2xl leading-none">{booking.customerName}</p>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <a href={`tel:${booking.phone}`} className="text-[12px] sm:text-[13px] font-black uppercase text-brand-gray-600 tracking-widest hover:text-brand-black transition-colors flex items-center gap-1">
+                                    <Phone size={10} />
+                                    {booking.phone}
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-y-2 gap-x-4 border-t border-brand-gray-50 pt-4 sm:flex sm:items-center sm:flex-wrap sm:gap-4 sm:pt-3">
+                              <div className="flex items-center gap-2 col-span-2 sm:col-span-auto">
+                                <span className="w-1.5 h-1.5 rounded-full bg-brand-black"></span>
+                                <p className="text-[12px] sm:text-[13px] font-black tracking-[0.2em] text-brand-black uppercase">
+                                  {booking.startTime}
+                                </p>
+                              </div>
+
+                              <div className="hidden sm:block opacity-10 font-bold">—</div>
+
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 sm:hidden">Service</p>
+                                <p className="text-[12px] sm:text-[13px] font-bold text-brand-gray-700 uppercase tracking-widest">
+                                  {typeof booking.serviceId === 'object' ? booking.serviceId.name : 'Unknown'}
+                                </p>
+                              </div>
+
+                              <div className="hidden sm:block opacity-10 font-bold">—</div>
+
+                              <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 sm:hidden">Stylist</p>
+                                <p className="text-[11px] sm:text-[12px] font-bold text-brand-gray-500 italic">
+                                  {booking.attendantId && typeof booking.attendantId === 'object'
+                                    ? (booking.attendantId as Attendant).name
+                                    : 'Unassigned'}
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Grid details for mobile, inline row for desktop */}
-                        <div className="grid grid-cols-2 gap-y-2 gap-x-4 border-t border-brand-gray-50 pt-4 sm:flex sm:items-center sm:flex-wrap sm:gap-4 sm:pt-3">
-                          <div className="flex items-center gap-2 col-span-2 sm:col-span-auto">
-                            <span className="w-1.5 h-1.5 rounded-full bg-brand-black"></span>
-                            <p className="text-[12px] sm:text-[13px] font-black tracking-[0.2em] text-brand-black uppercase">
-                              {booking.startTime}
-                            </p>
+                          <div className="flex items-center justify-between sm:justify-end border-t border-brand-gray-50/50 pt-3 sm:border-t-0 sm:pt-0 sm:pl-4">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 sm:hidden">Cost</span>
+                            <span className="font-black text-sm sm:text-base bg-brand-gray-50 px-2.5 py-1 sm:bg-transparent sm:p-0">
+                              {typeof booking.serviceId === 'object'
+                                ? formatPrice(booking.serviceId.price, (booking.serviceId as Service).priceMax)
+                                : 'KES 0'}
+                            </span>
                           </div>
+                        </motion.div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
 
-                          <div className="hidden sm:block opacity-10 font-bold">—</div>
+              {/* Desktop Proper Data Table (≥1024px) */}
+              <div className="hidden lg:block space-y-6">
+                {/* Toolbar Row */}
+                <div className="flex items-center justify-between border-b border-brand-gray-100 pb-4">
+                  <div>
+                    <h2 className="text-3xl font-serif font-black tracking-tight uppercase text-brand-black">
+                      Daily Ledger
+                    </h2>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-gray-400 mt-1">
+                      {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
 
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 sm:hidden">Service</p>
-                            <p className="text-[12px] sm:text-[13px] font-bold text-brand-gray-700 uppercase tracking-widest">
-                              {typeof booking.serviceId === 'object' ? booking.serviceId.name : 'Unknown'}
-                            </p>
-                          </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-brand-gray-100/70 border border-brand-gray-200 px-3.5 py-2 rounded-xl text-xs font-black text-brand-black">
+                      <Clock size={15} className="text-brand-gray-500 animate-pulse" />
+                      <span className="font-mono tracking-wider">{currentTime}</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-brand-black text-white px-4 py-2 rounded-xl text-xs font-black tracking-wider shadow-sm">
+                      <span className="uppercase text-white/70">Confirmed Today:</span>
+                      <span className="font-mono text-sm">{sortedToday.length}</span>
+                    </div>
+                  </div>
+                </div>
 
-                          <div className="hidden sm:block opacity-10 font-bold">—</div>
+                {/* Data Table */}
+                {sortedToday.length === 0 ? (
+                  <div className="p-16 text-center border-2 border-dashed border-brand-gray-100 bg-white rounded-2xl italic font-serif text-brand-gray-400">
+                    <p>No confirmed appointments scheduled for today.</p>
+                  </div>
+                ) : (
+                  <div className="bg-brand-white border border-brand-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto max-h-[640px]">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="sticky top-0 bg-brand-gray-50/95 backdrop-blur-md border-b border-brand-gray-100 z-10">
+                          <tr>
+                            <th className="py-3.5 px-6 text-[10px] font-black uppercase tracking-[0.2em] text-brand-gray-500">Time</th>
+                            <th className="py-3.5 px-6 text-[10px] font-black uppercase tracking-[0.2em] text-brand-gray-500">Client</th>
+                            <th className="py-3.5 px-6 text-[10px] font-black uppercase tracking-[0.2em] text-brand-gray-500">Service</th>
+                            <th className="py-3.5 px-6 text-[10px] font-black uppercase tracking-[0.2em] text-brand-gray-500">Stylist</th>
+                            <th className="py-3.5 px-6 text-[10px] font-black uppercase tracking-[0.2em] text-brand-gray-500 text-right">Cost</th>
+                            <th className="py-3.5 px-6 text-[10px] font-black uppercase tracking-[0.2em] text-brand-gray-500 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-brand-gray-100">
+                          {sortedToday.map((booking, idx) => {
+                            const isPassed = booking.startTime < currentTime;
+                            const serviceObj = typeof booking.serviceId === 'object' ? booking.serviceId as Service : null;
+                            const serviceName = serviceObj ? serviceObj.name : 'Unknown Service';
+                            const attendantName = booking.attendantId && typeof booking.attendantId === 'object'
+                              ? (booking.attendantId as Attendant).name
+                              : 'Unassigned';
 
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 sm:hidden">Stylist</p>
-                            <p className="text-[11px] sm:text-[12px] font-bold text-brand-gray-500 italic">
-                              {booking.attendantId && typeof booking.attendantId === 'object'
-                                ? (booking.attendantId as Attendant).name
-                                : 'Unassigned'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Price display badge */}
-                      <div className="flex items-center justify-between sm:justify-end border-t border-brand-gray-50/50 pt-3 sm:border-t-0 sm:pt-0 sm:pl-4">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-brand-gray-400 sm:hidden">Cost</span>
-                        <span className="font-black text-sm sm:text-base bg-brand-gray-50 px-2.5 py-1 sm:bg-transparent sm:p-0">
-                          {typeof booking.serviceId === 'object'
-                            ? formatPrice(booking.serviceId.price, (booking.serviceId as Service).priceMax)
-                            : 'KES 0'}
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-                })
-              )}
-            </div>
-          </>
-        )}
+                            return (
+                              <tr
+                                key={booking._id || idx}
+                                tabIndex={0}
+                                className={`transition-colors hover:bg-brand-gray-50/70 focus:outline-none focus-visible:bg-brand-gray-50 ${
+                                  isPassed ? 'opacity-40 grayscale' : ''
+                                }`}
+                              >
+                                <td className="py-4 px-6 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-brand-black" />
+                                    <span className="text-sm font-black font-mono tracking-wider text-brand-black">
+                                      {booking.startTime}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-4 px-6">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-brand-black text-white flex items-center justify-center font-bold text-xs tracking-wider shrink-0 shadow-sm">
+                                      {booking.customerName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <p className="font-serif italic text-base text-brand-black leading-tight">
+                                        {booking.customerName}
+                                      </p>
+                                      <a
+                                        href={`tel:${booking.phone}`}
+                                        className="text-[11px] font-bold text-brand-gray-500 hover:text-brand-black transition-colors flex items-center gap-1 mt-0.5"
+                                      >
+                                        <Phone size={10} />
+                                        {booking.phone}
+                                      </a>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-4 px-6">
+                                  <p className="text-xs font-black uppercase tracking-wider text-brand-black">
+                                    {serviceName}
+                                  </p>
+                                  {serviceObj?.duration && (
+                                    <span className="text-[10px] text-brand-gray-400 font-medium">
+                                      {serviceObj.duration} mins
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-4 px-6">
+                                  <span className="text-xs font-bold italic text-brand-gray-600">
+                                    {attendantName}
+                                  </span>
+                                </td>
+                                <td className="py-4 px-6 text-right whitespace-nowrap">
+                                  <span className="font-black text-sm text-brand-black font-mono">
+                                    {serviceObj ? formatPrice(serviceObj.price, serviceObj.priceMax) : 'KES 0'}
+                                  </span>
+                                </td>
+                                <td className="py-4 px-6 text-center whitespace-nowrap">
+                                  <span className="inline-block px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200/60 rounded-full">
+                                    Confirmed
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         {/* ── TAB 2: Pending Requests ─────────────────────── */}
         {activeTab === 'pending' && (
           <>
@@ -3317,6 +3589,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
           <SettingsTab ownerToken={ownerToken} />
         )}
 
+        </div>
       </div>
     </div>
   );
