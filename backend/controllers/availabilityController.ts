@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { DateTime } from 'luxon';
 import Service from '../models/Service';
 import Booking from '../models/Booking';
 import Attendant from '../models/Attendant';
@@ -167,12 +168,23 @@ export const getMultiAvailability = async (req: Request, res: Response) => {
       status: { $ne: 'cancelled' },
     });
 
-    const multiOptions = generateMultiServiceSlots(
+    let multiOptions = generateMultiServiceSlots(
       date,
       itemsInput,
       existingBookings,
       req.tenant!.workingHours
     );
+
+    const tz = req.tenant!.timezone || 'Africa/Nairobi';
+    const nowInTz = DateTime.now().setZone(tz);
+    const todayStr = nowInTz.toFormat('yyyy-MM-dd');
+
+    if (date < todayStr) {
+      multiOptions = [];
+    } else if (date === todayStr) {
+      const currentHm = nowInTz.toFormat('HH:mm');
+      multiOptions = multiOptions.filter(o => o.time > currentHm);
+    }
 
     const slots = multiOptions.map(o => o.time);
 
@@ -183,5 +195,120 @@ export const getMultiAvailability = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[availabilityController] getMultiAvailability error:', error);
     res.status(500).json({ error: 'Failed to fetch multi-service availability' });
+  }
+};
+
+/**
+ * GET /api/availability/month?month=YYYY-MM[&serviceId=xxx][&attendantId=yyy][&items=JSON]
+ * Returns slot counts per day for the entire month, scoped to the tenant and Africa/Nairobi timezone.
+ */
+export const getMonthAvailability = async (req: Request, res: Response) => {
+  try {
+    const tenantId = req.tenant!._id;
+    const tz = req.tenant!.timezone || 'Africa/Nairobi';
+    const workingHours = req.tenant!.workingHours || { start: '09:00', end: '18:00' };
+
+    let month = req.query.month as string;
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      month = DateTime.now().setZone(tz).toFormat('yyyy-MM');
+    }
+
+    let items: Array<{ serviceId: string; attendantId?: string | null }> = [];
+    if (req.query.items) {
+      try {
+        items = typeof req.query.items === 'string' ? JSON.parse(req.query.items as string) : req.query.items;
+      } catch {
+        items = [];
+      }
+    }
+    if ((!items || items.length === 0) && req.query.serviceId) {
+      items = [{
+        serviceId: req.query.serviceId as string,
+        attendantId: (req.query.attendantId as string) || null,
+      }];
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items or serviceId is required' });
+    }
+
+    if (items.length > MAX_SERVICES) {
+      return res.status(400).json({ error: `Cannot book more than ${MAX_SERVICES} services` });
+    }
+
+    const itemsInput = [];
+    for (const item of items) {
+      if (!item.serviceId) continue;
+      const service = await Service.findOne({ _id: item.serviceId, tenantId });
+      if (!service) continue;
+
+      if (item.attendantId) {
+        const attendant = await Attendant.findOne({ _id: item.attendantId, tenantId, isActive: true });
+        if (!attendant) continue;
+      }
+
+      const qualified = await Attendant.find({
+        tenantId,
+        isActive: true,
+        serviceIds: item.serviceId,
+      }).select('_id name');
+
+      itemsInput.push({
+        serviceId: item.serviceId,
+        duration: service.duration,
+        requestedAttendantId: item.attendantId || null,
+        qualifiedAttendants: qualified.map(a => ({ _id: a._id.toString(), name: a.name })),
+      });
+    }
+
+    if (itemsInput.length === 0) {
+      return res.json({ counts: {} });
+    }
+
+    const firstOfMonth = DateTime.fromISO(`${month}-01`, { zone: tz });
+    const daysInMonth = firstOfMonth.daysInMonth || 30;
+    const startDate = `${month}-01`;
+    const endDate = `${month}-${String(daysInMonth).padStart(2, '0')}`;
+
+    const monthBookings = await Booking.find({
+      tenantId,
+      date: { $gte: startDate, $lte: endDate },
+      status: { $ne: 'cancelled' },
+    });
+
+    const bookingsByDate: Record<string, typeof monthBookings> = {};
+    for (const b of monthBookings) {
+      if (!bookingsByDate[b.date]) bookingsByDate[b.date] = [];
+      bookingsByDate[b.date].push(b);
+    }
+
+    const nowInTz = DateTime.now().setZone(tz);
+    const todayStr = nowInTz.toFormat('yyyy-MM-dd');
+    const currentHm = nowInTz.toFormat('HH:mm');
+
+    const counts: Record<string, number> = {};
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayStr = `${month}-${String(day).padStart(2, '0')}`;
+      if (dayStr < todayStr) {
+        counts[dayStr] = 0;
+        continue;
+      }
+
+      const dayBookings = bookingsByDate[dayStr] || [];
+      const options = generateMultiServiceSlots(dayStr, itemsInput, dayBookings, workingHours);
+
+      let slotCount = options.length;
+      if (dayStr === todayStr) {
+        slotCount = options.filter(o => o.time > currentHm).length;
+      }
+
+      counts[dayStr] = slotCount;
+    }
+
+    res.json({ counts });
+  } catch (error) {
+    console.error('[availabilityController] getMonthAvailability error:', error);
+    res.status(500).json({ error: 'Failed to fetch month availability' });
   }
 };

@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAvailability, getAnyAvailability, getMultiAvailability } from '../controllers/availabilityController';
+import { getAvailability, getAnyAvailability, getMultiAvailability, getMonthAvailability } from '../controllers/availabilityController';
 
 const router = express.Router();
 
@@ -15,5 +15,9 @@ router.get('/any', getAnyAvailability);
 // Returns consecutive slots and attendant resolution for multi-service sequence
 router.get('/multi', getMultiAvailability);
 router.post('/multi', getMultiAvailability);
+
+// GET /api/availability/month?month=YYYY-MM&items=[...]
+// Returns available slot counts for each day in the month
+router.get('/month', getMonthAvailability);
 
 export default router;

@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -14,6 +14,7 @@ import { useTenant } from './hooks/useTenant';
 import { SalonDashboard } from './components/SalonDashboard';
 import { AdminPortal } from './components/AdminPortal';
 import { CustomerAccountModal } from './components/CustomerAccountModal';
+import { DateTimeSelectionScreen } from './components/DateTimeSelectionScreen';
 
 /** Formats a service price as a fixed price or a range.
  *  e.g. formatPrice(2000)        → "KES 2,000"
@@ -150,11 +151,30 @@ export default function App() {
   const [activeStep, setActiveStep] = useState<BookingStep>('service');
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
+  // Sync browser back/forward buttons with activeStep while keeping booking state intact
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.step) {
+        setActiveStep(e.state.step);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateStep = useCallback((step: BookingStep) => {
+    setActiveStep(step);
+    try {
+      window.history.pushState({ step }, '', window.location.href);
+    } catch {}
+  }, []);
+
   // Data from API
   const [services, setServices] = useState<Service[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
   // System status toast notifications (e.g., success, info, warning)
@@ -483,6 +503,7 @@ export default function App() {
     const fetchSlots = async () => {
       if (selectedServices.length === 0 || !selectedDate) return;
 
+      setIsLoadingSlots(true);
       try {
         const items = selectedServices.map(s => ({
           serviceId: s._id,
@@ -496,35 +517,45 @@ export default function App() {
         console.error('Failed to fetch multi slots, falling back', err);
         setTimeSlots(FALLBACK_TIME_SLOTS);
         setMultiSlotOptions([]);
+      } finally {
+        setIsLoadingSlots(false);
       }
     };
 
-    if (activeStep === 'time') {
+    if (activeStep === 'date') {
       fetchSlots();
     }
   }, [tenantLoading, tenant?._id, selectedDate, selectedServices, serviceAttendants, activeStep]);
 
-  // Fetch attendants for each selected service when entering the attendant step
+  // Fetch attendants for each selected service when entering the date or service step
   useEffect(() => {
     if (tenantLoading || !tenant) return;
 
     const fetchAttendants = async () => {
-      if (selectedServices.length === 0) return;
+      if (selectedServices.length === 0) {
+        setAttendants([]);
+        return;
+      }
       try {
         const map: Record<string, Attendant[]> = {};
+        const allAtts: Attendant[] = [];
         for (const s of selectedServices) {
           const data = await api.getAttendantsForService(s._id);
           map[s._id] = data;
+          for (const a of data) {
+            if (!allAtts.some(existing => existing._id === a._id)) {
+              allAtts.push(a);
+            }
+          }
         }
         setServiceAttendantsMap(map);
-        if (selectedServices[0]) {
-          setAttendants(map[selectedServices[0]._id] || []);
-        }
+        setAttendants(allAtts);
       } catch (err) {
         console.error('Failed to fetch attendants', err);
       }
     };
-    if (activeStep === 'attendant') {
+
+    if (activeStep === 'date' || activeStep === 'service') {
       fetchAttendants();
     }
   }, [tenantLoading, tenant?._id, activeStep, selectedServices]);
@@ -585,7 +616,18 @@ export default function App() {
       setActiveStep('confirmation');
       setTimeout(() => setShowNotificationPrompt(true), 800);
     } catch (err: any) {
-      alert(err.message || 'Failed to create booking. Please try again.');
+      const errorMsg = err.message || 'Failed to create booking. Please try again.';
+      if (
+        errorMsg.toLowerCase().includes('already booked') ||
+        errorMsg.toLowerCase().includes('not available') ||
+        errorMsg.toLowerCase().includes('no attendant is available')
+      ) {
+        setSelectedTime(null);
+        setActiveStep('date');
+        triggerToast('That time slot was just taken by another client. Please choose another slot.', 'error');
+      } else {
+        triggerToast(errorMsg, 'error');
+      }
     }
   };
 
@@ -805,9 +847,7 @@ export default function App() {
 
   const handleStepBack = () => {
     if (activeStep === 'date') setActiveStep('service');
-    if (activeStep === 'attendant') setActiveStep('date');
-    if (activeStep === 'time') setActiveStep('attendant');
-    if (activeStep === 'contact') setActiveStep('time');
+    if (activeStep === 'contact') setActiveStep('date');
   };
 
   // ── Lookup Handlers ────────────────────────────────────────────────────────
@@ -970,7 +1010,7 @@ export default function App() {
 
   try {
     return (
-      <div className="min-h-screen max-w-lg mx-auto bg-brand-white relative flex flex-col font-sans tracking-tight">
+      <div className={`min-h-screen ${viewMode === 'admin' && ownerToken ? 'w-full lg:max-w-none' : 'max-w-lg'} mx-auto bg-brand-white relative flex flex-col font-sans tracking-tight`}>
         <AnimatePresence>
           {apiError && (
             <motion.div
@@ -1137,7 +1177,7 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <header className="px-4 sm:px-8 py-6 sm:py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100">
+        <header className={`px-4 sm:px-8 py-6 sm:py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100 ${viewMode === 'admin' && ownerToken ? 'lg:hidden' : ''}`}>
           <div className="flex items-center gap-5 cursor-pointer group" onClick={resetFlow}>
             <div className="h-16 w-16 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
               <img
@@ -1399,7 +1439,7 @@ export default function App() {
                                   </p>
                                 </div>
                                 <button
-                                  onClick={() => setActiveStep('date')}
+                                  onClick={() => navigateStep('date')}
                                   className="bg-[#B08968] text-white px-5 py-2.5 rounded-full font-semibold text-xs uppercase tracking-wider hover:bg-[#9c7554] active:scale-95 transition-all cursor-pointer shadow-lg"
                                 >
                                   {selectedServices.length === 1 ? 'Continue (1)' : 'Continue (2)'}
@@ -1414,334 +1454,33 @@ export default function App() {
 
                   {activeStep === 'date' && (
                     <motion.div
-                      key="date"
+                      key="datetime"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="space-y-12"
                     >
-                      <button onClick={handleStepBack} className="flex items-center gap-3 text-brand-black hover:translate-x-[-4px] transition-all duration-300">
-                        <ArrowLeft size={16} strokeWidth={3} />
-                        <span className="text-sm font-black uppercase tracking-[0.2em]">Previous</span>
-                      </button>
-                      <div className="space-y-8">
-                        <div>
-                          <h2 className="text-4xl font-serif font-black tracking-tight mb-8">Calendar</h2>
-                          <DateScroller selectedDate={selectedDate} onDateSelect={handleDateSelect} />
-                        </div>
-
-                        <div className="border-t border-brand-gray-100 pt-8 flex items-center justify-between">
-                          <div className="space-y-1">
-                            <p className="text-[11px] uppercase tracking-widest font-bold text-brand-gray-400">Selected Services ({selectedServices.length})</p>
-                            <p className="font-serif italic text-xl leading-tight">
-                              {selectedServices.map(s => s.name).join(' + ')}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-black tracking-tighter">
-                              KES {totalServicePrice.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-brand-gray-500 font-medium">
-                              {Math.floor(totalServiceDuration / 60) > 0 ? `${Math.floor(totalServiceDuration / 60)}h ` : ''}{totalServiceDuration % 60 > 0 ? `${totalServiceDuration % 60}m` : ''}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        ref={dateCtaRef}
-                        onClick={() => setActiveStep('attendant')}
-                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all hover:tracking-[0.4em] active:scale-[0.98]"
-                      >
-                        Continue
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {activeStep === 'attendant' && (
-                    <motion.div
-                      key="attendant"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="space-y-12"
-                    >
-                      <button onClick={handleStepBack} className="flex items-center gap-3 text-brand-black hover:translate-x-[-4px] transition-all duration-300">
-                        <ArrowLeft size={16} strokeWidth={3} />
-                        <span className="text-sm font-black uppercase tracking-[0.2em]">Previous</span>
-                      </button>
-                      <div className="space-y-8">
-                        <div>
-                          <h2 className="text-4xl font-serif font-black tracking-tight leading-none">Choose Artist</h2>
-                          <p className="text-xs text-[#6B6B6B] mt-2">
-                            {selectedServices.length > 1
-                              ? 'Select a stylist for each service or leave as "Any Available".'
-                              : 'Select your preferred stylist or choose any available artist.'}
-                          </p>
-                        </div>
-
-                        {selectedServices.length <= 1 ? (
-                          <div className="flex flex-col gap-3">
-                            {/* "Any Available" option */}
-                            <button
-                              onClick={() => setSelectedAttendant(null)}
-                              className={`flex items-center justify-between p-6 border-2 transition-all duration-300 rounded-xl ${selectedAttendant === null
-                                  ? 'bg-brand-black text-white border-brand-black'
-                                  : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
-                                }`}
-                            >
-                              <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm font-serif italic border-2 ${selectedAttendant === null ? 'border-white/40 bg-white/10 text-white' : 'border-brand-gray-200 text-brand-gray-400'
-                                  }`}>
-                                  ✦
-                                </div>
-                                <div className="text-left">
-                                  <p className="font-serif italic text-xl leading-none">Any Available</p>
-                                  <p className={`text-[11px] font-black uppercase tracking-widest mt-1 ${selectedAttendant === null ? 'text-white/70' : 'text-brand-gray-400'
-                                    }`}>First available slot</p>
-                                </div>
-                              </div>
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedAttendant === null ? 'border-white bg-white' : 'border-brand-gray-200'
-                                }`}>
-                                {selectedAttendant === null && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
-                              </div>
-                            </button>
-
-                            {/* Per-attendant cards */}
-                            {attendants.map(attendant => {
-                              const isSelected = selectedAttendant?._id === attendant._id;
-                              const initials = attendant.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
-                              return (
-                                <button
-                                  key={attendant._id}
-                                  onClick={() => setSelectedAttendant(attendant)}
-                                  className={`flex items-center justify-between p-6 border-2 transition-all duration-300 rounded-xl ${isSelected
-                                      ? 'bg-brand-black text-white border-brand-black'
-                                      : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'
-                                    }`}
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-sm font-serif italic border-2 ${isSelected ? 'border-white/40 bg-white/10 text-white' : 'border-brand-gray-200 text-brand-black'
-                                      }`}>
-                                      {initials}
-                                    </div>
-                                    <div className="text-left">
-                                      <p className="font-serif italic text-xl leading-none">{attendant.name}</p>
-                                      <p className={`text-[11px] font-black uppercase tracking-widest mt-1 ${isSelected ? 'text-white/70' : 'text-brand-gray-400'
-                                        }`}>Certified Artist</p>
-                                    </div>
-                                  </div>
-                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-white bg-white' : 'border-brand-gray-200 group-hover:border-brand-black'
-                                    }`}>
-                                    {isSelected && <CheckCircle2 size={14} strokeWidth={3} className="text-brand-black" />}
-                                  </div>
-                                </button>
-                              );
-                            })}
-
-                            {attendants.length === 0 && (
-                              <div className="py-8 text-center border border-brand-gray-100 font-serif italic text-brand-gray-300">
-                                Loading artists...
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-10">
-                            {selectedServices.map((svc, idx) => {
-                              const curAttendant = serviceAttendants[svc._id] ?? null;
-                              const qualifiedList = serviceAttendantsMap[svc._id] || [];
-
-                              return (
-                                <div key={svc._id} className="space-y-4 bg-[#FAF7F3] p-5 rounded-2xl border border-[#E6D3C3]">
-                                  <div className="flex items-center justify-between border-b border-[#E6D3C3] pb-2.5">
-                                    <div>
-                                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#B08968] text-white">
-                                        Service {idx + 1}
-                                      </span>
-                                      <h3 className="font-bold text-[15px] text-[#1F1F1F] mt-1">
-                                        {svc.name}
-                                      </h3>
-                                    </div>
-                                    <span className="text-xs text-[#6B6B6B] font-medium">
-                                      {svc.duration > 60 ? `${Math.round(svc.duration / 60)} hrs` : `${svc.duration} min`}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex flex-col gap-2.5">
-                                    {/* Any Available option */}
-                                    <button
-                                      onClick={() => setServiceAttendants(prev => ({ ...prev, [svc._id]: null }))}
-                                      className={`flex items-center justify-between p-4 border transition-all duration-300 rounded-xl cursor-pointer ${curAttendant === null
-                                          ? 'bg-[#1F1F1F] text-white border-[#1F1F1F] shadow-sm'
-                                          : 'bg-white border-[#E6D3C3] hover:border-[#B08968] text-[#1F1F1F]'
-                                        }`}
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${curAttendant === null ? 'bg-white/20 text-white' : 'bg-[#FAF7F3] text-[#6B6B6B]'}`}>
-                                          ✦
-                                        </div>
-                                        <div className="text-left">
-                                          <p className="font-semibold text-sm leading-tight">Any Available</p>
-                                          <p className={`text-[10px] ${curAttendant === null ? 'text-white/70' : 'text-[#6B6B6B]'}`}>
-                                            First available artist
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${curAttendant === null ? 'border-white bg-white' : 'border-[#E6D3C3]'}`}>
-                                        {curAttendant === null && <CheckCircle2 size={12} strokeWidth={3} className="text-[#1F1F1F]" />}
-                                      </div>
-                                    </button>
-
-                                    {/* Qualified attendants */}
-                                    {qualifiedList.map(attendant => {
-                                      const isSelected = curAttendant?._id === attendant._id;
-                                      const initials = attendant.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
-                                      return (
-                                        <button
-                                          key={attendant._id}
-                                          onClick={() => setServiceAttendants(prev => ({ ...prev, [svc._id]: attendant }))}
-                                          className={`flex items-center justify-between p-4 border transition-all duration-300 rounded-xl cursor-pointer ${isSelected
-                                              ? 'bg-[#1F1F1F] text-white border-[#1F1F1F] shadow-sm'
-                                              : 'bg-white border-[#E6D3C3] hover:border-[#B08968] text-[#1F1F1F]'
-                                            }`}
-                                        >
-                                          <div className="flex items-center gap-3">
-                                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${isSelected ? 'bg-white/20 text-white' : 'bg-[#FAF7F3] text-[#1F1F1F]'}`}>
-                                              {initials}
-                                            </div>
-                                            <div className="text-left">
-                                              <p className="font-semibold text-sm leading-tight">{attendant.name}</p>
-                                              <p className={`text-[10px] ${isSelected ? 'text-white/70' : 'text-[#6B6B6B]'}`}>
-                                                Certified Stylist
-                                              </p>
-                                            </div>
-                                          </div>
-                                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'border-white bg-white' : 'border-[#E6D3C3]'}`}>
-                                            {isSelected && <CheckCircle2 size={12} strokeWidth={3} className="text-[#1F1F1F]" />}
-                                          </div>
-                                        </button>
-                                      );
-                                    })}
-
-                                    {qualifiedList.length === 0 && (
-                                      <div className="py-4 text-center border border-dashed border-[#E6D3C3] rounded-xl text-xs text-[#6B6B6B]">
-                                        Loading certified artists for this service...
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => setActiveStep('time')}
-                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all hover:tracking-[0.4em] active:scale-[0.98]"
-                      >
-                        Continue to Time Slots
-                      </button>
+                      <DateTimeSelectionScreen
+                        selectedServices={selectedServices}
+                        selectedAttendant={selectedAttendant}
+                        onSelectAttendant={setSelectedAttendant}
+                        selectedDate={selectedDate}
+                        onSelectDate={setSelectedDate}
+                        selectedTime={selectedTime}
+                        onSelectTime={setSelectedTime}
+                        timeSlots={timeSlots}
+                        multiSlotOptions={multiSlotOptions}
+                        totalPrice={totalServicePrice}
+                        totalDuration={totalServiceDuration}
+                        attendants={attendants}
+                        isLoadingSlots={isLoadingSlots}
+                        onContinue={() => navigateStep('contact')}
+                        onBack={() => navigateStep('service')}
+                      />
                     </motion.div>
                   )}
 
 
-                  {activeStep === 'time' && (
-                    <motion.div
-                      key="time"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="space-y-12"
-                    >
-                      <button onClick={handleStepBack} className="flex items-center gap-3 text-brand-black hover:translate-x-[-4px] transition-all duration-300">
-                        <ArrowLeft size={16} strokeWidth={3} />
-                        <span className="text-sm font-black uppercase tracking-[0.2em]">Previous</span>
-                      </button>
-                      <div className="space-y-10">
-                        <div className="flex items-center justify-between border-b border-brand-gray-100 pb-8">
-                          <div>
-                            <p className="text-[13px] text-brand-gray-600 uppercase font-bold tracking-widest mb-1">Date</p>
-                            <p className="font-serif text-2xl font-black">
-                              {new Date(selectedDate).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
-                            </p>
-                          </div>
-                          {/* Show chosen attendant(s) in time step header */}
-                          <div className="text-right">
-                            <p className="text-[13px] text-brand-gray-600 uppercase font-bold tracking-widest mb-1">Artist</p>
-                            <p className="font-serif italic text-xl leading-none">
-                              {selectedServices.length > 1
-                                ? selectedServices.map((s, i) => `${i + 1}. ${serviceAttendants[s._id]?.name || 'Any'}`).join(' • ')
-                                : (selectedAttendant ? selectedAttendant.name : 'Any')}
-                            </p>
-                          </div>
-                        </div>
 
-                        <div className="space-y-6">
-                          <h2 className="text-3xl font-serif font-black tracking-tight">Timeline</h2>
-                          <div className="grid grid-cols-2 gap-4">
-                            {timeSlots.length > 0 ? timeSlots.map(time => {
-                              const isSelected = selectedTime === time;
-                              return (
-                                <button
-                                  key={time}
-                                  onClick={() => setSelectedTime(time)}
-                                  className={`
-                                  py-5 text-xs font-black tracking-[0.2em] transition-all duration-500 rounded-lg border-2
-                                  ${isSelected ? 'bg-brand-black text-brand-white border-brand-black shadow-xl ring-4 ring-brand-black/5' : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'}
-                                `}
-                                >
-                                  {time}
-                                </button>
-                              );
-                            }) : (
-                              <div className="col-span-2 py-8 text-center text-brand-gray-400 italic font-serif text-sm border border-brand-gray-100">
-                                No available slots for this date.
-                              </div>
-                            )}
-                          </div>
-
-                          {selectedTime && (
-                            <div className="bg-[#FAF7F3] border border-[#E6D3C3] rounded-2xl p-5 space-y-3">
-                              <p className="text-xs font-bold uppercase tracking-wider text-[#6B6B6B]">
-                                Appointment Schedule Preview
-                              </p>
-                              {(() => {
-                                const selectedOpt = multiSlotOptions.find(o => o.time === selectedTime);
-                                if (selectedOpt && selectedOpt.segments.length > 0) {
-                                  return (
-                                    <div className="space-y-2">
-                                      {selectedOpt.segments.map((seg, idx) => {
-                                        const svc = selectedServices.find(s => s._id === seg.serviceId);
-                                        return (
-                                          <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-[#E6D3C3]/40 last:border-b-0">
-                                            <span className="font-semibold text-[#1F1F1F]">
-                                              {idx + 1}. {svc?.name} ({seg.startTime} – {seg.endTime})
-                                            </span>
-                                            <span className="text-[#6B6B6B] font-medium">with {seg.attendantName}</span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  );
-                                }
-                                return (
-                                  <p className="text-xs text-[#1F1F1F]">
-                                    Starts at <strong>{selectedTime}</strong> ({totalServiceDuration} min)
-                                  </p>
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        disabled={!selectedTime}
-                        onClick={() => setActiveStep('contact')}
-                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98]"
-                      >
-                        Confirm Selection
-                      </button>
-                    </motion.div>
-                  )}
 
                   {activeStep === 'contact' && (
                     <motion.div
@@ -2336,10 +2075,9 @@ export default function App() {
 
 function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
   const steps: { key: BookingStep, label: string }[] = [
-    { key: 'service', label: 'Service' },
-    { key: 'date', label: 'Date' },
-    { key: 'time', label: 'Time' },
-    { key: 'attendant', label: 'Stylist' },
+    { key: 'service', label: 'Services' },
+    { key: 'date', label: 'Date & Time' },
+    { key: 'contact', label: 'Details' },
     { key: 'confirmation', label: 'Confirm' }
   ];
   const activeIndex = steps.findIndex(s => s.key === activeStep);

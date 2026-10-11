@@ -359,7 +359,7 @@ export function CustomerAccountModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
         transition={{ duration: 0.2 }}
-        className="w-full max-w-xl bg-brand-white border border-brand-gray-200 shadow-2xl rounded-xl flex flex-col max-h-[90vh] overflow-hidden font-sans"
+        className="w-full max-w-[560px] bg-brand-white border border-brand-gray-200 shadow-2xl rounded-xl flex flex-col max-h-[90vh] overflow-hidden font-sans"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-brand-gray-200 bg-brand-white">
