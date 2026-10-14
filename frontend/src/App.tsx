@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -2285,6 +2285,22 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
   const [editStaffSearchQuery, setEditStaffSearchQuery] = useState('');
   const [showStaffPin, setShowStaffPin] = useState(false);
   const [showEditStaffPin, setShowEditStaffPin] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const mobileMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (mobileMoreRef.current && !mobileMoreRef.current.contains(e.target as Node)) {
+        setMobileMoreOpen(false);
+      }
+    };
+    if (mobileMoreOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [mobileMoreOpen]);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todaysConfirmed = confirmedBookings.filter(b => b.date === todayStr && b.status === 'confirmed');
@@ -2430,6 +2446,11 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
     { key: 'settings', label: 'Settings', icon: Settings },
   ];
 
+  const primaryTabs = tabs.slice(0, 3);
+  const moreTabs = tabs.slice(3);
+  const isMoreActive = moreTabs.some(t => t.key === activeTab);
+  const activeMoreTab = moreTabs.find(t => t.key === activeTab);
+
   return (
     <div className="flex-1 flex flex-col min-h-0 relative">
       {/* Desktop Fixed Left Sidebar (240px wide, visible on lg and above) */}
@@ -2568,85 +2589,228 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
         </div>
       </aside>
 
-      {/* Mobile Top Tab Navigation + Admin Notification Toggle (<1024px) */}
-      <nav className="lg:hidden border-b border-brand-gray-100 flex flex-col md:flex-row md:items-center px-4 sm:px-8 py-2 md:py-0 gap-3 md:gap-8 bg-brand-white">
-        {/* Scrollable Tabs */}
-        <div className="flex overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 gap-6 sm:gap-8 flex-nowrap border-b border-brand-gray-50 md:border-b-0">
-          {tabs.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`py-3.5 sm:py-4 text-[12px] sm:text-[13px] font-black uppercase tracking-[0.2em] relative transition-all whitespace-nowrap ${activeTab === tab.key ? 'text-brand-black font-extrabold' : 'text-brand-gray-400 hover:text-brand-black'
-                }`}
-            >
-              {tab.label}
-              {tab.key === 'pending' && pendingBookings.length > 0 && (
-                <span className="ml-1.5 sm:ml-2 bg-brand-black text-brand-white text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 tracking-widest">
-                  {pendingBookings.length}
-                </span>
-              )}
-              {activeTab === tab.key && (
-                <motion.div
-                  layoutId="activeAdminTab"
-                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-black"
-                />
-              )}
-            </button>
-          ))}
-        </div>
+      {/* Mobile Top Navigation (Standout Hybrid Segmented Controls + Luxury More Menu) (<1024px) */}
+      <nav className="lg:hidden border-b border-brand-gray-200/80 bg-white/90 backdrop-blur-xl sticky top-0 z-40 py-2.5 px-3 sm:px-6 shadow-xs">
+        <div className="flex items-center justify-between gap-2 max-w-lg mx-auto sm:max-w-none">
+          {/* Segmented Pill Track */}
+          <div
+            className="flex-1 flex items-center bg-brand-gray-100/90 p-1 rounded-2xl border border-brand-gray-200/60 shadow-inner relative"
+            ref={mobileMoreRef}
+          >
+            {primaryTabs.map(tab => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.key);
+                    setMobileMoreOpen(false);
+                  }}
+                  className={`flex-1 py-2 px-1 text-[11px] sm:text-xs font-black uppercase tracking-wider relative transition-colors duration-200 whitespace-nowrap flex items-center justify-center gap-1 z-10 cursor-pointer ${
+                    isActive ? 'text-white' : 'text-brand-gray-600 hover:text-brand-black'
+                  }`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="mobileActivePill"
+                      className="absolute inset-0 bg-brand-black rounded-xl shadow-md -z-10"
+                      transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                    />
+                  )}
+                  <span>{tab.label}</span>
+                  {tab.key === 'pending' && pendingBookings.length > 0 && (
+                    <span
+                      className={`text-[9px] font-black px-1.5 py-0.2 rounded-full tracking-wider transition-all ${
+                        isActive
+                          ? 'bg-red-500 text-white shadow-xs animate-pulse'
+                          : 'bg-red-100 text-red-600 border border-red-200'
+                      }`}
+                    >
+                      {pendingBookings.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
 
-        {/* Admin push notification toggle — sits at far right on desktop, flows gracefully on mobile */}
-        {adminPush.permission !== 'unsupported' && adminPush.permission !== 'denied' && (
-          <div className="md:ml-auto flex items-center justify-between md:justify-end gap-2 pb-2 md:pb-0">
-            <span className="md:hidden text-[10px] font-black uppercase tracking-widest text-brand-gray-400">Push Alerts</span>
-            <div className="flex items-center gap-2">
+            {/* "More ▾" Pill Button */}
+            <div className="flex-1 relative">
               <button
-                onClick={() => adminPush.isSubscribed ? adminPush.unsubscribe() : adminPush.subscribe()}
-                disabled={adminPush.isLoading}
-                title={adminPush.isSubscribed ? 'Disable booking notifications' : 'Enable booking notifications'}
-                className={`flex items-center gap-1.5 py-2 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.15em] transition-all border rounded-[10px] ${adminPush.isSubscribed
-                    ? 'bg-brand-black text-white border-brand-black shadow-sm'
-                    : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
-                  } disabled:opacity-40 active:scale-95`}
+                type="button"
+                onClick={() => setMobileMoreOpen(prev => !prev)}
+                className={`w-full py-2 px-1 text-[11px] sm:text-xs font-black uppercase tracking-wider relative transition-colors duration-200 whitespace-nowrap flex items-center justify-center gap-1 z-10 cursor-pointer ${
+                  isMoreActive ? 'text-white' : 'text-brand-gray-600 hover:text-brand-black'
+                }`}
               >
-                {adminPush.isSubscribed
-                  ? <><Bell size={12} className="text-white animate-bounce" /> <span className="hidden sm:inline">Notifs On</span></>
-                  : <><BellOff size={12} /> <span className="hidden sm:inline">Notifs Off</span></>
-                }
+                {isMoreActive && (
+                  <motion.div
+                    layoutId="mobileActivePill"
+                    className="absolute inset-0 bg-brand-black rounded-xl shadow-md -z-10"
+                    transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                  />
+                )}
+                {isMoreActive && <Sparkles size={11} className="text-amber-400 shrink-0" />}
+                <span className="truncate max-w-[65px] sm:max-w-none">
+                  {isMoreActive && activeMoreTab ? activeMoreTab.label : 'More'}
+                </span>
+                <ChevronDown
+                  size={12}
+                  className={`transition-transform duration-200 shrink-0 ${
+                    mobileMoreOpen ? 'rotate-180 text-amber-500' : ''
+                  }`}
+                />
               </button>
-              {adminPush.isSubscribed && (
-                <div className="flex flex-col gap-1.5 pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={adminPush.soundPreference}
-                      onChange={e => adminPush.updateSound(e.target.value)}
-                      className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest border border-brand-gray-200 bg-white text-brand-black py-1.5 px-2 focus:border-brand-black focus:outline-none cursor-pointer hover:border-brand-black transition-colors rounded-lg"
+
+              {/* Floating Dropdown Card with Backdrop Overlay */}
+              <AnimatePresence>
+                {mobileMoreOpen && (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40 -top-2"
+                      onClick={() => setMobileMoreOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                      className="absolute right-0 sm:left-0 mt-2 w-72 bg-white/98 backdrop-blur-2xl border border-brand-gray-200/90 rounded-3xl shadow-2xl p-3 z-50 space-y-2"
                     >
-                      <option value="default">Default 🎵</option>
-                      <option value="chime">Chime ✨</option>
-                      <option value="bell">Bell 🔔</option>
-                      <option value="ding">Ding 🛎️</option>
-                      <option value="silent">Silent 🔇</option>
-                    </select>
-                    <button
-                      type="button"
-                      disabled={adminPush.soundPreference === 'silent'}
-                      onClick={() => playNotificationSound(adminPush.soundPreference)}
-                      title={adminPush.soundPreference === 'silent' ? 'Sound is set to silent' : 'Test sound'}
-                      className="py-1.5 px-2 text-[9px] font-black uppercase tracking-wider bg-white border border-brand-gray-200 hover:border-brand-black hover:text-brand-black text-brand-gray-600 rounded-lg flex items-center gap-1 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
-                    >
-                      <Volume2 size={11} />
-                      <span>Test</span>
-                    </button>
-                  </div>
-                  <p className="text-[8px] sm:text-[9px] text-brand-gray-400 max-w-xs leading-snug">
-                    If the app is closed, your phone's notification sound is used. Check your phone's notification settings.
-                  </p>
-                </div>
-              )}
+                      {/* Header */}
+                      <div className="flex items-center justify-between px-2 pt-1 pb-1.5 border-b border-brand-gray-100">
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-[0.25em] text-brand-gray-400">
+                            Studio Operations
+                          </p>
+                          <p className="font-serif italic font-bold text-sm text-brand-black">
+                            Management Suite
+                          </p>
+                        </div>
+                        <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 font-black uppercase tracking-wider px-2 py-0.5 rounded-full">
+                          Admin
+                        </span>
+                      </div>
+
+                      {/* Items */}
+                      <div className="space-y-1">
+                        {moreTabs.map(tab => {
+                          const Icon = tab.icon;
+                          const isActive = activeTab === tab.key;
+                          const subtitles: Record<string, string> = {
+                            services: 'Pricing, catalog & times',
+                            staff: 'Team members & access PINs',
+                            settings: 'Salon details & policies',
+                          };
+                          return (
+                            <button
+                              key={tab.key}
+                              type="button"
+                              onClick={() => {
+                                setActiveTab(tab.key);
+                                setMobileMoreOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between p-2.5 rounded-2xl transition-all text-left group ${
+                                isActive
+                                  ? 'bg-brand-black text-white shadow-md'
+                                  : 'text-brand-gray-800 hover:bg-brand-gray-100/80'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div
+                                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                    isActive
+                                      ? 'bg-white/15 text-white'
+                                      : 'bg-brand-gray-100 text-brand-black group-hover:bg-brand-black group-hover:text-white'
+                                  }`}
+                                >
+                                  <Icon size={16} />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-black uppercase tracking-wider truncate leading-tight">
+                                    {tab.label}
+                                  </p>
+                                  <p
+                                    className={`text-[10px] truncate ${
+                                      isActive ? 'text-white/70 font-medium' : 'text-brand-gray-400 font-semibold'
+                                    }`}
+                                  >
+                                    {subtitles[tab.key] || ''}
+                                  </p>
+                                </div>
+                              </div>
+                              {isActive && (
+                                <div className="w-5 h-5 rounded-full bg-white text-brand-black flex items-center justify-center shrink-0">
+                                  <Check size={12} strokeWidth={3} />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Quick Links */}
+                      <div className="pt-2 border-t border-brand-gray-100 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileMoreOpen(false);
+                            navigate('customer', tenantSlug || undefined);
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider text-brand-gray-700 hover:bg-brand-gray-100 transition-all text-left"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Scissors size={14} className="text-brand-gray-400" />
+                            <span>Preview Live Salon</span>
+                          </div>
+                          <ChevronRight size={13} className="text-brand-gray-400" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileMoreOpen(false);
+                            handleSignOut();
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider text-red-500 hover:bg-red-50 transition-all text-left"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <LogOut size={14} />
+                            <span>Sign Out</span>
+                          </div>
+                          <ChevronRight size={13} className="text-red-400" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-        )}
+
+          {/* Admin Push Notification Toggle Button */}
+          {adminPush.permission !== 'unsupported' && adminPush.permission !== 'denied' && (
+            <button
+              type="button"
+              onClick={() => adminPush.isSubscribed ? adminPush.unsubscribe() : adminPush.subscribe()}
+              disabled={adminPush.isLoading}
+              title={adminPush.isSubscribed ? 'Notifications active' : 'Enable notifications'}
+              className={`w-10 h-10 rounded-2xl border flex items-center justify-center shrink-0 transition-all shadow-xs active:scale-95 cursor-pointer ${
+                adminPush.isSubscribed
+                  ? 'bg-brand-black text-white border-brand-black shadow-md'
+                  : 'bg-white text-brand-gray-500 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
+              }`}
+            >
+              {adminPush.isSubscribed ? (
+                <Bell size={15} className="animate-bounce" />
+              ) : (
+                <BellOff size={15} />
+              )}
+            </button>
+          )}
+        </div>
       </nav>
 
       {/* Main Content Area: Fixed padding & centered container on desktop */}
