@@ -330,7 +330,7 @@ export function DateTimeSelectionScreen({
               aria-checked={selectedAttendant === null}
               aria-label="Any professional (first available)"
               onClick={() => handleAttendantChange(null)}
-              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-full border transition-all duration-200 shrink-0 min-h-[44px] ${
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-200 shrink-0 min-h-[44px] ${
                 selectedAttendant === null
                   ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
                   : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
@@ -365,7 +365,7 @@ export function DateTimeSelectionScreen({
                   aria-checked={isSelected}
                   aria-label={`Staff member ${att.name}`}
                   onClick={() => handleAttendantChange(att)}
-                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-full border transition-all duration-200 shrink-0 min-h-[44px] ${
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-200 shrink-0 min-h-[44px] ${
                     isSelected
                       ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
                       : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
@@ -545,17 +545,14 @@ export function DateTimeSelectionScreen({
       </section>
 
       {/* Time Slots Section */}
-      <section aria-labelledby="slots-heading" className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 id="slots-heading" className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">
-              Times for {formattedSelectedDate}
-            </h2>
-            <span className="text-[11px] text-brand-gray-400">Timezone: Africa/Nairobi (EAT)</span>
-          </div>
+      <section aria-labelledby="slots-heading" className="space-y-4">
+        <h2 id="slots-heading" className="sr-only">
+          Available Appointment Times
+        </h2>
 
-          {/* Morning / Afternoon / Evening filter chips */}
-          <div className="flex items-center gap-1 bg-brand-gray-100/70 p-1 rounded-xl">
+        {/* Morning / Afternoon / Evening filter container matching calendar width with centered items */}
+        <div className="w-full bg-brand-gray-100/70 p-1.5 rounded-2xl flex items-center justify-center">
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2 max-w-full overflow-x-auto scrollbar-hide">
             {(['all', 'morning', 'afternoon', 'evening'] as const).map(period => {
               const isActive = periodFilter === period;
               const labels = {
@@ -570,7 +567,7 @@ export function DateTimeSelectionScreen({
                   type="button"
                   onClick={() => setPeriodFilter(period)}
                   aria-pressed={isActive}
-                  className={`text-xs px-2.5 py-1.5 rounded-lg font-bold capitalize transition-all min-h-[36px] ${
+                  className={`text-xs px-3.5 sm:px-4 py-2 rounded-xl font-bold capitalize transition-all min-h-[38px] text-center whitespace-nowrap ${
                     isActive
                       ? 'bg-brand-black text-brand-white shadow-sm'
                       : 'text-brand-gray-600 hover:text-brand-black hover:bg-white/60'
