@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Calendar, AlertCircle, Sparkles, ChevronRight, ArrowUpRight, Clock, Users, ArrowRight } from 'lucide-react';
+import { Calendar, AlertCircle, Sparkles, ChevronRight, Clock, Users, ArrowRight } from 'lucide-react';
 import { Booking, Service, Attendant } from '../types';
 
 interface SalonDashboardProps {
@@ -237,126 +237,76 @@ export function SalonDashboard({
         </motion.div>
       </div>
 
-      {/* -- Row 2: Weekly Volume Chart (Full width on desktop) & Quick Actions (Mobile only) -------- */}
-      <div className="space-y-4">
-        {/* Weekly Volume Chart */}
-        <div className="bg-brand-white border border-brand-gray-100 p-5 sm:p-6 rounded-2xl space-y-4 shadow-sm flex flex-col justify-between">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-sm font-black uppercase tracking-widest text-brand-black">
-                Weekly Volume Distribution
-              </h3>
-              <p className="text-[11px] font-bold text-brand-gray-400 uppercase tracking-wider">
-                Bookings per day (Mon – Sun)
-              </p>
-            </div>
-            <div className="text-right">
-              <span className="text-xs font-black text-brand-black uppercase tracking-wider">
-                {metrics.weeklyTotal} total
-              </span>
-              <p className="text-[10px] text-brand-gray-400 font-bold uppercase tracking-widest">
-                This week
-              </p>
-            </div>
-          </div>
-
-          {metrics.weeklyTotal === 0 ? (
-            <div className="h-44 flex flex-col items-center justify-center border-2 border-dashed border-brand-gray-100 rounded-xl bg-brand-gray-50/40 p-6 text-center">
-              <Calendar size={28} className="text-brand-gray-300 mb-2" />
-              <p className="text-xs font-serif italic text-brand-gray-500">
-                No bookings recorded for this week yet.
-              </p>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-brand-gray-400 mt-1">
-                New appointments will appear here day by day.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-7 gap-2 sm:gap-4 items-end h-44 pt-4 border-b border-brand-gray-100 pb-2">
-              {metrics.dailyCounts.map((d, idx) => {
-                const heightPercent = d.count > 0
-                  ? Math.max(Math.round((d.count / metrics.maxDailyCount) * 100), 16)
-                  : 6;
-
-                return (
-                  <div key={idx} className="flex flex-col items-center gap-2 h-full justify-end group">
-                    <span
-                      className={`text-[10px] font-black transition-opacity ${
-                        d.count > 0 ? 'text-brand-black opacity-90' : 'text-brand-gray-300 opacity-0 group-hover:opacity-100'
-                      }`}
-                    >
-                      {d.count}
-                    </span>
-                    <div
-                      style={{ height: `${heightPercent}%` }}
-                      title={`${d.dayLabel}: ${d.count} bookings`}
-                      className={`w-full max-w-[36px] rounded-t-lg transition-all duration-500 ${
-                        d.isToday
-                          ? 'bg-brand-black shadow-md'
-                          : d.count > 0
-                          ? 'bg-brand-gray-400 hover:bg-brand-black'
-                          : 'bg-brand-gray-100'
-                      }`}
-                    />
-                    <span
-                      className={`text-[10px] font-black uppercase tracking-wider ${
-                        d.isToday ? 'text-brand-black font-extrabold underline' : 'text-brand-gray-400'
-                      }`}
-                    >
-                      {d.dayLabel}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Quick Action Shortcuts Tile (Hidden on desktop, available on mobile) */}
-        <div className="lg:hidden bg-brand-black text-white p-5 sm:p-6 rounded-2xl space-y-4 shadow-sm flex flex-col justify-between">
-          <div className="space-y-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">
-              Quick Actions
-            </p>
-            <h3 className="text-xl font-serif italic font-bold">
-              Studio Operations
+      {/* -- Row 2: Weekly Volume Chart -------- */}
+      <div className="bg-brand-white border border-brand-gray-100 p-5 sm:p-6 rounded-2xl space-y-4 shadow-sm flex flex-col justify-between">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-widest text-brand-black">
+              Weekly Volume Distribution
             </h3>
+            <p className="text-[11px] font-bold text-brand-gray-400 uppercase tracking-wider">
+              Bookings per day (Mon – Sun)
+            </p>
           </div>
-
-          <div className="grid grid-cols-1 gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={() => onNavigateTab('ledger')}
-              className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 transition-all rounded-xl text-xs font-black uppercase tracking-widest flex justify-between items-center text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-            >
-              <span>Today's Ledger</span>
-              <ArrowUpRight size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateTab('pending')}
-              className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 transition-all rounded-xl text-xs font-black uppercase tracking-widest flex justify-between items-center text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-            >
-              <span>Pending Requests ({pendingCount})</span>
-              <ArrowUpRight size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateTab('services')}
-              className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 transition-all rounded-xl text-xs font-black uppercase tracking-widest flex justify-between items-center text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-            >
-              <span>Pricing & Services</span>
-              <ArrowUpRight size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateTab('staff')}
-              className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 transition-all rounded-xl text-xs font-black uppercase tracking-widest flex justify-between items-center text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-            >
-              <span>Manage Staff Team</span>
-              <ArrowUpRight size={16} />
-            </button>
+          <div className="text-right">
+            <span className="text-xs font-black text-brand-black uppercase tracking-wider">
+              {metrics.weeklyTotal} total
+            </span>
+            <p className="text-[10px] text-brand-gray-400 font-bold uppercase tracking-widest">
+              This week
+            </p>
           </div>
         </div>
+
+        {metrics.weeklyTotal === 0 ? (
+          <div className="h-44 flex flex-col items-center justify-center border-2 border-dashed border-brand-gray-100 rounded-xl bg-brand-gray-50/40 p-6 text-center">
+            <Calendar size={28} className="text-brand-gray-300 mb-2" />
+            <p className="text-xs font-serif italic text-brand-gray-500">
+              No bookings recorded for this week yet.
+            </p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-gray-400 mt-1">
+              New appointments will appear here day by day.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-2 sm:gap-4 items-end h-44 pt-4 border-b border-brand-gray-100 pb-2">
+            {metrics.dailyCounts.map((d, idx) => {
+              const heightPercent = d.count > 0
+                ? Math.max(Math.round((d.count / metrics.maxDailyCount) * 100), 16)
+                : 6;
+
+              return (
+                <div key={idx} className="flex flex-col items-center gap-2 h-full justify-end group">
+                  <span
+                    className={`text-[10px] font-black transition-opacity ${
+                      d.count > 0 ? 'text-brand-black opacity-90' : 'text-brand-gray-300 opacity-0 group-hover:opacity-100'
+                    }`}
+                  >
+                    {d.count}
+                  </span>
+                  <div
+                    style={{ height: `${heightPercent}%` }}
+                    title={`${d.dayLabel}: ${d.count} bookings`}
+                    className={`w-full max-w-[36px] rounded-t-lg transition-all duration-500 ${
+                      d.isToday
+                        ? 'bg-brand-black shadow-md'
+                        : d.count > 0
+                        ? 'bg-brand-gray-400 hover:bg-brand-black'
+                        : 'bg-brand-gray-100'
+                    }`}
+                  />
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider ${
+                      d.isToday ? 'text-brand-black font-extrabold underline' : 'text-brand-gray-400'
+                    }`}
+                  >
+                    {d.dayLabel}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* -- Row 3: Top Services (5 cols) & Today's Schedule Table (7 cols) ------ */}
