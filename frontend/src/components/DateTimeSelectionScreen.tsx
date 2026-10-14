@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Users, Clock, Calendar as CalendarIcon, ArrowLeft } from 'lucide-react';
 import { Service, Attendant, MultiSlotOption } from '../types';
 import * as api from '../api/client';
@@ -244,6 +244,37 @@ export function DateTimeSelectionScreen({
     }
   }, [selectedDate]);
 
+  // Staff horizontal scroll tracking for 3 pagination indicator dots
+  const staffScrollRef = useRef<HTMLDivElement>(null);
+  const [staffScrollProgress, setStaffScrollProgress] = useState(0);
+
+  const handleStaffScroll = useCallback(() => {
+    if (!staffScrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = staffScrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 5) {
+      setStaffScrollProgress(0);
+      return;
+    }
+    const ratio = scrollLeft / maxScroll;
+    if (ratio < 0.3) {
+      setStaffScrollProgress(0);
+    } else if (ratio < 0.7) {
+      setStaffScrollProgress(1);
+    } else {
+      setStaffScrollProgress(2);
+    }
+  }, []);
+
+  const scrollToStaffSegment = useCallback((idx: number) => {
+    if (!staffScrollRef.current) return;
+    const { scrollWidth, clientWidth } = staffScrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    const target = (idx / 2) * maxScroll;
+    staffScrollRef.current.scrollTo({ left: target, behavior: 'smooth' });
+    setStaffScrollProgress(idx);
+  }, []);
+
   return (
     <div className="space-y-6 pb-28">
       {/* Top Navigation */}
@@ -286,71 +317,101 @@ export function DateTimeSelectionScreen({
           )}
         </div>
 
-        <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide py-1 -mx-2 px-2">
-          {/* "Any professional" chip */}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={selectedAttendant === null}
-            aria-label="Any professional (first available)"
-            onClick={() => handleAttendantChange(null)}
-            className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-full border transition-all duration-200 shrink-0 min-h-[44px] ${
-              selectedAttendant === null
-                ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
-                : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
-            }`}
+        <div className="relative">
+          <div 
+            ref={staffScrollRef}
+            onScroll={handleStaffScroll}
+            className="flex items-center gap-3 overflow-x-auto scrollbar-hide py-1 -mx-2 px-2 scroll-smooth"
           >
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs border ${
+            {/* "Any professional" chip */}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selectedAttendant === null}
+              aria-label="Any professional (first available)"
+              onClick={() => handleAttendantChange(null)}
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-full border transition-all duration-200 shrink-0 min-h-[44px] ${
                 selectedAttendant === null
-                  ? 'border-white/30 bg-white/10 text-white'
-                  : 'border-brand-gray-200 bg-brand-gray-50 text-brand-black'
+                  ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
+                  : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
               }`}
             >
-              <Users size={14} />
-            </div>
-            <div className="text-left leading-tight pr-1">
-              <span className="text-xs font-bold block">Any professional</span>
-              <span className={`text-[10px] block ${selectedAttendant === null ? 'text-white/70' : 'text-brand-gray-400'}`}>
-                First available
-              </span>
-            </div>
-          </button>
-
-          {/* Individual Staff Chips */}
-          {attendants.map(att => {
-            const isSelected = selectedAttendant?._id === att._id;
-            const initials = getInitials(att.name);
-            return (
-              <button
-                key={att._id}
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                aria-label={`Staff member ${att.name}`}
-                onClick={() => handleAttendantChange(att)}
-                className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-full border transition-all duration-200 shrink-0 min-h-[44px] ${
-                  isSelected
-                    ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
-                    : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs border ${
+                  selectedAttendant === null
+                    ? 'border-white/30 bg-white/10 text-white'
+                    : 'border-brand-gray-200 bg-brand-gray-50 text-brand-black'
                 }`}
               >
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border ${
+                <Users size={14} />
+              </div>
+              <div className="text-left leading-tight pr-1">
+                <span className="text-xs font-bold block">Any professional</span>
+                <span className={`text-[10px] block ${selectedAttendant === null ? 'text-white/70' : 'text-brand-gray-400'}`}>
+                  First available
+                </span>
+              </div>
+            </button>
+
+            {/* Individual Staff Chips */}
+            {attendants.map(att => {
+              const isSelected = selectedAttendant?._id === att._id;
+              const initials = getInitials(att.name);
+              return (
+                <button
+                  key={att._id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  aria-label={`Staff member ${att.name}`}
+                  onClick={() => handleAttendantChange(att)}
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-full border transition-all duration-200 shrink-0 min-h-[44px] ${
                     isSelected
-                      ? 'border-white/30 bg-white/10 text-white'
-                      : 'border-brand-gray-200 bg-brand-gray-50 text-brand-black'
+                      ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
+                      : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
                   }`}
                 >
-                  {initials}
-                </div>
-                <div className="text-left leading-tight pr-1">
-                  <span className="text-xs font-bold block">{att.name}</span>
-                  <span className={`text-[10px] block ${isSelected ? 'text-white/70' : 'text-brand-gray-400'}`}>
-                    Certified
-                  </span>
-                </div>
-              </button>
+                  <div
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border ${
+                      isSelected
+                        ? 'border-white/30 bg-white/10 text-white'
+                        : 'border-brand-gray-200 bg-brand-gray-50 text-brand-black'
+                    }`}
+                  >
+                    {initials}
+                  </div>
+                  <div className="text-left leading-tight pr-1">
+                    <span className="text-xs font-bold block">{att.name}</span>
+                    <span className={`text-[10px] block ${isSelected ? 'text-white/70' : 'text-brand-gray-400'}`}>
+                      Certified
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 3 Pagination / swipe indicator dots */}
+        <div 
+          className="flex items-center justify-center gap-1.5 pt-1" 
+          role="navigation"
+          aria-label="Staff carousel pagination"
+        >
+          {[0, 1, 2].map((idx) => {
+            const isActive = staffScrollProgress === idx;
+            return (
+              <button
+                key={idx}
+                type="button"
+                aria-label={`Staff page ${idx + 1}`}
+                onClick={() => scrollToStaffSegment(idx)}
+                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                  isActive 
+                    ? 'w-4 bg-brand-black shadow-xs' 
+                    : 'w-1.5 bg-brand-gray-300 hover:bg-brand-gray-400'
+                }`}
+              />
             );
           })}
         </div>
