@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Download } from 'lucide-react';
-
+ g
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
   readonly userChoice: Promise<{
