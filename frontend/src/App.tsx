@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -2283,6 +2283,8 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
   const [editStaffError, setEditStaffError] = useState<string | null>(null);
   const [addStaffSearchQuery, setAddStaffSearchQuery] = useState('');
   const [editStaffSearchQuery, setEditStaffSearchQuery] = useState('');
+  const [showStaffPin, setShowStaffPin] = useState(false);
+  const [showEditStaffPin, setShowEditStaffPin] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todaysConfirmed = confirmedBookings.filter(b => b.date === todayStr && b.status === 'confirmed');
@@ -3202,9 +3204,6 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
           <>
             <header className="space-y-2 px-4 sm:px-0">
               <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-none uppercase">Staff<br />Management</h2>
-              <p className="text-brand-gray-600 font-bold uppercase tracking-[0.3em] text-[11px] sm:text-[12px] pt-1 sm:pt-2">
-                Attendant accounts // login credentials
-              </p>
             </header>
 
             {/* Owner PIN gate for staff management */}
@@ -3309,73 +3308,166 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
                               <p className="text-red-500 text-[10px] font-black uppercase tracking-widest">{editStaffError}</p>
                             )}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Display Name</label>
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] font-black uppercase tracking-wider text-brand-gray-700">Display Name</label>
                                 <input
                                   type="text"
+                                  placeholder="e.g. Florence Miller"
                                   value={editStaffForm.name}
                                   onChange={e => setEditStaffForm(p => ({ ...p, name: e.target.value }))}
-                                  className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-1.5 font-bold text-sm bg-transparent"
+                                  className="w-full bg-brand-gray-50/50 border border-brand-gray-200 rounded-xl px-3.5 py-2.5 font-bold text-sm text-brand-black placeholder:font-normal placeholder:text-brand-gray-400 focus:bg-white focus:border-brand-black focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
                                 />
                               </div>
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">PIN (4–6 digits, optional)</label>
-                                <input
-                                  type="password"
-                                  maxLength={6}
-                                  placeholder="Leave blank to keep current"
-                                  value={editStaffForm.pin}
-                                  onChange={e => setEditStaffForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, '') }))}
-                                  className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-1.5 font-bold text-sm bg-transparent tracking-[0.5em]"
-                                />
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] font-black uppercase tracking-wider text-brand-gray-700">PIN (4–6 digits, optional)</label>
+                                <div className="relative flex items-center">
+                                  <input
+                                    type={showEditStaffPin ? "text" : "password"}
+                                    maxLength={6}
+                                    inputMode="numeric"
+                                    placeholder="Leave blank to keep current"
+                                    value={editStaffForm.pin}
+                                    onChange={e => setEditStaffForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, '') }))}
+                                    className="w-full bg-brand-gray-50/50 border border-brand-gray-200 rounded-xl px-3.5 py-2.5 pr-20 font-mono font-bold text-base tracking-[0.4em] text-brand-black placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-brand-gray-400 focus:bg-white focus:border-brand-black focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowEditStaffPin(!showEditStaffPin)}
+                                    tabIndex={-1}
+                                    className="absolute right-3 py-1 px-2 text-brand-gray-400 hover:text-brand-black transition-colors text-xs font-semibold flex items-center gap-1 rounded-md"
+                                  >
+                                    {showEditStaffPin ? (
+                                      <>
+                                        <EyeOff size={14} />
+                                        <span className="text-[10px] uppercase font-bold tracking-wider">Hide</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Eye size={14} />
+                                        <span className="text-[10px] uppercase font-bold tracking-wider">Show</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                             </div>
 
-                            <div className="space-y-2.5">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">
-                                  Services Offered ({editStaffForm.serviceIds.length})
-                                </label>
+                            <div className="pt-2 space-y-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-t border-brand-gray-100 pt-3">
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[11px] font-black uppercase tracking-wider text-brand-black">
+                                    Services Offered
+                                  </label>
+                                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                    editStaffForm.serviceIds.length > 0
+                                      ? 'bg-brand-black text-white'
+                                      : 'bg-brand-gray-100 text-brand-gray-500'
+                                  }`}>
+                                    {editStaffForm.serviceIds.length === services.length && services.length > 0
+                                      ? 'All Services'
+                                      : `${editStaffForm.serviceIds.length} of ${services.length}`}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const allIds = services.map(s => s._id);
+                                      setEditStaffForm(p => ({ ...p, serviceIds: allIds }));
+                                    }}
+                                    className="text-[10px] font-black uppercase tracking-wider text-brand-gray-600 hover:text-brand-black px-2.5 py-1 rounded-lg border border-brand-gray-200 hover:border-brand-black transition-all bg-white"
+                                  >
+                                    Select All
+                                  </button>
+                                  {editStaffForm.serviceIds.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditStaffForm(p => ({ ...p, serviceIds: [] }))}
+                                      className="text-[10px] font-black uppercase tracking-wider text-brand-gray-400 hover:text-red-500 px-2.5 py-1 rounded-lg border border-transparent hover:border-red-200 transition-all"
+                                    >
+                                      Clear
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="relative">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray-400 pointer-events-none" />
                                 <input
                                   type="text"
-                                  placeholder="Search services..."
+                                  placeholder="Filter services by name..."
                                   value={editStaffSearchQuery}
                                   onChange={e => setEditStaffSearchQuery(e.target.value)}
-                                  className="border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-1 font-bold text-xs bg-transparent w-full sm:w-48 placeholder:font-normal placeholder:text-brand-gray-300"
+                                  className="w-full bg-brand-gray-50/40 border border-brand-gray-200 rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-brand-black placeholder:font-normal placeholder:text-brand-gray-400 focus:bg-white focus:border-brand-black focus:outline-none transition-all"
                                 />
+                                {editStaffSearchQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditStaffSearchQuery('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-brand-gray-400 hover:text-brand-black"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
                               </div>
-                              <div className="max-h-48 overflow-y-auto border border-brand-gray-100 rounded-[10px] p-2 space-y-1 bg-brand-gray-50/50">
-                                {services
-                                  .filter(s => s.name.toLowerCase().includes(editStaffSearchQuery.toLowerCase()))
-                                  .map(s => {
-                                    const isSelected = editStaffForm.serviceIds.includes(s._id);
-                                    return (
-                                      <button
-                                        key={s._id}
-                                        type="button"
-                                        onClick={() => setEditStaffForm(p => ({
-                                          ...p,
-                                          serviceIds: isSelected
-                                            ? p.serviceIds.filter(id => id !== s._id)
-                                            : [...p.serviceIds, s._id]
-                                        }))}
-                                        className={`w-full flex items-center justify-between p-2.5 rounded-md border text-left transition-all active:scale-[0.99] ${
-                                          isSelected
-                                            ? 'bg-brand-black/5 border-brand-black text-brand-black font-semibold'
-                                            : 'border-transparent hover:bg-brand-gray-50 text-brand-gray-700 bg-white shadow-sm'
-                                        }`}
-                                      >
-                                        <span className="text-[11px] uppercase tracking-wider font-medium">{s.name}</span>
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                                          isSelected ? 'bg-brand-black border-brand-black text-white' : 'border-brand-gray-300'
-                                        }`}>
-                                          {isSelected && <CheckCircle2 size={10} />}
+
+                              <div className="max-h-60 overflow-y-auto border border-brand-gray-200 rounded-xl p-2.5 bg-brand-gray-50/30">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {services
+                                    .filter(s => s.name.toLowerCase().includes(editStaffSearchQuery.toLowerCase()))
+                                    .map(s => {
+                                      const isSelected = editStaffForm.serviceIds.includes(s._id);
+                                      return (
+                                        <div
+                                          key={s._id}
+                                          onClick={() => setEditStaffForm(p => ({
+                                            ...p,
+                                            serviceIds: isSelected
+                                              ? p.serviceIds.filter(id => id !== s._id)
+                                              : [...p.serviceIds, s._id]
+                                          }))}
+                                          className={`cursor-pointer flex items-center justify-between p-3 rounded-xl border transition-all select-none ${
+                                            isSelected
+                                              ? 'bg-brand-black text-white border-brand-black shadow-sm'
+                                              : 'bg-white border-brand-gray-200 hover:border-brand-gray-400 text-brand-black'
+                                          }`}
+                                        >
+                                          <div className="min-w-0 pr-2">
+                                            <p className="text-xs font-black uppercase tracking-wide truncate">
+                                              {s.name}
+                                            </p>
+                                            <p className={`text-[10px] font-semibold mt-0.5 ${
+                                              isSelected ? 'text-brand-gray-300' : 'text-brand-gray-500'
+                                            }`}>
+                                              {formatPrice(s.price, s.priceMax)}
+                                              {s.durationMinutes ? ` • ${s.durationMinutes} min` : ''}
+                                            </p>
+                                          </div>
+                                          <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                                            isSelected
+                                              ? 'bg-white border-white text-brand-black'
+                                              : 'border-brand-gray-300 bg-white'
+                                          }`}>
+                                            {isSelected && <Check size={12} strokeWidth={3} />}
+                                          </div>
                                         </div>
-                                      </button>
-                                    );
-                                  })}
+                                      );
+                                    })}
+                                </div>
                                 {services.filter(s => s.name.toLowerCase().includes(editStaffSearchQuery.toLowerCase())).length === 0 && (
-                                  <div className="p-4 text-center text-brand-gray-400 text-xs italic">No matching services.</div>
+                                  <div className="p-6 text-center space-y-1">
+                                    <p className="text-xs text-brand-gray-500 font-semibold">
+                                      No services match "{editStaffSearchQuery}"
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditStaffSearchQuery('')}
+                                      className="text-[11px] text-brand-black font-bold underline hover:no-underline"
+                                    >
+                                      Clear filter
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -3492,115 +3584,283 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
                 </div>
 
                 {/* Add staff form */}
-                <div className="border-2 border-brand-black bg-white p-5 sm:p-6 space-y-6 rounded-xl shadow-sm">
-                  <p className="text-[11px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-4 flex items-center gap-1.5">
-                    <Plus size={14} /> New Staff Account
-                  </p>
+                <div className="border border-brand-gray-200 bg-white p-6 sm:p-7 space-y-6 rounded-2xl shadow-sm">
+                  <div className="flex items-center justify-between border-b border-brand-gray-100 pb-4">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-black uppercase tracking-[0.25em] text-brand-black flex items-center gap-2">
+                        <UserPlus size={16} className="text-brand-black" /> New Staff Account
+                      </p>
+                      <p className="text-[11px] text-brand-gray-400 font-medium">
+                        Create credentials and assign services for this team member.
+                      </p>
+                    </div>
+                  </div>
+
                   {staffError && (
-                    <p className="text-red-500 text-[11px] font-black uppercase tracking-widest">{staffError}</p>
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-600 text-xs font-bold">
+                      <AlertCircle size={16} className="shrink-0" />
+                      <span>{staffError}</span>
+                    </div>
                   )}
-                  <div className="space-y-4">
+
+                  <form autoComplete="off" onSubmit={e => e.preventDefault()} className="space-y-5">
+                    {/* Basic details: Name and Username */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Display Name</label>
-                        <input
-                          type="text" placeholder="Florence"
-                          value={staffForm.name}
-                          onChange={e => setStaffForm(p => ({ ...p, name: e.target.value }))}
-                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-2.5 font-bold text-sm bg-transparent"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">Username</label>
-                        <input
-                          type="text" placeholder="flo" autoCapitalize="none"
-                          value={staffForm.username}
-                          onChange={e => setStaffForm(p => ({ ...p, username: e.target.value }))}
-                          className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-2.5 font-bold text-sm bg-transparent"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">PIN (4–6 digits)</label>
-                      <input
-                        type="password" maxLength={6} placeholder="••••"
-                        value={staffForm.pin}
-                        onChange={e => setStaffForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, '') }))}
-                        className="w-full border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-2.5 font-bold text-sm bg-transparent tracking-[0.5em]"
-                      />
-                    </div>
-                    <div className="space-y-2.5">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <label className="text-[10px] font-black uppercase tracking-[0.25em] text-brand-gray-500">
-                          Services Offered ({staffForm.serviceIds.length})
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-black uppercase tracking-wider text-brand-gray-700 flex items-center gap-1">
+                          Display Name <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
-                          placeholder="Search services..."
+                          name="staff_display_name"
+                          autoComplete="off"
+                          placeholder="e.g. Florence Miller"
+                          value={staffForm.name}
+                          onChange={e => setStaffForm(p => ({ ...p, name: e.target.value }))}
+                          className="w-full bg-brand-gray-50/50 border border-brand-gray-200 rounded-xl px-3.5 py-2.5 font-bold text-sm text-brand-black placeholder:font-normal placeholder:text-brand-gray-400 focus:bg-white focus:border-brand-black focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
+                        />
+                        <p className="text-[10px] text-brand-gray-400">Shown to clients on booking schedule</p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-black uppercase tracking-wider text-brand-gray-700 flex items-center gap-1">
+                          Login Username <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative flex items-center">
+                          <span className="absolute left-3.5 text-xs font-black text-brand-gray-400 select-none">@</span>
+                          <input
+                            type="text"
+                            name="staff_member_username"
+                            autoComplete="off"
+                            autoCapitalize="none"
+                            spellCheck={false}
+                            placeholder="flomiller"
+                            value={staffForm.username}
+                            onChange={e => setStaffForm(p => ({ ...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '') }))}
+                            className="w-full bg-brand-gray-50/50 border border-brand-gray-200 rounded-xl pl-8 pr-3.5 py-2.5 font-bold text-sm text-brand-black placeholder:font-normal placeholder:text-brand-gray-400 focus:bg-white focus:border-brand-black focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
+                          />
+                        </div>
+                        <p className="text-[10px] text-brand-gray-400">Lowercase handle for staff portal login</p>
+                      </div>
+                    </div>
+
+                    {/* PIN Code */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[11px] font-black uppercase tracking-wider text-brand-gray-700 flex items-center gap-1">
+                          Staff PIN Code <span className="text-red-500">*</span>
+                        </label>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                          staffForm.pin.length >= 4 ? 'text-emerald-600' : 'text-brand-gray-400'
+                        }`}>
+                          {staffForm.pin.length > 0 ? `${staffForm.pin.length} / 6 digits` : '4–6 digits required'}
+                        </span>
+                      </div>
+                      <div className="relative flex items-center">
+                        <input
+                          type={showStaffPin ? "text" : "password"}
+                          name="staff_security_pin"
+                          autoComplete="new-password"
+                          inputMode="numeric"
+                          maxLength={6}
+                          placeholder="••••"
+                          value={staffForm.pin}
+                          onChange={e => setStaffForm(p => ({ ...p, pin: e.target.value.replace(/\D/g, '') }))}
+                          className="w-full bg-brand-gray-50/50 border border-brand-gray-200 rounded-xl px-3.5 py-2.5 pr-20 font-mono font-bold text-base tracking-[0.4em] text-brand-black placeholder:font-sans placeholder:tracking-normal placeholder:font-normal placeholder:text-brand-gray-400 focus:bg-white focus:border-brand-black focus:outline-none focus:ring-2 focus:ring-black/5 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowStaffPin(!showStaffPin)}
+                          tabIndex={-1}
+                          className="absolute right-3 py-1 px-2 text-brand-gray-400 hover:text-brand-black transition-colors text-xs font-semibold flex items-center gap-1 rounded-md"
+                        >
+                          {showStaffPin ? (
+                            <>
+                              <EyeOff size={15} />
+                              <span className="text-[10px] uppercase font-bold tracking-wider">Hide</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye size={15} />
+                              <span className="text-[10px] uppercase font-bold tracking-wider">Show</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-brand-gray-400">Used by the staff member to unlock the salon schedule</p>
+                    </div>
+
+                    {/* Services Offered Multi-select */}
+                    <div className="pt-2 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-t border-brand-gray-100 pt-4">
+                        <div className="flex items-center gap-2">
+                          <label className="text-[11px] font-black uppercase tracking-wider text-brand-black">
+                            Services Offered
+                          </label>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            staffForm.serviceIds.length > 0
+                              ? 'bg-brand-black text-white'
+                              : 'bg-brand-gray-100 text-brand-gray-500'
+                          }`}>
+                            {staffForm.serviceIds.length === services.length && services.length > 0
+                              ? 'All Services'
+                              : `${staffForm.serviceIds.length} of ${services.length}`}
+                          </span>
+                        </div>
+
+                        {/* Quick action buttons */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allIds = services.map(s => s._id);
+                              setStaffForm(p => ({ ...p, serviceIds: allIds }));
+                            }}
+                            className="text-[10px] font-black uppercase tracking-wider text-brand-gray-600 hover:text-brand-black px-2.5 py-1 rounded-lg border border-brand-gray-200 hover:border-brand-black transition-all bg-white"
+                          >
+                            Select All
+                          </button>
+                          {staffForm.serviceIds.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setStaffForm(p => ({ ...p, serviceIds: [] }))}
+                              className="text-[10px] font-black uppercase tracking-wider text-brand-gray-400 hover:text-red-500 px-2.5 py-1 rounded-lg border border-transparent hover:border-red-200 transition-all"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Search box for services */}
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Filter services by name..."
                           value={addStaffSearchQuery}
                           onChange={e => setAddStaffSearchQuery(e.target.value)}
-                          className="border-b-2 border-brand-gray-100 focus:border-brand-black focus:outline-none py-1 font-bold text-xs bg-transparent w-full sm:w-48 placeholder:font-normal placeholder:text-brand-gray-300"
+                          className="w-full bg-brand-gray-50/40 border border-brand-gray-200 rounded-xl pl-9 pr-8 py-2 text-xs font-semibold text-brand-black placeholder:font-normal placeholder:text-brand-gray-400 focus:bg-white focus:border-brand-black focus:outline-none transition-all"
                         />
+                        {addStaffSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setAddStaffSearchQuery('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-brand-gray-400 hover:text-brand-black"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
                       </div>
-                      <div className="max-h-48 overflow-y-auto border border-brand-gray-100 rounded-[10px] p-2 space-y-1 bg-brand-gray-50/50">
-                        {services
-                          .filter(s => s.name.toLowerCase().includes(addStaffSearchQuery.toLowerCase()))
-                          .map(s => {
-                            const isSelected = staffForm.serviceIds.includes(s._id);
-                            return (
-                              <button
-                                key={s._id}
-                                type="button"
-                                onClick={() => setStaffForm(p => ({
-                                  ...p,
-                                  serviceIds: isSelected
-                                    ? p.serviceIds.filter(id => id !== s._id)
-                                    : [...p.serviceIds, s._id]
-                                }))}
-                                className={`w-full flex items-center justify-between p-2.5 rounded-md border text-left transition-all active:scale-[0.99] ${
-                                  isSelected
-                                    ? 'bg-brand-black/5 border-brand-black text-brand-black font-semibold'
-                                    : 'border-transparent hover:bg-brand-gray-50 text-brand-gray-700 bg-white shadow-sm'
-                                }`}
-                              >
-                                <span className="text-[11px] uppercase tracking-wider font-medium">{s.name}</span>
-                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
-                                  isSelected ? 'bg-brand-black border-brand-black text-white' : 'border-brand-gray-300'
-                                }`}>
-                                  {isSelected && <CheckCircle2 size={10} />}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        {services.filter(s => s.name.toLowerCase().includes(addStaffSearchQuery.toLowerCase())).length === 0 && (
-                          <div className="p-4 text-center text-brand-gray-400 text-xs italic">No matching services.</div>
+
+                      {/* Filtered Services Grid (2 columns on sm+, clean checkboxes and cards) */}
+                      <div className="max-h-64 overflow-y-auto border border-brand-gray-200 rounded-xl p-2.5 bg-brand-gray-50/30">
+                        {services.length === 0 ? (
+                          <div className="p-6 text-center text-brand-gray-400 text-xs italic">
+                            No services created yet in Pricing & Services.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {services
+                              .filter(s => s.name.toLowerCase().includes(addStaffSearchQuery.toLowerCase()))
+                              .map(s => {
+                                const isSelected = staffForm.serviceIds.includes(s._id);
+                                return (
+                                  <div
+                                    key={s._id}
+                                    onClick={() => setStaffForm(p => ({
+                                      ...p,
+                                      serviceIds: isSelected
+                                        ? p.serviceIds.filter(id => id !== s._id)
+                                        : [...p.serviceIds, s._id]
+                                    }))}
+                                    className={`cursor-pointer flex items-center justify-between p-3 rounded-xl border transition-all select-none ${
+                                      isSelected
+                                        ? 'bg-brand-black text-white border-brand-black shadow-sm'
+                                        : 'bg-white border-brand-gray-200 hover:border-brand-gray-400 text-brand-black'
+                                    }`}
+                                  >
+                                    <div className="min-w-0 pr-2">
+                                      <p className="text-xs font-black uppercase tracking-wide truncate">
+                                        {s.name}
+                                      </p>
+                                      <p className={`text-[10px] font-semibold mt-0.5 ${
+                                        isSelected ? 'text-brand-gray-300' : 'text-brand-gray-500'
+                                      }`}>
+                                        {formatPrice(s.price, s.priceMax)}
+                                        {s.durationMinutes ? ` • ${s.durationMinutes} min` : ''}
+                                      </p>
+                                    </div>
+                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                                      isSelected
+                                        ? 'bg-white border-white text-brand-black'
+                                        : 'border-brand-gray-300 bg-white'
+                                    }`}>
+                                      {isSelected && <Check size={12} strokeWidth={3} />}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
+
+                        {services.length > 0 && services.filter(s => s.name.toLowerCase().includes(addStaffSearchQuery.toLowerCase())).length === 0 && (
+                          <div className="p-6 text-center space-y-1">
+                            <p className="text-xs text-brand-gray-500 font-semibold">
+                              No services match "{addStaffSearchQuery}"
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setAddStaffSearchQuery('')}
+                              className="text-[11px] text-brand-black font-bold underline hover:no-underline"
+                            >
+                              Clear filter
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                  <button
-                    disabled={!staffForm.name || !staffForm.username || staffForm.pin.length < 4 || staffAddLoading}
-                    onClick={async () => {
-                      setStaffAddLoading(true);
-                      setStaffError(null);
-                      try {
-                        const created = await api.createAttendant(ownerPin, staffForm);
-                        setAttendants(prev => [...prev, created]);
-                        setStaffForm({ name: '', username: '', pin: '', serviceIds: [] });
-                        setAddStaffSearchQuery('');
-                      } catch (err: any) {
-                        setStaffError(err.message || 'Failed to create staff account');
-                      } finally {
-                        setStaffAddLoading(false);
-                      }
-                    }}
-                    className="w-full bg-brand-black text-white py-4.5 sm:py-5 font-black uppercase tracking-[0.3em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed shadow active:scale-[0.99] flex items-center justify-center gap-2 rounded-[10px]"
-                  >
-                    {staffAddLoading ? (
-                      <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : null}
-                    + Add Staff Member
-                  </button>
+
+                    {/* Submit Button */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        disabled={!staffForm.name.trim() || !staffForm.username.trim() || staffForm.pin.length < 4 || staffAddLoading}
+                        onClick={async () => {
+                          setStaffAddLoading(true);
+                          setStaffError(null);
+                          try {
+                            const created = await api.createAttendant(ownerPin, {
+                              ...staffForm,
+                              name: staffForm.name.trim(),
+                              username: staffForm.username.trim().toLowerCase(),
+                            });
+                            setAttendants(prev => [...prev, created]);
+                            setStaffForm({ name: '', username: '', pin: '', serviceIds: [] });
+                            setAddStaffSearchQuery('');
+                          } catch (err: any) {
+                            setStaffError(err.message || 'Failed to create staff account');
+                          } finally {
+                            setStaffAddLoading(false);
+                          }
+                        }}
+                        className="w-full bg-brand-black text-white py-3.5 sm:py-4 font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed shadow active:scale-[0.99] flex items-center justify-center gap-2 rounded-xl"
+                      >
+                        {staffAddLoading ? (
+                          <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <Plus size={16} />
+                        )}
+                        <span>Add Staff Member</span>
+                      </button>
+
+                      {(!staffForm.name.trim() || !staffForm.username.trim() || staffForm.pin.length < 4) && (
+                        <p className="text-[10px] text-center text-brand-gray-400 mt-2">
+                          Required: Display name, username, and at least 4-digit PIN.
+                        </p>
+                      )}
+                    </div>
+                  </form>
                 </div>
               </div>
             )}
