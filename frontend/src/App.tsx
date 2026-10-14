@@ -278,6 +278,7 @@ export default function App() {
 
   // Auto-restore confirmation screen when ?ref=... is in URL or saved in localStorage
   useEffect(() => {
+    if (tenantLoading) return;
     const refToRestore = bookingRef || (!createdBooking && activeStep === 'service' ? localStorage.getItem('lastBookingReference') : null);
     if (!refToRestore) return;
 
@@ -311,7 +312,7 @@ export default function App() {
           console.warn('[App] Failed to auto-restore booking reference:', err);
         });
     }
-  }, [bookingRef]);
+  }, [bookingRef, tenantLoading]);
 
   // Lookup Booking State
   const [lookupQuery, setLookupQuery] = useState('');
@@ -1244,8 +1245,8 @@ export default function App() {
             )}
             <NotificationCenter 
               onNavigate={handleNotificationNavigate} 
-              token={attendantSession?.token || ownerToken || undefined} 
-              ownerPin={ownerSessionPin} 
+              token={userMode === 'owner' ? (ownerToken || undefined) : userMode === 'attendant' ? (attendantSession?.token || undefined) : undefined} 
+              ownerPin={userMode === 'owner' ? ownerSessionPin : undefined} 
             />
             {userMode !== 'customer' && (
               <>

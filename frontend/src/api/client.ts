@@ -13,6 +13,34 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api';
 let activeTenantSlug: string | null = null;
 let activeAuthToken: string | null = null;
 
+export function getEffectiveTenantSlug(): string | null {
+  if (activeTenantSlug) return activeTenantSlug;
+  if (typeof window !== 'undefined') {
+    const pathname = window.location.pathname;
+    // Don't inject fallback tenant if on generic multi-tenant selection or registration screens
+    if (pathname.startsWith('/select') || pathname.startsWith('/register')) {
+      return null;
+    }
+    const segments = pathname.split('/').filter(Boolean);
+    if (
+      segments.length > 0 &&
+      !['select', 'register', 'admin', 'staff', 'owner', 'attendant', 'api'].includes(segments[0])
+    ) {
+      return segments[0];
+    }
+    return (
+      localStorage.getItem('lastTenantSlug') ||
+      localStorage.getItem('ownerTenantSlug') ||
+      localStorage.getItem('staffTenantSlug') ||
+      'flo-sisterlocks'
+    );
+  }
+  return 'flo-sisterlocks';
+}
+
+// Safely initialize with initial effective slug
+activeTenantSlug = getEffectiveTenantSlug();
+
 export function setApiTenantSlug(slug: string | null) {
   activeTenantSlug = slug;
 }
@@ -42,8 +70,9 @@ window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
     }
   };
 
-  if (activeTenantSlug) {
-    setHeader('X-Tenant-Slug', activeTenantSlug);
+  const tenantSlugToUse = activeTenantSlug || getEffectiveTenantSlug();
+  if (tenantSlugToUse) {
+    setHeader('X-Tenant-Slug', tenantSlugToUse);
   }
 
   if (activeAuthToken) {
