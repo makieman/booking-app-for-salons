@@ -96,7 +96,7 @@ async function seedDefaultTenant(): Promise<void> {
       // Seed default attendant "flo"
       const pinHash = await bcrypt.hash('1234', 10);
       await Attendant.create({
-        name: 'Florence',
+        name: 'Flora',
         username: 'flo',
         pinHash,
         isActive: true,
