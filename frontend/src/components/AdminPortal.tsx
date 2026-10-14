@@ -203,7 +203,7 @@ export function AdminPortal({
             <form onSubmit={handleOwnerSubmit} className="space-y-5">
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-gray-600 block">
-                  Salon ID (Slug)
+                  Salon ID.
                 </label>
                 <input
                   type="text"
