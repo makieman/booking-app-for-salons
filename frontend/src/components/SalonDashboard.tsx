@@ -237,10 +237,10 @@ export function SalonDashboard({
         </motion.div>
       </div>
 
-      {/* -- Row 2: Weekly Volume Chart (8 cols) & Quick Actions (4 cols) -------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Weekly Volume Chart (8 columns on desktop) */}
-        <div className="lg:col-span-8 bg-brand-white border border-brand-gray-100 p-5 sm:p-6 rounded-2xl space-y-4 shadow-sm flex flex-col justify-between">
+      {/* -- Row 2: Weekly Volume Chart (Full width on desktop) & Quick Actions (Mobile only) -------- */}
+      <div className="space-y-4">
+        {/* Weekly Volume Chart */}
+        <div className="bg-brand-white border border-brand-gray-100 p-5 sm:p-6 rounded-2xl space-y-4 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-sm font-black uppercase tracking-widest text-brand-black">
@@ -311,8 +311,8 @@ export function SalonDashboard({
           )}
         </div>
 
-        {/* Quick Action Shortcuts Tile (4 columns on desktop) */}
-        <div className="lg:col-span-4 bg-brand-black text-white p-5 sm:p-6 rounded-2xl space-y-4 shadow-sm flex flex-col justify-between">
+        {/* Quick Action Shortcuts Tile (Hidden on desktop, available on mobile) */}
+        <div className="lg:hidden bg-brand-black text-white p-5 sm:p-6 rounded-2xl space-y-4 shadow-sm flex flex-col justify-between">
           <div className="space-y-1">
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">
               Quick Actions
