@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -344,6 +344,7 @@ export default function App() {
   const [rescheduleSlots, setRescheduleSlots] = useState<string[]>([]);
   const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
 
   const dateCtaRef = useRef<HTMLButtonElement>(null);
 
@@ -578,8 +579,9 @@ export default function App() {
   }, [searchQuery, services]);
 
   const handleConfirmBooking = async () => {
-    if (selectedServices.length === 0 || !selectedTime || !clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline) return;
+    if (selectedServices.length === 0 || !selectedTime || !clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline || isSubmittingBooking) return;
 
+    setIsSubmittingBooking(true);
     try {
       const newBooking = await api.createBooking({
         customerName: clientInfo.name,
@@ -630,10 +632,13 @@ export default function App() {
       } else {
         triggerToast(errorMsg, 'error');
       }
+    } finally {
+      setIsSubmittingBooking(false);
     }
   };
 
   const resetFlow = () => {
+    setIsSubmittingBooking(false);
     setActiveStep('service');
     setSelectedServices([]);
     setServiceAttendants({});
@@ -1565,11 +1570,21 @@ export default function App() {
                       </div>
 
                       <button
-                        disabled={!clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline}
+                        disabled={!clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline || isSubmittingBooking}
                         onClick={handleConfirmBooking}
-                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98]"
+                        aria-busy={isSubmittingBooking}
+                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98] flex items-center justify-center gap-3 cursor-pointer disabled:cursor-not-allowed"
                       >
-                        {isOffline ? 'Offline - Booking Disabled' : 'Finalize Booking'}
+                        {isOffline ? (
+                          'Offline - Booking Disabled'
+                        ) : isSubmittingBooking ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-brand-white shrink-0" />
+                            <span>Finalizing Booking...</span>
+                          </>
+                        ) : (
+                          'Finalize Booking'
+                        )}
                       </button>
                     </motion.div>
                   )}
@@ -2816,6 +2831,7 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
       {/* Main Content Area: Fixed padding & centered container on desktop */}
       <div className="flex-1 lg:pl-60 overflow-y-auto scrollbar-hide">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-8 lg:px-10 py-6 sm:py-8 lg:py-10 space-y-8 sm:space-y-12">
+
           {/* ── TAB 0: Analytics Dashboard ───────────────────── */}
           {activeTab === 'dashboard' && (
             <SalonDashboard
