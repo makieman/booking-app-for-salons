@@ -174,6 +174,7 @@ export async function sendBookingCancelledToCustomer(
   booking: IBooking,
   service: IService,
   attendantName?: string,
+  reason?: string,
 ): Promise<void> {
   if (!booking.email) return;
 
@@ -189,6 +190,7 @@ export async function sendBookingCancelledToCustomer(
     attendantName,
     formattedDate,
     formattedPrice,
+    reason,
   });
 
   const { from, replyTo } = getEmailHeaders(tenant);

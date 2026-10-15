@@ -173,8 +173,12 @@ export async function sendWhatsAppBookingConfirmed(booking: IBooking, service: I
   });
 }
 
-export async function sendWhatsAppBookingCancelled(booking: IBooking, service: IService): Promise<void> {
-  await sendTemplate({
+export async function sendWhatsAppBookingCancelled(
+  booking: IBooking,
+  service: IService,
+  reason?: string
+): Promise<void> {
+  const sent = await sendTemplate({
     to: booking.phone,
     templateName: 'booking_cancelled',
     components: [{ type: 'body', parameters: [
@@ -184,6 +188,10 @@ export async function sendWhatsAppBookingCancelled(booking: IBooking, service: I
       { type: 'text', text: booking.reference },
     ]}],
   });
+
+  if (sent && reason) {
+    await sendWhatsAppFreeText(booking.phone, `Cancellation reason: ${reason}`);
+  }
 }
 
 export async function sendWhatsAppReminder(booking: IBooking, service: IService, attendantName?: string): Promise<void> {

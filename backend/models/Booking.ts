@@ -29,8 +29,11 @@ export interface IBooking extends Document {
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string;   // HH:mm
-  /** 'completed' is set by the attendant after performing the service */
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  /** 'completed' is set by attendant/admin, 'no-show' flags unattended bookings */
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
+  cancellationReason?: string;
+  completedAt?: Date;
+  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,9 +55,12 @@ const BookingSchema: Schema = new Schema(
     date: { type: String, required: true },
     startTime: { type: String, required: true },
     endTime: { type: String, required: true },
+    cancellationReason: { type: String, default: null },
+    completedAt: { type: Date, default: null },
+    notes: { type: String, default: null },
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+      enum: ['pending', 'confirmed', 'cancelled', 'completed', 'no-show'],
       default: 'pending',
     },
   },
@@ -67,6 +73,9 @@ BookingSchema.index({ tenantId: 1, reference: 1, groupOrder: 1 }, { unique: true
 // Performance indexes for common query patterns
 BookingSchema.index({ tenantId: 1, date: 1 });
 BookingSchema.index({ tenantId: 1, status: 1 });
+BookingSchema.index({ tenantId: 1, date: 1, status: 1 });
+BookingSchema.index({ tenantId: 1, customerName: 1 });
+BookingSchema.index({ tenantId: 1, phone: 1 });
 BookingSchema.index({ tenantId: 1, groupId: 1 });
 BookingSchema.index({ tenantId: 1, attendantId: 1, date: 1 });
 BookingSchema.index({ tenantId: 1, attendantId: 1, status: 1 });

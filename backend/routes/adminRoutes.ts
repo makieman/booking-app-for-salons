@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAdminBookings, updateBookingStatus } from '../controllers/adminController';
+import { getAdminBookings, updateBookingStatus, createAdminBooking } from '../controllers/adminController';
 import {
   listAttendants,
   createAttendant,
@@ -12,10 +12,13 @@ import { requireOwnerAuth } from '../middleware/authMiddleware';
 const router = express.Router();
 
 // ── Booking management (owner-only with JWT) ──────────────────────────────────
-// GET /api/admin/bookings — fetch all bookings
+// GET /api/admin/bookings — fetch all bookings with optional search & filters
 router.get('/bookings', requireOwnerAuth, getAdminBookings);
 
-// PATCH /api/admin/bookings/:id — confirm or cancel a booking
+// POST /api/admin/bookings — create walk-in / phone booking directly
+router.post('/bookings', requireOwnerAuth, createAdminBooking);
+
+// PATCH /api/admin/bookings/:id — confirm, reschedule, or cancel a booking
 router.patch('/bookings/:id', requireOwnerAuth, updateBookingStatus);
 
 // ── Attendant / Staff management (owner-only) ─────────────────────────────────
