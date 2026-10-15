@@ -2272,6 +2272,27 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
 
   // Admin push notifications
   const adminPush = useAdminPushNotifications();
+  const [showPushBanner, setShowPushBanner] = useState(false);
+
+  // Auto-subscribe for push on mount; show banner if permission not yet decided
+  useEffect(() => {
+    if (adminPush.permission === 'unsupported') return;
+    const dismissed = localStorage.getItem('adminPushBannerDismissed') === 'true';
+    if (adminPush.isSubscribed) {
+      setShowPushBanner(false);
+      return;
+    }
+    if (adminPush.permission === 'granted') {
+      // Permission already granted — silently re-subscribe (e.g. new browser session)
+      adminPush.subscribe();
+      setShowPushBanner(false);
+    } else if (adminPush.permission === 'default' && !dismissed) {
+      // Not yet decided — show the prompt banner
+      setShowPushBanner(true);
+    }
+    // If 'denied' — respect the user's decision, no banner
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminPush.permission, adminPush.isSubscribed]);
 
   // Add service form state
   const [addForm, setAddForm] = useState({ name: '', duration: '', price: '', priceMax: '', description: '' });
@@ -2831,6 +2852,60 @@ function AdminView({ bookings: initialBookings, ownerPin: initialOwnerPin, owner
       {/* Main Content Area: Fixed padding & centered container on desktop */}
       <div className="flex-1 lg:pl-60 overflow-y-auto scrollbar-hide">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-8 lg:px-10 py-6 sm:py-8 lg:py-10 space-y-8 sm:space-y-12">
+
+          {/* ── Push Notification Banner ──────────────────────── */}
+          {showPushBanner && (
+            <motion.div
+              key="push-banner"
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="flex items-start sm:items-center justify-between gap-4 bg-brand-black text-white px-5 py-4 rounded-2xl shadow-lg"
+            >
+              <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                <span className="text-xl shrink-0" aria-hidden="true">🔔</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-black uppercase tracking-widest leading-tight">Enable Booking Alerts</p>
+                  <p className="text-[11px] text-white/60 mt-0.5 leading-snug">
+                    Get instant push notifications for new bookings, cancellations &amp; reschedules — even when this tab is closed.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await adminPush.subscribe();
+                    if (ok) {
+                      setShowPushBanner(false);
+                      playNotificationSound('chime');
+                    }
+                  }}
+                  disabled={adminPush.isLoading}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-white text-brand-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-brand-gray-100 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {adminPush.isLoading ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <Bell size={11} />
+                  )}
+                  <span>Enable</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPushBanner(false);
+                    localStorage.setItem('adminPushBannerDismissed', 'true');
+                  }}
+                  className="p-2 text-white/50 hover:text-white transition-colors cursor-pointer"
+                  title="Dismiss"
+                  aria-label="Dismiss notification prompt"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </motion.div>
+          )}
 
           {/* ── TAB 0: Analytics Dashboard ───────────────────── */}
           {activeTab === 'dashboard' && (
