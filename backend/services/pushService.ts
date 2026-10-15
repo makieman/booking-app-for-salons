@@ -123,7 +123,10 @@ export async function sendPushToAdmins(
     subscriptions = await PushSubscription.find(query);
   } catch (err) { console.error('[pushService] Failed to query admin subscriptions:', err); return; }
 
-  if (subscriptions.length === 0) return;
+  if (subscriptions.length === 0) {
+    console.warn(`[pushService] No admin subscriptions found for tenant ${tenantId} — push notification dropped. Admin must enable notifications in the dashboard.`);
+    return;
+  }
   await sendToSubscriptions(subscriptions, payload);
 }
 
