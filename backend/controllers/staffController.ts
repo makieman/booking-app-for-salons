@@ -93,6 +93,8 @@ export const createAttendant = async (req: Request, res: Response) => {
   }
 };
 
+import Booking from '../models/Booking';
+
 /**
  * PATCH /api/admin/attendants/:id
  * Owner-only. Updates an attendant belonging to this tenant.
@@ -100,14 +102,21 @@ export const createAttendant = async (req: Request, res: Response) => {
 export const updateAttendant = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, serviceIds, isActive, pin } = req.body as {
-      name?: string; serviceIds?: string[]; isActive?: boolean; pin?: string;
+    const { name, serviceIds, isActive, pin, schedule, daysOff } = req.body as {
+      name?: string;
+      serviceIds?: string[];
+      isActive?: boolean;
+      pin?: string;
+      schedule?: any[];
+      daysOff?: string[];
     };
 
     const update: Record<string, unknown> = {};
     if (name !== undefined) update.name = name.trim();
     if (serviceIds !== undefined) update.serviceIds = serviceIds;
     if (isActive !== undefined) update.isActive = isActive;
+    if (schedule !== undefined) update.schedule = schedule;
+    if (daysOff !== undefined) update.daysOff = daysOff;
 
     if (pin !== undefined) {
       if (pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin)) {
@@ -133,13 +142,31 @@ export const updateAttendant = async (req: Request, res: Response) => {
 
 /**
  * DELETE /api/admin/attendants/:id
- * Owner-only. Deletes an attendant belonging to this tenant.
+ * Owner-only. Deletes or deactivates an attendant belonging to this tenant.
+ * FIX ISSUE 19: If attendant has historical bookings, soft-deactivate instead
+ * of destructive delete so past appointments keep their stylist record intact.
  */
 export const deleteAttendant = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    // Scope to tenant
-    const attendant = await Attendant.findOneAndDelete({ _id: id, tenantId: req.tenant!._id });
+    const tenantId = req.tenant!._id;
+
+    const hasBookings = await Booking.exists({ tenantId, attendantId: id });
+    if (hasBookings) {
+      const updated = await Attendant.findOneAndUpdate(
+        { _id: id, tenantId },
+        { isActive: false },
+        { new: true }
+      );
+      if (!updated) return res.status(404).json({ error: 'Attendant not found' });
+      return res.json({
+        message: 'Attendant deactivated to preserve historical booking records',
+        _id: id,
+        deactivated: true,
+      });
+    }
+
+    const attendant = await Attendant.findOneAndDelete({ _id: id, tenantId });
     if (!attendant) return res.status(404).json({ error: 'Attendant not found' });
     res.json({ message: 'Attendant deleted successfully', _id: id });
   } catch (error) {

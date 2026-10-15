@@ -33,6 +33,12 @@ export const getPublicTenant = async (req: Request, res: Response) => {
         supportEmail: tenant.supportEmail,
       },
       locale: tenant.locale,
+      bookingRules: tenant.bookingRules || {
+        slotInterval: 30,
+        bufferMinutes: 0,
+        minNoticeHours: 2,
+        holidays: [],
+      },
       supportPhone: tenant.supportPhone,
       supportEmail: tenant.supportEmail,
     });
@@ -48,6 +54,7 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
       name,
       timezone,
       workingHours,
+      bookingRules,
       branding, // primaryColor, emailFromName, emailReplyTo, whatsappSenderNumber
       locale,
       mpesaTillNumber,
@@ -67,6 +74,12 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
     if (name !== undefined) tenant.name = name;
     if (timezone !== undefined) tenant.timezone = timezone;
     if (workingHours !== undefined) tenant.workingHours = workingHours;
+    if (bookingRules !== undefined) {
+      tenant.bookingRules = {
+        ...(tenant.bookingRules || { slotInterval: 30, bufferMinutes: 0, minNoticeHours: 2, holidays: [] }),
+        ...bookingRules,
+      };
+    }
     if (locale !== undefined) tenant.locale = locale;
     if (mpesaTillNumber !== undefined) tenant.mpesaTillNumber = mpesaTillNumber;
     if (mpesaPaybillNumber !== undefined) tenant.mpesaPaybillNumber = mpesaPaybillNumber;
