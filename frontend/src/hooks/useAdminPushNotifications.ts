@@ -49,7 +49,7 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading]       = useState(false);
   const [soundPreference, setSoundPreference] = useState<string>(
-    () => (typeof window !== 'undefined' ? localStorage.getItem('soundPreference') || 'default' : 'default')
+    () => (typeof window !== 'undefined' ? localStorage.getItem('soundPreference') || 'chime' : 'chime')
   );
 
   // Check existing admin subscription on mount
@@ -109,11 +109,15 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
 
       // 5. Save to server as admin subscription
       const employeeId = localStorage.getItem('employeeId') ?? 'admin';
-      const currentSound = localStorage.getItem('soundPreference') ?? 'default';
+      const currentSound = localStorage.getItem('soundPreference') ?? 'chime';
+      const ownerToken = localStorage.getItem('ownerToken') ?? '';
 
       const saveRes = await fetch(`${API_BASE}/push/subscribe-admin`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(ownerToken ? { 'Authorization': `Bearer ${ownerToken}` } : {}),
+        },
         body:    JSON.stringify({
           endpoint: sub.endpoint,
           keys: { p256dh, auth },
@@ -126,6 +130,7 @@ export function useAdminPushNotifications(): UseAdminPushNotifications {
       setIsSubscribed(true);
       setSoundPreference(currentSound);
       localStorage.setItem('adminPushEnabled', 'true');
+      localStorage.setItem('soundPreference', currentSound);
       return true;
     } catch (err) {
       console.error('[useAdminPush] subscribe error:', err);
