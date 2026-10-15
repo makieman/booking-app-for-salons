@@ -17,6 +17,20 @@ export interface Service {
   image: string;
 }
 
+export interface AttendantBreak {
+  start: string; // HH:mm
+  end: string;   // HH:mm
+  label?: string;
+}
+
+export interface AttendantDaySchedule {
+  dayOfWeek: number; // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  isWorkingDay: boolean;
+  start: string; // HH:mm
+  end: string;   // HH:mm
+  breaks?: AttendantBreak[];
+}
+
 /** A staff member who performs services */
 export interface Attendant {
   _id: string;
@@ -26,6 +40,8 @@ export interface Attendant {
   /** Only present in admin view (populated) */
   username?: string;
   isActive?: boolean;
+  schedule?: AttendantDaySchedule[];
+  daysOff?: string[]; // Array of YYYY-MM-DD
 }
 
 export interface TimeSlot {
@@ -33,7 +49,7 @@ export interface TimeSlot {
   available: boolean;
 }
 
-export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
+export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
 
 export const MAX_SERVICES = 2;
 
@@ -53,6 +69,9 @@ export interface Booking {
   startTime: string;  // HH:mm
   endTime: string;    // HH:mm
   status: BookingStatus;
+  cancellationReason?: string;
+  completedAt?: string;
+  notes?: string;
   createdAt?: string;
 }
 
@@ -88,6 +107,13 @@ export interface AttendantSession {
   token: string;
 }
 
+export interface TenantBookingRules {
+  slotInterval: number; // 15 | 30 | 45 | 60 (default: 30)
+  bufferMinutes: number; // default: 0
+  minNoticeHours: number; // default: 2
+  holidays?: string[]; // Array of YYYY-MM-DD
+}
+
 export interface Tenant {
   _id: string;
   name: string;
@@ -95,6 +121,7 @@ export interface Tenant {
   ownerEmail: string;
   timezone: string;
   workingHours: { start: string; end: string };
+  bookingRules?: TenantBookingRules;
   branding: {
     logoUrl?: string;
     faviconUrl?: string;

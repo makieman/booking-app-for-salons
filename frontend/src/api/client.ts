@@ -6,7 +6,7 @@
  * configure your reverse proxy (nginx, etc.) to handle this.
  */
 
-import type { Attendant, Booking, MultiSlotOption } from '../types';
+import type { Attendant, AttendantDaySchedule, Booking, BookingStatus, MultiSlotOption } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -230,16 +230,36 @@ export async function getMonthAvailability(
   return res.json();
 }
 
-// ── Admin: Bookings ────────────────────────────────────────────────────────
+export interface AdminBookingFilters {
+  status?: string;
+  attendantId?: string;
+  date?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
 
 /**
- * Admin: Fetches all bookings, optionally filtered by status and/or attendant.
- * Endpoint: GET /api/admin/bookings?status=pending&attendantId=xxx
+ * Admin: Fetches bookings with optional search, date-range, and status filters.
+ * Endpoint: GET /api/admin/bookings
  */
-export async function getAdminBookings(status?: string, attendantId?: string) {
+export async function getAdminBookings(filters?: string | AdminBookingFilters, attendantId?: string) {
   const params = new URLSearchParams();
-  if (status) params.set('status', status);
-  if (attendantId) params.set('attendantId', attendantId);
+  if (typeof filters === 'string') {
+    if (filters) params.set('status', filters);
+    if (attendantId) params.set('attendantId', attendantId);
+  } else if (filters) {
+    if (filters.status) params.set('status', filters.status);
+    if (filters.attendantId) params.set('attendantId', filters.attendantId);
+    if (filters.date) params.set('date', filters.date);
+    if (filters.startDate) params.set('startDate', filters.startDate);
+    if (filters.endDate) params.set('endDate', filters.endDate);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.page) params.set('page', String(filters.page));
+    if (filters.limit) params.set('limit', String(filters.limit));
+  }
   const url = params.toString()
     ? `${API_BASE}/admin/bookings?${params}`
     : `${API_BASE}/admin/bookings`;
@@ -248,19 +268,68 @@ export async function getAdminBookings(status?: string, attendantId?: string) {
   return res.json();
 }
 
+export interface AdminCreateBookingPayload {
+  customerName: string;
+  phone: string;
+  email?: string;
+  serviceId: string;
+  attendantId?: string;
+  date: string;
+  startTime: string;
+  notes?: string;
+  status?: 'confirmed' | 'pending';
+  sendNotifications?: boolean;
+}
+
 /**
- * Admin: Confirm or cancel a booking.
- * Endpoint: PATCH /api/admin/bookings/:id
+ * Admin: Fast appointment creation for walk-in or telephone clients.
+ * Endpoint: POST /api/admin/bookings
  */
-export async function updateBookingStatus(id: string, status: 'confirmed' | 'cancelled') {
-  const res = await fetch(`${API_BASE}/admin/bookings/${id}`, {
-    method: 'PATCH',
+export async function createAdminBooking(data: AdminCreateBookingPayload): Promise<Booking> {
+  const res = await fetch(`${API_BASE}/admin/bookings`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(data),
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || 'Failed to update booking status');
+    throw new Error(errorData.error || 'Failed to create booking');
+  }
+  return res.json();
+}
+
+export interface AdminUpdateBookingPayload {
+  status?: BookingStatus;
+  reason?: string;
+  cancellationReason?: string;
+  notes?: string;
+  reschedule?: {
+    date: string;
+    startTime: string;
+    attendantId?: string;
+  };
+}
+
+/**
+ * Admin: Confirm, cancel, complete, mark no-show, or reschedule a booking.
+ * Endpoint: PATCH /api/admin/bookings/:id
+ */
+export async function updateBookingStatus(
+  id: string,
+  payloadOrStatus: BookingStatus | AdminUpdateBookingPayload
+) {
+  const body = typeof payloadOrStatus === 'string'
+    ? { status: payloadOrStatus }
+    : payloadOrStatus;
+
+  const res = await fetch(`${API_BASE}/admin/bookings/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update booking');
   }
   return res.json();
 }
@@ -334,7 +403,14 @@ export async function createAttendant(
 export async function updateAttendant(
   ownerPin: string,
   id: string,
-  data: Partial<{ name: string; pin: string; serviceIds: string[]; isActive: boolean }>
+  data: Partial<{
+    name: string;
+    pin: string;
+    serviceIds: string[];
+    isActive: boolean;
+    schedule: AttendantDaySchedule[];
+    daysOff: string[];
+  }>
 ): Promise<Attendant> {
   const res = await fetch(`${API_BASE}/admin/attendants/${id}`, {
     method: 'PATCH',

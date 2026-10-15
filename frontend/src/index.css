@@ -23,13 +23,21 @@
   --color-brand-gray-700: #181818;
   --color-brand-gray-800: #111111;
   --color-brand-gray-900: #0A0A0A;
-  /* Aliasing for easier replacement */
+  /* Aliasing for easier replacement & semantic tokens */
   --color-brand-cream: #FAF7F3;
   --color-brand-sage: #B08968;
   --color-brand-charcoal: #111111;
   --color-brand-surface: #FAF7F3;
   --color-brand-muted: #4A4A4A;
   --color-brand-border: #D4C5B5;
+
+  /* Clean semantic tokens for modern admin views */
+  --color-surface-card: #FFFFFF;
+  --color-surface-subtle: #F6F3EE;
+  --color-border-subtle: #E8DFD5;
+  --color-text-main: #111111;
+  --color-text-muted: #555555;
+  --color-text-subtle: #767676;
 
   --shadow-luxury: 0 20px 40px -15px rgba(0, 0, 0, 0.04);
 
