@@ -18,6 +18,13 @@ const RESERVED_SLUGS = ['api', 'admin', 'auth', 'health', 'www', 'app'];
  * - plan:               'free' | 'paid' — stored for future plan-gating logic.
  * - isActive:           Soft-delete / suspension flag.
  */
+export interface ITenantBookingRules {
+  slotInterval: number; // 15 | 30 | 45 | 60 (default: 30)
+  bufferMinutes: number; // default: 0
+  minNoticeHours: number; // default: 2
+  holidays?: string[]; // Array of YYYY-MM-DD
+}
+
 export interface ITenant extends Document {
   name: string;
   slug: string;
@@ -25,6 +32,7 @@ export interface ITenant extends Document {
   ownerPasswordHash: string;
   timezone: string;
   workingHours: { start: string; end: string };
+  bookingRules?: ITenantBookingRules;
   branding: {
     logoUrl?: string;
     faviconUrl?: string;
@@ -97,6 +105,12 @@ const TenantSchema: Schema = new Schema(
     workingHours: {
       start: { type: String, default: '09:00' },
       end:   { type: String, default: '18:00' },
+    },
+    bookingRules: {
+      slotInterval:   { type: Number, default: 30 },
+      bufferMinutes:  { type: Number, default: 0 },
+      minNoticeHours: { type: Number, default: 2 },
+      holidays:       [{ type: String }],
     },
     branding: {
       logoUrl:      { type: String },

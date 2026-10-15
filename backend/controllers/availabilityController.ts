@@ -8,7 +8,7 @@ import { generateAvailableSlots, generateMultiServiceSlots, MAX_SERVICES } from 
 /**
  * GET /api/availability?date=YYYY-MM-DD&serviceId=xxx[&attendantId=yyy]
  * Returns available time slots. All queries scoped to the resolved tenant.
- * Uses tenant.workingHours to determine the bookable window.
+ * Uses tenant.workingHours and attendant shift/breaks/rules to determine the bookable window.
  */
 export const getAvailability = async (req: Request, res: Response) => {
   try {
@@ -24,8 +24,15 @@ export const getAvailability = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Service not found' });
     }
 
+    let attendant = null;
     const bookingQuery: Record<string, unknown> = { tenantId, date: date as string };
-    if (attendantId) bookingQuery.attendantId = attendantId as string;
+    if (attendantId) {
+      bookingQuery.attendantId = attendantId as string;
+      attendant = await Attendant.findOne({ _id: attendantId as string, tenantId, isActive: true });
+      if (!attendant) {
+        return res.json([]);
+      }
+    }
 
     const existingBookings = await Booking.find(bookingQuery);
 
@@ -34,6 +41,11 @@ export const getAvailability = async (req: Request, res: Response) => {
       service.duration,
       existingBookings,
       req.tenant!.workingHours,
+      {
+        bookingRules: req.tenant!.bookingRules,
+        attendant,
+        timezone: req.tenant!.timezone,
+      }
     );
 
     res.json(availableSlots);
@@ -66,7 +78,7 @@ export const getAnyAvailability = async (req: Request, res: Response) => {
       tenantId,
       isActive: true,
       serviceIds: serviceId as string,
-    }).select('_id name');
+    }).select('_id name schedule daysOff');
 
     if (attendants.length === 0) {
       return res.json({ slots: [], attendantSlots: [] });
@@ -84,6 +96,11 @@ export const getAnyAvailability = async (req: Request, res: Response) => {
           service.duration,
           bookings,
           req.tenant!.workingHours,
+          {
+            bookingRules: req.tenant!.bookingRules,
+            attendant,
+            timezone: req.tenant!.timezone,
+          }
         );
         return { attendantId: attendant._id.toString(), name: attendant.name, slots };
       })
@@ -146,18 +163,23 @@ export const getMultiAvailability = async (req: Request, res: Response) => {
         }
       }
 
-      // Fetch all active qualified attendants for this service
+      // Fetch all active qualified attendants for this service with schedules & days off
       const qualified = await Attendant.find({
         tenantId,
         isActive: true,
         serviceIds: item.serviceId,
-      }).select('_id name');
+      }).select('_id name schedule daysOff');
 
       itemsInput.push({
         serviceId: item.serviceId,
         duration: service.duration,
         requestedAttendantId: item.attendantId || null,
-        qualifiedAttendants: qualified.map(a => ({ _id: a._id.toString(), name: a.name })),
+        qualifiedAttendants: qualified.map(a => ({
+          _id: a._id.toString(),
+          name: a.name,
+          schedule: a.schedule,
+          daysOff: a.daysOff,
+        })),
       });
     }
 
@@ -168,23 +190,16 @@ export const getMultiAvailability = async (req: Request, res: Response) => {
       status: { $ne: 'cancelled' },
     });
 
-    let multiOptions = generateMultiServiceSlots(
+    const multiOptions = generateMultiServiceSlots(
       date,
       itemsInput,
       existingBookings,
-      req.tenant!.workingHours
+      req.tenant!.workingHours,
+      {
+        bookingRules: req.tenant!.bookingRules,
+        timezone: req.tenant!.timezone,
+      }
     );
-
-    const tz = req.tenant!.timezone || 'Africa/Nairobi';
-    const nowInTz = DateTime.now().setZone(tz);
-    const todayStr = nowInTz.toFormat('yyyy-MM-dd');
-
-    if (date < todayStr) {
-      multiOptions = [];
-    } else if (date === todayStr) {
-      const currentHm = nowInTz.toFormat('HH:mm');
-      multiOptions = multiOptions.filter(o => o.time > currentHm);
-    }
 
     const slots = multiOptions.map(o => o.time);
 
@@ -251,13 +266,18 @@ export const getMonthAvailability = async (req: Request, res: Response) => {
         tenantId,
         isActive: true,
         serviceIds: item.serviceId,
-      }).select('_id name');
+      }).select('_id name schedule daysOff');
 
       itemsInput.push({
         serviceId: item.serviceId,
         duration: service.duration,
         requestedAttendantId: item.attendantId || null,
-        qualifiedAttendants: qualified.map(a => ({ _id: a._id.toString(), name: a.name })),
+        qualifiedAttendants: qualified.map(a => ({
+          _id: a._id.toString(),
+          name: a.name,
+          schedule: a.schedule,
+          daysOff: a.daysOff,
+        })),
       });
     }
 
@@ -284,7 +304,6 @@ export const getMonthAvailability = async (req: Request, res: Response) => {
 
     const nowInTz = DateTime.now().setZone(tz);
     const todayStr = nowInTz.toFormat('yyyy-MM-dd');
-    const currentHm = nowInTz.toFormat('HH:mm');
 
     const counts: Record<string, number> = {};
 
@@ -296,14 +315,18 @@ export const getMonthAvailability = async (req: Request, res: Response) => {
       }
 
       const dayBookings = bookingsByDate[dayStr] || [];
-      const options = generateMultiServiceSlots(dayStr, itemsInput, dayBookings, workingHours);
+      const options = generateMultiServiceSlots(
+        dayStr,
+        itemsInput,
+        dayBookings,
+        workingHours,
+        {
+          bookingRules: req.tenant!.bookingRules,
+          timezone: tz,
+        }
+      );
 
-      let slotCount = options.length;
-      if (dayStr === todayStr) {
-        slotCount = options.filter(o => o.time > currentHm).length;
-      }
-
-      counts[dayStr] = slotCount;
+      counts[dayStr] = options.length;
     }
 
     res.json({ counts });

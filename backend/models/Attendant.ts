@@ -11,6 +11,20 @@ import mongoose, { Schema, Document } from 'mongoose';
  * - isActive:   Soft-delete flag; deactivated attendants are hidden from the booking flow
  * - serviceIds: ObjectIds of services this attendant is qualified to perform
  */
+export interface IAttendantBreak {
+  start: string; // HH:mm
+  end: string;   // HH:mm
+  label?: string;
+}
+
+export interface IAttendantDaySchedule {
+  dayOfWeek: number; // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  isWorkingDay: boolean;
+  start: string; // HH:mm
+  end: string;   // HH:mm
+  breaks?: IAttendantBreak[];
+}
+
 export interface IAttendant extends Document {
   tenantId: mongoose.Types.ObjectId;
   name: string;
@@ -18,6 +32,8 @@ export interface IAttendant extends Document {
   pinHash: string;
   isActive: boolean;
   serviceIds: mongoose.Types.ObjectId[];
+  schedule?: IAttendantDaySchedule[];
+  daysOff?: string[]; // Array of YYYY-MM-DD
   /** Number of consecutive failed login attempts (resets on success) */
   failedLoginAttempts: number;
   /** Account is locked until this date (null/undefined = not locked) */
@@ -43,6 +59,22 @@ const AttendantSchema: Schema = new Schema(
     pinHash: { type: String, required: true },
     isActive: { type: Boolean, default: true, index: true },
     serviceIds: [{ type: Schema.Types.ObjectId, ref: 'Service' }],
+    schedule: [
+      {
+        dayOfWeek: { type: Number, min: 0, max: 6 },
+        isWorkingDay: { type: Boolean, default: true },
+        start: { type: String, default: '09:00' },
+        end: { type: String, default: '18:00' },
+        breaks: [
+          {
+            start: { type: String, required: true },
+            end: { type: String, required: true },
+            label: { type: String, default: 'Break' },
+          },
+        ],
+      },
+    ],
+    daysOff: [{ type: String }],
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
   },
