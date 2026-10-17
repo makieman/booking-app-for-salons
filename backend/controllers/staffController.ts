@@ -14,7 +14,10 @@ export const publicListAttendants = async (req: Request, res: Response) => {
     const filter: Record<string, unknown> = { tenantId: req.tenant!._id, isActive: true };
     if (serviceId) filter.serviceIds = serviceId as string;
 
-    const attendants = await Attendant.find(filter).select('_id name serviceIds');
+    let attendants = await Attendant.find(filter).select('_id name serviceIds');
+    if (serviceId && attendants.length === 0) {
+      attendants = await Attendant.find({ tenantId: req.tenant!._id, isActive: true }).select('_id name serviceIds');
+    }
     res.json(attendants);
   } catch (error) {
     console.error('[staffController] publicListAttendants:', error);
