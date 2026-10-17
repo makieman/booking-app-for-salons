@@ -42,6 +42,8 @@ interface AdminScheduleTabProps {
   onBookingCreated?: (newBooking: Booking) => void;
   triggerToast?: (msg: string, type?: 'success' | 'error') => void;
   loading?: boolean;
+  initialDate?: string | null;
+  initialBookingId?: string | null;
 }
 
 export type ScheduleScope = 'day' | 'week' | 'month';
@@ -55,6 +57,8 @@ export function AdminScheduleTab({
   onBookingCreated,
   triggerToast = () => {},
   loading = false,
+  initialDate,
+  initialBookingId,
 }: AdminScheduleTabProps) {
   const todayStr = getTodayDateString();
   const currentTime = getCurrentTimeString();
@@ -85,8 +89,8 @@ export function AdminScheduleTab({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [scopeDropdownOpen]);
 
-  // Selected date (defaults to today)
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  // Selected date (defaults to initialDate or today)
+  const [selectedDate, setSelectedDate] = useState<string>(initialDate || todayStr);
 
   // Filter & Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +102,24 @@ export function AdminScheduleTab({
 
   // Walk-in / New Appointment Modal state
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  // Sync initial date from external search
+  useEffect(() => {
+    if (initialDate) {
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate]);
+
+  // Sync initial booking from external search
+  useEffect(() => {
+    if (initialBookingId) {
+      const match = bookings.find(b => b._id === initialBookingId);
+      if (match) {
+        setSelectedBooking(match);
+        if (match.date) setSelectedDate(match.date);
+      }
+    }
+  }, [initialBookingId, bookings]);
 
   // Date Navigation step logic depending on scope
   const handleShiftDate = (direction: -1 | 1) => {
@@ -166,6 +188,24 @@ export function AdminScheduleTab({
       return true;
     });
   }, [dateAppointments, statusFilter, selectedStylistId, searchQuery]);
+
+  // Matches across other dates when search query is active
+  const otherDateMatches = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
+    const cleanQ = q.replace(/[\s\-\+]/g, '');
+
+    return bookings.filter(b => {
+      if (b.date === selectedDate) return false;
+      const customerMatch = b.customerName?.toLowerCase().includes(q) || false;
+      const cleanPhone = (b.phone || '').replace(/[\s\-\+]/g, '');
+      const phoneMatch = cleanPhone.includes(cleanQ) || (b.phone || '').toLowerCase().includes(q);
+      const refMatch = b.reference?.toLowerCase().includes(q) || false;
+      const svcObj = typeof b.serviceId === 'object' ? (b.serviceId as Service) : null;
+      const serviceMatch = svcObj?.name?.toLowerCase().includes(q) || false;
+      return customerMatch || phoneMatch || refMatch || serviceMatch;
+    });
+  }, [bookings, selectedDate, searchQuery]);
 
   // Metrics for date bar
   const confirmedCount = dateAppointments.filter(b => b.status === 'confirmed').length;
@@ -679,21 +719,91 @@ export function AdminScheduleTab({
             /* Day Layout: Responsive Ledger (Mobile Cards on small screens, Data Table on desktop) */
             <div className="bg-white border border-brand-gray-200 rounded-2xl shadow-xs overflow-hidden">
               {filteredAppointments.length === 0 ? (
-                <div className="p-12 text-center text-brand-gray-400 space-y-2">
-                  <p className="font-serif italic text-base">No appointments found matching current filters.</p>
+                <div className="p-8 sm:p-12 text-center text-brand-gray-400 space-y-4">
+                  <p className="font-serif italic text-base text-brand-black">
+                    {searchQuery.trim()
+                      ? `No appointments on ${formatDisplayDate(selectedDate)} matching "${searchQuery}".`
+                      : 'No appointments found matching current filters.'}
+                  </p>
+
+                  {otherDateMatches.length > 0 && (
+                    <div className="max-w-xl mx-auto pt-2 space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-brand-black">
+                        Found {otherDateMatches.length} matching appointment(s) on other dates:
+                      </p>
+                      <div className="space-y-1.5 text-left">
+                        {otherDateMatches.slice(0, 6).map(b => (
+                          <button
+                            key={b._id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedDate(b.date);
+                              setSelectedBooking(b);
+                            }}
+                            className="w-full p-3 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200 rounded-xl flex items-center justify-between text-xs transition-colors cursor-pointer group shadow-2xs"
+                          >
+                            <div className="flex items-center gap-2.5 truncate">
+                              <span className="font-bold text-brand-black group-hover:underline truncate">
+                                {b.customerName}
+                              </span>
+                              {b.reference && (
+                                <span className="text-[10px] font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-brand-gray-200 shrink-0">
+                                  {b.reference}
+                                </span>
+                              )}
+                              <span className="text-brand-gray-500 font-mono text-[11px] shrink-0">
+                                {b.phone}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-semibold text-brand-black">
+                                {formatDisplayDate(b.date)} at {b.startTime}
+                              </span>
+                              <span className="text-[10px] font-bold text-brand-black underline">
+                                Jump to date →
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => {
                       setStatusFilter('all');
                       setSelectedStylistId('all');
                       setSearchQuery('');
                     }}
-                    className="text-xs font-bold text-brand-black hover:underline"
+                    className="text-xs font-bold text-brand-black hover:underline cursor-pointer block mx-auto pt-1"
                   >
                     Reset filters
                   </button>
                 </div>
               ) : (
                 <>
+                  {otherDateMatches.length > 0 && (
+                    <div className="px-4 py-2 bg-brand-gray-50 border-b border-brand-gray-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className="text-brand-gray-600">
+                        Also found <strong>{otherDateMatches.length}</strong> matching appointment(s) on other dates:
+                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {otherDateMatches.slice(0, 3).map(b => (
+                          <button
+                            key={b._id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedDate(b.date);
+                              setSelectedBooking(b);
+                            }}
+                            className="text-[11px] font-bold text-brand-black underline hover:text-brand-gray-700 cursor-pointer"
+                          >
+                            {b.customerName} ({formatDisplayDate(b.date)}) →
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {/* ── Mobile Responsive Cards (<768px) — Clean, Zero Squeeze ── */}
                   <div className="md:hidden divide-y divide-brand-gray-100">
                     {filteredAppointments.map(b => {
