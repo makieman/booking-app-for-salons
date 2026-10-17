@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Bell, BellOff, Volume2, Loader2, Check, AlertCircle, Save, Clock, Calendar, Plus, Trash2, X } from 'lucide-react';
+import { Upload, Bell, BellOff, Volume2, Loader2, Check, AlertCircle, Save } from 'lucide-react';
 import { Tenant } from '../../types';
 import * as api from '../../api/client';
 import { useAdminPushNotifications } from '../../hooks/useAdminPushNotifications';
 import { playNotificationSound } from '../../utils/notificationSound';
+import { ScheduleSettings } from './ScheduleSettings';
 
 interface AdminSettingsTabProps {
   tenant: Tenant | null;
@@ -32,17 +33,6 @@ export function AdminSettingsTab({
   const [supportPhone, setSupportPhone] = useState(tenant?.supportPhone || '');
   const [supportEmail, setSupportEmail] = useState(tenant?.supportEmail || '');
 
-  // Operating Hours & Booking Rules state
-  const [workingHoursStart, setWorkingHoursStart] = useState(tenant?.workingHours?.start || '09:00');
-  const [workingHoursEnd, setWorkingHoursEnd] = useState(tenant?.workingHours?.end || '18:00');
-  const [slotInterval, setSlotInterval] = useState<number>(tenant?.bookingRules?.slotInterval || 30);
-  const [bufferMinutes, setBufferMinutes] = useState<number>(tenant?.bookingRules?.bufferMinutes || 0);
-  const [minNoticeHours, setMinNoticeHours] = useState<number>(
-    tenant?.bookingRules?.minNoticeHours !== undefined ? tenant.bookingRules.minNoticeHours : 2
-  );
-  const [holidays, setHolidays] = useState<string[]>(tenant?.bookingRules?.holidays || []);
-  const [newHoliday, setNewHoliday] = useState('');
-
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [faviconFile, setFaviconFile] = useState<File | null>(null);
 
@@ -64,31 +54,8 @@ export function AdminSettingsTab({
       setMpesaPaybillNumber(tenant.mpesaPaybillNumber || '');
       setSupportPhone(tenant.supportPhone || '');
       setSupportEmail(tenant.supportEmail || '');
-      setWorkingHoursStart(tenant.workingHours?.start || '09:00');
-      setWorkingHoursEnd(tenant.workingHours?.end || '18:00');
-      setSlotInterval(tenant.bookingRules?.slotInterval || 30);
-      setBufferMinutes(tenant.bookingRules?.bufferMinutes || 0);
-      setMinNoticeHours(
-        tenant.bookingRules?.minNoticeHours !== undefined ? tenant.bookingRules.minNoticeHours : 2
-      );
-      setHolidays(tenant.bookingRules?.holidays || []);
     }
   }, [tenant]);
-
-  const handleAddHoliday = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newHoliday) return;
-    if (holidays.includes(newHoliday)) {
-      triggerToast('Holiday date already added', 'error');
-      return;
-    }
-    setHolidays(prev => [...prev, newHoliday].sort());
-    setNewHoliday('');
-  };
-
-  const handleRemoveHoliday = (dateStr: string) => {
-    setHolidays(prev => prev.filter(d => d !== dateStr));
-  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,16 +64,6 @@ export function AdminSettingsTab({
     try {
       const updated = await api.updateTenantSettings(ownerToken, {
         name: name.trim(),
-        workingHours: {
-          start: workingHoursStart,
-          end: workingHoursEnd,
-        },
-        bookingRules: {
-          slotInterval: Number(slotInterval),
-          bufferMinutes: Number(bufferMinutes),
-          minNoticeHours: Number(minNoticeHours),
-          holidays,
-        },
         branding: {
           primaryColor,
           emailFromName: emailFromName.trim(),
@@ -261,142 +218,14 @@ export function AdminSettingsTab({
               </div>
             </div>
 
-            {/* Operating Hours & Booking Engine Rules Card */}
-            <div className="p-6 bg-white border border-brand-gray-200 rounded-2xl shadow-xs space-y-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-brand-gray-500 border-b border-brand-gray-100 pb-2">
-                Operating Hours & Booking Engine Rules
-              </p>
+            {/* Dedicated Schedule Settings Section */}
+            <ScheduleSettings
+              tenant={tenant}
+              ownerToken={ownerToken}
+              onTenantUpdated={onTenantUpdated}
+              triggerToast={triggerToast}
+            />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Salon Working Hours */}
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 flex items-center gap-1.5">
-                    <Clock size={12} className="text-brand-gray-400" />
-                    <span>Salon Default Operating Hours</span>
-                  </label>
-                  <div className="flex items-center gap-2 max-w-sm">
-                    <input
-                      type="time"
-                      value={workingHoursStart}
-                      onChange={e => setWorkingHoursStart(e.target.value)}
-                      className="w-full border border-brand-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-brand-black focus:outline-none"
-                    />
-                    <span className="text-xs font-bold text-brand-gray-400">to</span>
-                    <input
-                      type="time"
-                      value={workingHoursEnd}
-                      onChange={e => setWorkingHoursEnd(e.target.value)}
-                      className="w-full border border-brand-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-brand-black focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Slot Interval */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">
-                    Slot Step Interval
-                  </label>
-                  <select
-                    value={slotInterval}
-                    onChange={e => setSlotInterval(Number(e.target.value))}
-                    className="w-full border border-brand-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-brand-black focus:outline-none bg-white cursor-pointer"
-                  >
-                    <option value={15}>15 Minutes</option>
-                    <option value={30}>30 Minutes (Standard)</option>
-                    <option value={45}>45 Minutes</option>
-                    <option value={60}>60 Minutes (Hourly)</option>
-                  </select>
-                  <p className="text-[11px] text-brand-gray-400">Frequency of selectable booking start times</p>
-                </div>
-
-                {/* Buffer Time */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">
-                    Buffer Time Between Appointments
-                  </label>
-                  <select
-                    value={bufferMinutes}
-                    onChange={e => setBufferMinutes(Number(e.target.value))}
-                    className="w-full border border-brand-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-brand-black focus:outline-none bg-white cursor-pointer"
-                  >
-                    <option value={0}>No Buffer (0 min)</option>
-                    <option value={5}>5 Minutes</option>
-                    <option value={10}>10 Minutes</option>
-                    <option value={15}>15 Minutes (Prep/Clean)</option>
-                    <option value={30}>30 Minutes</option>
-                  </select>
-                  <p className="text-[11px] text-brand-gray-400">Rest or sanitation buffer automatically held between clients</p>
-                </div>
-
-                {/* Minimum Notice */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">
-                    Minimum Advance Notice
-                  </label>
-                  <select
-                    value={minNoticeHours}
-                    onChange={e => setMinNoticeHours(Number(e.target.value))}
-                    className="w-full border border-brand-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-brand-black focus:outline-none bg-white cursor-pointer"
-                  >
-                    <option value={0}>Instant / No Notice (0 hrs)</option>
-                    <option value={1}>1 Hour Advance Notice</option>
-                    <option value={2}>2 Hours Advance Notice (Default)</option>
-                    <option value={4}>4 Hours Advance Notice</option>
-                    <option value={12}>12 Hours Advance Notice</option>
-                    <option value={24}>24 Hours Advance Notice</option>
-                  </select>
-                  <p className="text-[11px] text-brand-gray-400">Prevent last-minute bookings without enough prep time</p>
-                </div>
-
-                {/* Salon Closed Dates & Holidays */}
-                <div className="space-y-2 sm:col-span-2 pt-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 flex items-center gap-1.5">
-                    <Calendar size={12} className="text-brand-gray-400" />
-                    <span>Salon Closed Dates & Holidays</span>
-                  </label>
-                  <div className="flex items-center gap-2 max-w-md">
-                    <input
-                      type="date"
-                      value={newHoliday}
-                      onChange={e => setNewHoliday(e.target.value)}
-                      className="border border-brand-gray-200 rounded-xl px-3 py-2 text-xs font-semibold focus:border-brand-black focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddHoliday}
-                      disabled={!newHoliday}
-                      className="px-3.5 py-2 bg-brand-black hover:bg-brand-gray-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all disabled:opacity-40 flex items-center gap-1.5"
-                    >
-                      <Plus size={13} />
-                      <span>Add Date</span>
-                    </button>
-                  </div>
-
-                  {holidays.length === 0 ? (
-                    <p className="text-xs text-brand-gray-400 italic">No closed dates scheduled. Salon is open year-round.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {holidays.map(dateStr => (
-                        <div
-                          key={dateStr}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-bold"
-                        >
-                          <span>{dateStr}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveHoliday(dateStr)}
-                            className="p-0.5 hover:bg-red-200/60 rounded-md transition-all text-red-700"
-                            title="Remove holiday"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
 
             {/* Payments & Regional Card */}
             <div className="p-6 bg-white border border-brand-gray-200 rounded-2xl shadow-xs space-y-4">

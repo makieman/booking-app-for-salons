@@ -23,6 +23,8 @@ export interface ITenantBookingRules {
   bufferMinutes: number; // default: 0
   minNoticeHours: number; // default: 2
   holidays?: string[]; // Array of YYYY-MM-DD
+  closedWeekdays?: number[]; // 0=Sun ... 6=Sat
+  breaks?: Array<{ label: string; start: string; end: string }>;
 }
 
 export interface ITenant extends Document {
@@ -107,10 +109,18 @@ const TenantSchema: Schema = new Schema(
       end:   { type: String, default: '18:00' },
     },
     bookingRules: {
-      slotInterval:   { type: Number, default: 30 },
-      bufferMinutes:  { type: Number, default: 0 },
-      minNoticeHours: { type: Number, default: 2 },
-      holidays:       [{ type: String }],
+      slotInterval:     { type: Number, default: 30 },
+      bufferMinutes:    { type: Number, default: 0 },
+      minNoticeHours:   { type: Number, default: 2 },
+      holidays:         [{ type: String }],
+      closedWeekdays:   [{ type: Number }],
+      breaks: [
+        {
+          label: { type: String, default: 'Break' },
+          start: { type: String, required: true },
+          end:   { type: String, required: true },
+        },
+      ],
     },
     branding: {
       logoUrl:      { type: String },

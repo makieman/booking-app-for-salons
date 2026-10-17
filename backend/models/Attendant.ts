@@ -25,6 +25,14 @@ export interface IAttendantDaySchedule {
   breaks?: IAttendantBreak[];
 }
 
+export interface ITimeOffEntry {
+  date: string;       // YYYY-MM-DD
+  allDay: boolean;
+  startTime?: string; // HH:mm — only when allDay is false
+  endTime?: string;   // HH:mm — only when allDay is false
+  note?: string;
+}
+
 export interface IAttendant extends Document {
   tenantId: mongoose.Types.ObjectId;
   name: string;
@@ -34,6 +42,7 @@ export interface IAttendant extends Document {
   serviceIds: mongoose.Types.ObjectId[];
   schedule?: IAttendantDaySchedule[];
   daysOff?: string[]; // Array of YYYY-MM-DD
+  timeOff?: ITimeOffEntry[]; // Structured time-off entries
   /** Number of consecutive failed login attempts (resets on success) */
   failedLoginAttempts: number;
   /** Account is locked until this date (null/undefined = not locked) */
@@ -75,6 +84,15 @@ const AttendantSchema: Schema = new Schema(
       },
     ],
     daysOff: [{ type: String }],
+    timeOff: [
+      {
+        date:      { type: String, required: true },
+        allDay:    { type: Boolean, default: true },
+        startTime: { type: String },
+        endTime:   { type: String },
+        note:      { type: String },
+      },
+    ],
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
   },
