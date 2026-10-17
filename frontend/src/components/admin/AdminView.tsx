@@ -318,8 +318,11 @@ export function AdminView({
       {activeTab === 'services' && (
         <AdminServicesTab
           services={services}
+          attendants={attendants}
+          ownerPin={ownerPin}
           loading={loadingServices}
           onServicesUpdated={setServices}
+          onAttendantsUpdated={setAttendants}
           triggerToast={triggerToast}
         />
       )}
