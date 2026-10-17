@@ -7,7 +7,7 @@ import Service from '../models/Service';
  */
 export const createService = async (req: Request, res: Response) => {
   try {
-    const { name, duration, price, priceMax, description } = req.body;
+    const { name, duration, price, priceMax, description, bufferAfterMinutes } = req.body;
     if (!name || !duration || price === undefined) {
       return res.status(400).json({ error: 'name, duration, and price are required' });
     }
@@ -18,6 +18,7 @@ export const createService = async (req: Request, res: Response) => {
       price: Number(price),
       priceMax: priceMax !== undefined && priceMax !== null ? Number(priceMax) : undefined,
       description,
+      bufferAfterMinutes: bufferAfterMinutes !== undefined ? Number(bufferAfterMinutes) : 0,
     });
     await newService.save();
     res.status(201).json(newService);
@@ -46,7 +47,7 @@ export const getServices = async (req: Request, res: Response) => {
 export const updateService = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, duration, price, priceMax, description } = req.body;
+    const { name, duration, price, priceMax, description, bufferAfterMinutes } = req.body;
 
     const updates: Record<string, any> = {};
     if (name !== undefined) updates.name = name;
@@ -56,6 +57,9 @@ export const updateService = async (req: Request, res: Response) => {
       updates.priceMax = priceMax !== null && priceMax !== '' ? Number(priceMax) : null;
     }
     if (description !== undefined) updates.description = description;
+    if (bufferAfterMinutes !== undefined) {
+      updates.bufferAfterMinutes = bufferAfterMinutes !== null ? Number(bufferAfterMinutes) : 0;
+    }
 
     // Scope to tenant — prevents cross-tenant updates
     const updated = await Service.findOneAndUpdate(

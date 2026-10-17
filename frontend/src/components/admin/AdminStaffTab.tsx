@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Users, UserPlus, Search, X, Check, Eye, EyeOff, Loader2, AlertCircle, Trash2, Key, Calendar } from 'lucide-react';
+import { Users, UserPlus, Search, X, Check, Eye, EyeOff, Loader2, AlertCircle, Trash2, Key, Calendar, Clock } from 'lucide-react';
 import { Attendant, Service } from '../../types';
 import { formatPrice } from '../../utils/formatters';
 import * as api from '../../api/client';
 import { AdminStaffScheduleModal } from './AdminStaffScheduleModal';
+import { StylistTimeOffModal } from './StylistTimeOffModal';
 
 interface AdminStaffTabProps {
   attendants: Attendant[];
@@ -48,6 +49,8 @@ export function AdminStaffTab({
 
   // Staff Schedule & Availability modal state
   const [schedulingAttendant, setSchedulingAttendant] = useState<Attendant | null>(null);
+  // Time Off modal state
+  const [timeOffAttendant, setTimeOffAttendant] = useState<Attendant | null>(null);
 
   // Handle Add Staff
   const handleAddStaff = async (e: React.FormEvent) => {
@@ -359,6 +362,15 @@ export function AdminStaffTab({
                       </button>
                       <button
                         type="button"
+                        onClick={() => setTimeOffAttendant(a)}
+                        className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-brand-gray-200 text-brand-black hover:border-brand-black bg-brand-gray-50/60 hover:bg-brand-gray-100 rounded-lg transition-all flex items-center gap-1.5"
+                        title="Manage time off and unavailable dates"
+                      >
+                        <Clock size={12} className="text-brand-black" />
+                        <span>Time off</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => {
                           setEditingAttendantId(a._id);
                           const currentIds = (a.serviceIds || []).map((s: any) =>
@@ -561,6 +573,20 @@ export function AdminStaffTab({
           onSaved={updated => {
             onAttendantsUpdated(attendants.map(a => (a._id === updated._id ? updated : a)));
             setSchedulingAttendant(null);
+          }}
+          triggerToast={triggerToast}
+        />
+      )}
+
+      {timeOffAttendant && (
+        <StylistTimeOffModal
+          isOpen={!!timeOffAttendant}
+          onClose={() => setTimeOffAttendant(null)}
+          attendant={timeOffAttendant}
+          ownerPin={ownerPin}
+          onSaved={updated => {
+            onAttendantsUpdated(attendants.map(a => (a._id === updated._id ? updated : a)));
+            setTimeOffAttendant(null);
           }}
           triggerToast={triggerToast}
         />

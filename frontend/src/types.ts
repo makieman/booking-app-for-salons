@@ -15,6 +15,8 @@ export interface Service {
   priceMax?: number;  // optional upper bound — set to show a range (e.g. KES 2,000 – 5,000)
   description: string;
   image: string;
+  /** Minutes of rest/cleanup held after this service before the next slot opens */
+  bufferAfterMinutes?: number;
 }
 
 export interface AttendantBreak {
@@ -31,6 +33,15 @@ export interface AttendantDaySchedule {
   breaks?: AttendantBreak[];
 }
 
+/** A single time-off entry for a stylist — whole day or a time range */
+export interface TimeOffEntry {
+  date: string;        // YYYY-MM-DD
+  allDay: boolean;
+  startTime?: string;  // HH:mm — only when allDay is false
+  endTime?: string;    // HH:mm — only when allDay is false
+  note?: string;
+}
+
 /** A staff member who performs services */
 export interface Attendant {
   _id: string;
@@ -41,7 +52,8 @@ export interface Attendant {
   username?: string;
   isActive?: boolean;
   schedule?: AttendantDaySchedule[];
-  daysOff?: string[]; // Array of YYYY-MM-DD
+  daysOff?: string[]; // Array of YYYY-MM-DD (kept for backward-compat)
+  timeOff?: TimeOffEntry[]; // Structured time-off entries
 }
 
 export interface TimeSlot {
@@ -107,11 +119,19 @@ export interface AttendantSession {
   token: string;
 }
 
+export interface TenantScheduleBreak {
+  label: string;      // e.g. "Lunch", "Staff meeting"
+  start: string;      // HH:mm
+  end: string;        // HH:mm
+}
+
 export interface TenantBookingRules {
   slotInterval: number; // 15 | 30 | 45 | 60 (default: 30)
   bufferMinutes: number; // default: 0
   minNoticeHours: number; // default: 2
   holidays?: string[]; // Array of YYYY-MM-DD
+  closedWeekdays?: number[]; // 0=Sun … 6=Sat
+  breaks?: TenantScheduleBreak[];
 }
 
 export interface Tenant {

@@ -19,6 +19,8 @@ export interface IService extends Document {
   priceMax?: number; // optional upper bound for price-range display
   description?: string;
   image?: string;
+  /** Minutes of rest/cleanup held *after* this service before the next slot */
+  bufferAfterMinutes?: number;
 }
 
 const ServiceSchema: Schema = new Schema({
@@ -29,6 +31,7 @@ const ServiceSchema: Schema = new Schema({
   priceMax: { type: Number }, // optional — omit for fixed price, set for a range
   description: { type: String },
   image: { type: String },
+  bufferAfterMinutes: { type: Number, default: 0 }, // per-service rest/cleanup buffer
 });
 
 export default mongoose.model<IService>('Service', ServiceSchema);
