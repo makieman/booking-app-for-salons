@@ -74,11 +74,20 @@ export const getAnyAvailability = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Service not found' });
     }
 
-    const attendants = await Attendant.find({
+    let attendants = await Attendant.find({
       tenantId,
       isActive: true,
       serviceIds: serviceId as string,
-    }).select('_id name schedule daysOff');
+    }).select('_id name schedule daysOff timeOff');
+
+    // If no attendants are specifically assigned to this service yet,
+    // fallback to all active salon attendants so the service is immediately bookable
+    if (attendants.length === 0) {
+      attendants = await Attendant.find({
+        tenantId,
+        isActive: true,
+      }).select('_id name schedule daysOff timeOff');
+    }
 
     if (attendants.length === 0) {
       return res.json({ slots: [], attendantSlots: [] });
@@ -164,11 +173,20 @@ export const getMultiAvailability = async (req: Request, res: Response) => {
       }
 
       // Fetch all active qualified attendants for this service with schedules & days off
-      const qualified = await Attendant.find({
+      let qualified = await Attendant.find({
         tenantId,
         isActive: true,
         serviceIds: item.serviceId,
-      }).select('_id name schedule daysOff');
+      }).select('_id name schedule daysOff timeOff');
+
+      // If no attendants are specifically assigned to this service yet,
+      // fallback to all active salon attendants so the service is immediately bookable
+      if (qualified.length === 0) {
+        qualified = await Attendant.find({
+          tenantId,
+          isActive: true,
+        }).select('_id name schedule daysOff timeOff');
+      }
 
       itemsInput.push({
         serviceId: item.serviceId,
@@ -179,6 +197,7 @@ export const getMultiAvailability = async (req: Request, res: Response) => {
           name: a.name,
           schedule: a.schedule,
           daysOff: a.daysOff,
+          timeOff: a.timeOff,
         })),
       });
     }
