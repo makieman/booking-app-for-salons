@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Scissors, Check, Loader2, AlertCircle } from 'lucide-react';
-import { Service } from '../../types';
+import { Plus, Scissors, Check, Loader2, AlertCircle, Users } from 'lucide-react';
+import { Service, Attendant } from '../../types';
 import { formatPrice } from '../../utils/formatters';
 import * as api from '../../api/client';
 
@@ -9,6 +9,9 @@ interface AdminServicesTabProps {
   loading: boolean;
   onServicesUpdated: (services: Service[]) => void;
   triggerToast: (msg: string, type?: 'success' | 'error') => void;
+  attendants?: Attendant[];
+  ownerPin?: string;
+  onAttendantsUpdated?: (attendants: Attendant[]) => void;
 }
 
 export function AdminServicesTab({
@@ -16,6 +19,9 @@ export function AdminServicesTab({
   loading,
   onServicesUpdated,
   triggerToast,
+  attendants,
+  ownerPin,
+  onAttendantsUpdated,
 }: AdminServicesTabProps) {
   // Edit prices & durations state: Record<serviceId, string>
   const [editPrices, setEditPrices] = useState<Record<string, string>>({});
@@ -35,6 +41,7 @@ export function AdminServicesTab({
   });
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [selectedAttendantIds, setSelectedAttendantIds] = useState<string[]>([]);
 
   // Handle saving an existing service's edits
   const handleServiceEdit = async (service: Service) => {
@@ -111,8 +118,33 @@ export function AdminServicesTab({
         bufferAfterMinutes: addForm.bufferAfterMinutes ? Number(addForm.bufferAfterMinutes) : 0,
       });
 
+      // If specific stylists were selected, update their service qualifications
+      if (selectedAttendantIds.length > 0 && ownerPin && onAttendantsUpdated && attendants) {
+        try {
+          const updatedAttendants = await Promise.all(
+            attendants.map(async a => {
+              if (selectedAttendantIds.includes(a._id)) {
+                const currentIds = (a.serviceIds || []).map((s: any) =>
+                  typeof s === 'object' ? s._id : s
+                );
+                if (!currentIds.includes(created._id)) {
+                  return await api.updateAttendant(ownerPin, a._id, {
+                    serviceIds: [...currentIds, created._id],
+                  });
+                }
+              }
+              return a;
+            })
+          );
+          onAttendantsUpdated(updatedAttendants);
+        } catch (attErr) {
+          console.error('Failed to link attendants to new service:', attErr);
+        }
+      }
+
       onServicesUpdated([...services, created]);
       setAddForm({ name: '', duration: '', price: '', priceMax: '', description: '', bufferAfterMinutes: '' });
+      setSelectedAttendantIds([]);
       triggerToast('New service created successfully!', 'success');
     } catch (err: any) {
       console.error(err);
@@ -177,6 +209,29 @@ export function AdminServicesTab({
                         {service.description && (
                           <p className="text-xs text-brand-gray-500 mt-1 line-clamp-1">{service.description}</p>
                         )}
+                        {attendants && attendants.length > 0 && (() => {
+                          const assigned = attendants.filter(a =>
+                            (a.serviceIds || []).some((s: any) => (typeof s === 'object' ? s._id : s) === service._id)
+                          );
+                          return (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                                  assigned.length > 0
+                                    ? 'bg-brand-gray-100 text-brand-gray-700'
+                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                }`}
+                              >
+                                <Users size={10} />
+                                <span>
+                                  {assigned.length > 0
+                                    ? `${assigned.length} stylist${assigned.length > 1 ? 's' : ''}: ${assigned.map(a => a.name).join(', ')}`
+                                    : 'All stylists (open default)'}
+                                </span>
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-3">
@@ -361,6 +416,59 @@ export function AdminServicesTab({
                 Minutes held after this service ends before the next booking can start (cleanup, reset, etc.).
               </p>
             </div>
+
+            {/* Stylist assignment selector */}
+            {attendants && attendants.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">
+                    Assign Stylists
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedAttendantIds.length === attendants.length) {
+                        setSelectedAttendantIds([]);
+                      } else {
+                        setSelectedAttendantIds(attendants.map(a => a._id));
+                      }
+                    }}
+                    className="text-[11px] font-bold text-brand-black hover:underline cursor-pointer"
+                  >
+                    {selectedAttendantIds.length === attendants.length ? 'Clear all' : 'Select all'}
+                  </button>
+                </div>
+                <div className="max-h-36 overflow-y-auto border border-brand-gray-200 rounded-xl p-2 bg-brand-gray-50/40 grid grid-cols-2 gap-1.5">
+                  {attendants.map(a => {
+                    const isSelected = selectedAttendantIds.includes(a._id);
+                    return (
+                      <button
+                        key={a._id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedAttendantIds(prev =>
+                            isSelected ? prev.filter(id => id !== a._id) : [...prev, a._id]
+                          )
+                        }
+                        className={`p-2 rounded-lg text-left text-xs font-medium border flex items-center justify-between transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-brand-black text-white border-brand-black'
+                            : 'bg-white border-brand-gray-200 text-brand-black hover:border-brand-gray-400'
+                        }`}
+                      >
+                        <span className="truncate pr-1">{a.name}</span>
+                        {isSelected && <Check size={12} className="shrink-0 text-white" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-brand-gray-400">
+                  {selectedAttendantIds.length === 0
+                    ? 'All active stylists will be qualified by default.'
+                    : `${selectedAttendantIds.length} stylist(s) selected.`}
+                </p>
+              </div>
+            )}
 
             <button
               type="submit"
