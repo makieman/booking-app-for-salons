@@ -1,7 +1,7 @@
 import { DateTime, Interval } from 'luxon';
 import { IBooking } from '../models/Booking';
 import { ITenantBookingRules } from '../models/Tenant';
-import { IAttendant, IAttendantDaySchedule, IAttendantBreak } from '../models/Attendant';
+import { IAttendant, IAttendantDaySchedule, IAttendantBreak, ITimeOffEntry } from '../models/Attendant';
 
 /**
  * Default working hours — used when no tenant-specific hours are supplied.
@@ -29,6 +29,7 @@ export interface MultiServiceItemInput {
     name: string;
     schedule?: IAttendantDaySchedule[];
     daysOff?: string[];
+    timeOff?: ITimeOffEntry[];
   }>;
 }
 
@@ -49,13 +50,13 @@ export interface MultiSlotOption {
 /**
  * Checks whether an attendant is available during a given interval on a specific date.
  * Takes into account:
- * - Specific attendant days off (daysOff: YYYY-MM-DD[])
+ * - Specific attendant days off (daysOff: YYYY-MM-DD[]) and structured timeOff entries
  * - Weekly working day schedule and shift hours
  * - Daily recurring breaks
  * - Existing bookings plus salon buffer time
  */
 export function isAttendantFree(
-  attendant: { _id: string; name: string; schedule?: IAttendantDaySchedule[]; daysOff?: string[] },
+  attendant: { _id: string; name: string; schedule?: IAttendantDaySchedule[]; daysOff?: string[]; timeOff?: ITimeOffEntry[] },
   interval: Interval,
   date: string,
   existingBookings: IBooking[],
@@ -63,9 +64,22 @@ export function isAttendantFree(
   timezone: string = 'Africa/Nairobi',
   defaultWorkingHours: { start: string; end: string } = DEFAULT_WORKING_HOURS
 ): boolean {
-  // 1. Days off
+  // 1. Days off & structured time off
   if (attendant.daysOff && attendant.daysOff.includes(date)) {
     return false;
+  }
+  if (attendant.timeOff && attendant.timeOff.length > 0) {
+    const isOff = attendant.timeOff.some(t => {
+      if (t.date !== date) return false;
+      if (t.allDay || (!t.startTime && !t.endTime)) return true;
+      if (t.startTime && t.endTime) {
+        const toStart = DateTime.fromISO(`${date}T${t.startTime}`, { zone: timezone });
+        const toEnd = DateTime.fromISO(`${date}T${t.endTime}`, { zone: timezone });
+        return interval.overlaps(Interval.fromDateTimes(toStart, toEnd));
+      }
+      return false;
+    });
+    if (isOff) return false;
   }
 
   // 2. Day of week schedule
@@ -149,15 +163,21 @@ export function generateAvailableSlots(
     return [];
   }
 
-  // 2. Check attendant days off
+  // 1b. Check salon closed weekdays
+  const dt = DateTime.fromISO(date, { zone: tz });
+  const dayOfWeek = dt.weekday === 7 ? 0 : dt.weekday;
+  if (bookingRules?.closedWeekdays && bookingRules.closedWeekdays.includes(dayOfWeek)) {
+    return [];
+  }
+
+  // 2. Check attendant days off & full-day timeOff
   const attendant = options?.attendant;
   if (attendant?.daysOff && attendant.daysOff.includes(date)) {
     return [];
   }
-
-  // 3. Day of week schedule
-  const dt = DateTime.fromISO(date, { zone: tz });
-  const dayOfWeek = dt.weekday === 7 ? 0 : dt.weekday;
+  if (attendant?.timeOff && attendant.timeOff.some(t => t.date === date && (t.allDay || (!t.startTime && !t.endTime)))) {
+    return [];
+  }
 
   let shiftStartStr = workingHours.start || DEFAULT_WORKING_HOURS.start;
   let shiftEndStr = workingHours.end || DEFAULT_WORKING_HOURS.end;
@@ -192,6 +212,7 @@ export function generateAvailableSlots(
     return [shiftStartStr];
   }
 
+  const salonBreaks = bookingRules?.breaks || [];
   const slots: string[] = [];
   let currentSlot = startOfDay;
 
@@ -206,13 +227,39 @@ export function generateAvailableSlots(
       continue;
     }
 
-    // Break rule
+    // Salon-wide breaks rule
+    const overlapsSalonBreak = salonBreaks.some(brk => {
+      const brkStart = DateTime.fromISO(`${date}T${brk.start}`, { zone: tz });
+      const brkEnd   = DateTime.fromISO(`${date}T${brk.end}`, { zone: tz });
+      return potentialInterval.overlaps(Interval.fromDateTimes(brkStart, brkEnd));
+    });
+    if (overlapsSalonBreak) {
+      currentSlot = currentSlot.plus({ minutes: slotInterval });
+      continue;
+    }
+
+    // Attendant shift breaks rule
     const overlapsBreak = breaks.some(brk => {
       const brkStart = DateTime.fromISO(`${date}T${brk.start}`, { zone: tz });
       const brkEnd   = DateTime.fromISO(`${date}T${brk.end}`, { zone: tz });
       return potentialInterval.overlaps(Interval.fromDateTimes(brkStart, brkEnd));
     });
     if (overlapsBreak) {
+      currentSlot = currentSlot.plus({ minutes: slotInterval });
+      continue;
+    }
+
+    // Attendant partial-day timeOff rule
+    const overlapsTimeOff = attendant?.timeOff?.some(t => {
+      if (t.date !== date || t.allDay) return false;
+      if (t.startTime && t.endTime) {
+        const toStart = DateTime.fromISO(`${date}T${t.startTime}`, { zone: tz });
+        const toEnd   = DateTime.fromISO(`${date}T${t.endTime}`, { zone: tz });
+        return potentialInterval.overlaps(Interval.fromDateTimes(toStart, toEnd));
+      }
+      return false;
+    });
+    if (overlapsTimeOff) {
       currentSlot = currentSlot.plus({ minutes: slotInterval });
       continue;
     }
@@ -262,6 +309,12 @@ export function generateMultiServiceSlots(
     return [];
   }
 
+  const dt = DateTime.fromISO(date, { zone: tz });
+  const dayOfWeek = dt.weekday === 7 ? 0 : dt.weekday;
+  if (bookingRules?.closedWeekdays && bookingRules.closedWeekdays.includes(dayOfWeek)) {
+    return [];
+  }
+
   const slotInterval = bookingRules?.slotInterval || 30;
   const bufferMinutes = bookingRules?.bufferMinutes || 0;
   const minNoticeHours = bookingRules?.minNoticeHours !== undefined ? bookingRules.minNoticeHours : 2;
@@ -273,11 +326,24 @@ export function generateMultiServiceSlots(
   const endOfDay   = DateTime.fromISO(`${date}T${workingHours.end}`, { zone: tz });
   const totalDuration = items.reduce((sum, item) => sum + item.duration, 0);
 
+  const salonBreaks = bookingRules?.breaks || [];
   const results: MultiSlotOption[] = [];
   let currentStart = startOfDay;
 
   while (currentStart.plus({ minutes: totalDuration }) <= endOfDay) {
     if (minAllowedDateTime && currentStart < minAllowedDateTime) {
+      currentStart = currentStart.plus({ minutes: slotInterval });
+      continue;
+    }
+
+    // Salon-wide breaks check
+    const appointmentInterval = Interval.fromDateTimes(currentStart, currentStart.plus({ minutes: totalDuration }));
+    const overlapsSalonBreak = salonBreaks.some(brk => {
+      const brkStart = DateTime.fromISO(`${date}T${brk.start}`, { zone: tz });
+      const brkEnd   = DateTime.fromISO(`${date}T${brk.end}`, { zone: tz });
+      return appointmentInterval.overlaps(Interval.fromDateTimes(brkStart, brkEnd));
+    });
+    if (overlapsSalonBreak) {
       currentStart = currentStart.plus({ minutes: slotInterval });
       continue;
     }

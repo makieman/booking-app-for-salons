@@ -102,13 +102,14 @@ import Booking from '../models/Booking';
 export const updateAttendant = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, serviceIds, isActive, pin, schedule, daysOff } = req.body as {
+    const { name, serviceIds, isActive, pin, schedule, daysOff, timeOff } = req.body as {
       name?: string;
       serviceIds?: string[];
       isActive?: boolean;
       pin?: string;
       schedule?: any[];
       daysOff?: string[];
+      timeOff?: any[];
     };
 
     const update: Record<string, unknown> = {};
@@ -117,6 +118,7 @@ export const updateAttendant = async (req: Request, res: Response) => {
     if (isActive !== undefined) update.isActive = isActive;
     if (schedule !== undefined) update.schedule = schedule;
     if (daysOff !== undefined) update.daysOff = daysOff;
+    if (timeOff !== undefined) update.timeOff = timeOff;
 
     if (pin !== undefined) {
       if (pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin)) {

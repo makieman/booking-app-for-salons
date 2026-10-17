@@ -21,6 +21,7 @@ export function AdminServicesTab({
   const [editPrices, setEditPrices] = useState<Record<string, string>>({});
   const [editPriceMaxes, setEditPriceMaxes] = useState<Record<string, string>>({});
   const [editDurations, setEditDurations] = useState<Record<string, string>>({});
+  const [editBuffers, setEditBuffers] = useState<Record<string, string>>({});
   const [savingPriceId, setSavingPriceId] = useState<string | null>(null);
 
   // New service form state
@@ -30,6 +31,7 @@ export function AdminServicesTab({
     price: '',
     priceMax: '',
     description: '',
+    bufferAfterMinutes: '',
   });
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -39,9 +41,11 @@ export function AdminServicesTab({
     const currentPrice = editPrices[service._id] ?? String(service.price);
     const currentPriceMax = editPriceMaxes[service._id] ?? (service.priceMax ? String(service.priceMax) : '');
     const currentDuration = editDurations[service._id] ?? String(service.duration);
+    const currentBuffer = editBuffers[service._id] ?? String(service.bufferAfterMinutes ?? 0);
 
     const newPrice = Number(currentPrice);
     const newDuration = Number(currentDuration);
+    const newBuffer = Number(currentBuffer);
 
     if (isNaN(newPrice) || newPrice <= 0) {
       triggerToast('Price must be a valid positive number', 'error');
@@ -49,6 +53,10 @@ export function AdminServicesTab({
     }
     if (isNaN(newDuration) || newDuration <= 0) {
       triggerToast('Duration must be a valid positive number', 'error');
+      return;
+    }
+    if (isNaN(newBuffer) || newBuffer < 0) {
+      triggerToast('Rest time cannot be negative', 'error');
       return;
     }
 
@@ -65,6 +73,7 @@ export function AdminServicesTab({
         price: newPrice,
         duration: newDuration,
         priceMax: newPriceMax,
+        bufferAfterMinutes: newBuffer,
       });
 
       onServicesUpdated(services.map(s => (s._id === service._id ? updated : s)));
@@ -82,6 +91,14 @@ export function AdminServicesTab({
     e.preventDefault();
     if (!addForm.name.trim() || !addForm.duration || !addForm.price) return;
 
+    if (addForm.bufferAfterMinutes) {
+      const buf = Number(addForm.bufferAfterMinutes);
+      if (isNaN(buf) || buf < 0) {
+        setAddError('Rest after service cannot be negative');
+        return;
+      }
+    }
+
     setAddLoading(true);
     setAddError(null);
     try {
@@ -91,10 +108,11 @@ export function AdminServicesTab({
         price: Number(addForm.price),
         priceMax: addForm.priceMax ? Number(addForm.priceMax) : undefined,
         description: addForm.description.trim() || undefined,
+        bufferAfterMinutes: addForm.bufferAfterMinutes ? Number(addForm.bufferAfterMinutes) : 0,
       });
 
       onServicesUpdated([...services, created]);
-      setAddForm({ name: '', duration: '', price: '', priceMax: '', description: '' });
+      setAddForm({ name: '', duration: '', price: '', priceMax: '', description: '', bufferAfterMinutes: '' });
       triggerToast('New service created successfully!', 'success');
     } catch (err: any) {
       console.error(err);
@@ -138,11 +156,13 @@ export function AdminServicesTab({
                 const currentPrice = editPrices[service._id] ?? String(service.price);
                 const currentPriceMax = editPriceMaxes[service._id] ?? (service.priceMax ? String(service.priceMax) : '');
                 const currentDuration = editDurations[service._id] ?? String(service.duration);
+                const currentBuffer = editBuffers[service._id] ?? String(service.bufferAfterMinutes ?? 0);
 
                 const isPriceDirty = currentPrice !== String(service.price);
                 const isPriceMaxDirty = currentPriceMax !== (service.priceMax ? String(service.priceMax) : '');
                 const isDurationDirty = currentDuration !== String(service.duration);
-                const isDirty = isPriceDirty || isPriceMaxDirty || isDurationDirty;
+                const isBufferDirty = currentBuffer !== String(service.bufferAfterMinutes ?? 0);
+                const isDirty = isPriceDirty || isPriceMaxDirty || isDurationDirty || isBufferDirty;
 
                 return (
                   <div
@@ -199,6 +219,22 @@ export function AdminServicesTab({
                             value={currentPriceMax}
                             onChange={e => setEditPriceMaxes(prev => ({ ...prev, [service._id]: e.target.value }))}
                             className="w-20 text-center font-bold font-mono text-sm border border-brand-gray-200 rounded-lg py-1 bg-brand-gray-50/50 focus:bg-white focus:border-brand-black focus:outline-none transition-colors"
+                          />
+                        </div>
+
+                        {/* Rest after (buffer) */}
+                        <div className="flex items-center gap-1.5" title="Minutes of rest or cleanup held after this service">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-brand-gray-400">
+                            Rest
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="120"
+                            placeholder="0"
+                            value={currentBuffer}
+                            onChange={e => setEditBuffers(prev => ({ ...prev, [service._id]: e.target.value }))}
+                            className="w-14 text-center font-bold font-mono text-sm border border-brand-gray-200 rounded-lg py-1 bg-brand-gray-50/50 focus:bg-white focus:border-brand-black focus:outline-none transition-colors"
                           />
                         </div>
 
@@ -306,6 +342,24 @@ export function AdminServicesTab({
                 onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))}
                 className="w-full border border-brand-gray-200 rounded-xl px-3 py-2 text-sm focus:border-brand-black focus:outline-none transition-colors resize-none"
               />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">
+                Rest after service (min) <span className="text-brand-gray-400 font-normal lowercase">(optional)</span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={120}
+                placeholder="0"
+                value={addForm.bufferAfterMinutes}
+                onChange={e => setAddForm(p => ({ ...p, bufferAfterMinutes: e.target.value }))}
+                className="w-full border border-brand-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-brand-black focus:outline-none transition-colors"
+              />
+              <p className="text-[11px] text-brand-gray-400">
+                Minutes held after this service ends before the next booking can start (cleanup, reset, etc.).
+              </p>
             </div>
 
             <button
