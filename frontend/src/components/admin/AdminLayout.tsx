@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   X,
   Loader2,
+  Search,
 } from 'lucide-react';
 import { Tenant } from '../../types';
 import { playNotificationSound } from '../../utils/notificationSound';
@@ -39,6 +40,7 @@ interface AdminLayoutProps {
   showPushBanner: boolean;
   onDismissPushBanner: () => void;
   onEnablePushFromBanner: () => void;
+  onOpenSearch?: () => void;
   children: React.ReactNode;
 }
 
@@ -53,6 +55,7 @@ export function AdminLayout({
   showPushBanner,
   onDismissPushBanner,
   onEnablePushFromBanner,
+  onOpenSearch,
   children,
 }: AdminLayoutProps) {
   const tabs: AdminTabConfig[] = [
@@ -87,6 +90,7 @@ export function AdminLayout({
               </span>
             </div>
           </div>
+
 
           {/* Navigation Items */}
           <nav className="space-y-1">
@@ -226,6 +230,16 @@ export function AdminLayout({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            {onOpenSearch && (
+              <button
+                type="button"
+                onClick={onOpenSearch}
+                title="Search Bookings"
+                className="p-2 text-brand-gray-600 hover:text-brand-black text-xs font-bold flex items-center gap-1 rounded-lg hover:bg-brand-gray-50 cursor-pointer"
+              >
+                <Search size={16} />
+              </button>
+            )}
             <button
               type="button"
               onClick={onBackToSalon}
