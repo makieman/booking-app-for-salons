@@ -18,6 +18,19 @@ import Tenant from '../models/Tenant';
  *  - GET  /api/health                (public health check)
  * Those exclusions are enforced in server.ts.
  */
+// ── In-Memory Tenant Cache (5 min TTL) ──────────────────────────────────
+// Avoids repeated ~300ms remote DB round-trips on every single HTTP request.
+const TENANT_CACHE_TTL_MS = 5 * 60 * 1000;
+const tenantCache = new Map<string, { tenant: any; expiresAt: number }>();
+
+export function invalidateTenantCache(slug?: string): void {
+  if (slug) {
+    tenantCache.delete(slug.toLowerCase().trim());
+  } else {
+    tenantCache.clear();
+  }
+}
+
 export async function resolveTenant(
   req: Request,
   res: Response,
@@ -30,13 +43,27 @@ export async function resolveTenant(
     return;
   }
 
+  const normalizedSlug = slug.toLowerCase().trim();
+
+  // Check in-memory cache first
+  const cached = tenantCache.get(normalizedSlug);
+  if (cached && cached.expiresAt > Date.now()) {
+    req.tenant = cached.tenant;
+    return next();
+  }
+
   try {
-    const tenant = await Tenant.findOne({ slug: slug.toLowerCase().trim(), isActive: true });
+    const tenant = await Tenant.findOne({ slug: normalizedSlug, isActive: true });
 
     if (!tenant) {
       res.status(404).json({ error: `Salon "${slug}" not found or is inactive` });
       return;
     }
+
+    tenantCache.set(normalizedSlug, {
+      tenant,
+      expiresAt: Date.now() + TENANT_CACHE_TTL_MS,
+    });
 
     req.tenant = tenant;
     next();

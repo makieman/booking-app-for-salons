@@ -24,18 +24,22 @@ cleanupOutdatedCaches();
 
 // ── SPA Navigation Route
 // Serve index.html for all navigation requests except /api routes.
-// This allows the app to work offline for already-visited routes.
-registerRoute(
-  new NavigationRoute(createHandlerBoundToURL('index.html'), {
-    denylist: [/^\/api/],
-  }),
-);
+// This allows the app to work offline for already-visited routes in production.
+// In development, Vite serves index.html dynamically and it is not precached.
+if (import.meta.env.PROD) {
+  registerRoute(
+    new NavigationRoute(createHandlerBoundToURL('index.html'), {
+      denylist: [/^\/api/],
+    }),
+  );
+}
 
 // ── Runtime Caching: Services API ────────────────────────────────────────────
-// NetworkFirst: try network, fall back to cache. Keeps data fresh when online.
+// StaleWhileRevalidate: serves cached services instantly (<20ms) while silently
+// revalidating in the background. On first visit, fetches from network.
 registerRoute(
   /^\/api\/services/i,
-  new NetworkFirst({
+  new StaleWhileRevalidate({
     cacheName: 'services-api-cache',
     plugins: [
       new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 86_400 }), // 24 h
