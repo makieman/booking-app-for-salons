@@ -111,7 +111,7 @@ const TenantSchema: Schema = new Schema(
     bookingRules: {
       slotInterval:     { type: Number, default: 30 },
       bufferMinutes:    { type: Number, default: 0 },
-      minNoticeHours:   { type: Number, default: 2 },
+      minNoticeHours:   { type: Number, default: 0 },
       holidays:         [{ type: String }],
       closedWeekdays:   [{ type: Number }],
       breaks: [

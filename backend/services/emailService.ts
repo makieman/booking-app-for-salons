@@ -10,7 +10,7 @@ import { ITenant } from '../models/Tenant';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ── Resend client (lazy initialised so missing key doesn't crash startup) ──────
+// ── Resend client (lazy initialised so missing key doesn't crash startup)
 let _resend: Resend | null = null;
 
 function getResend(): Resend {
@@ -22,7 +22,7 @@ function getResend(): Resend {
   return _resend;
 }
 
-// ── Config ───────────────────────────────────────────────────────────────────
+// ── Config
 const FROM = process.env.FROM_EMAIL ?? 'onboarding@resend.dev';
 
 // Supports multiple admin emails separated by commas
@@ -31,7 +31,7 @@ const ADMIN_EMAILS: string[] = (process.env.ADMIN_EMAIL ?? '')
   .map(e => e.trim())
   .filter(Boolean);
 
-// ── Template renderer ────────────────────────────────────────────────────────
+// ── Template renderer
 function renderTemplate(templateName: string, context: any): string {
   const templatePath = path.join(__dirname, '..', 'templates', `${templateName}.hbs`);
   const layoutPath = path.join(__dirname, '..', 'templates', 'layout.hbs');
@@ -46,7 +46,7 @@ function renderTemplate(templateName: string, context: any): string {
   return layout({ ...context, body: bodyHtml });
 }
 
-// ── Email send helper (non-throwing — logs errors, never crashes the request) ─
+// ── Email send helper (non-throwing — logs errors, never crashes the request)
 async function sendEmail(opts: {
   to: string | string[];
   subject: string;
@@ -123,7 +123,7 @@ export async function sendBookingRequestReceived(
 
   await sendEmail({
     to: booking.email,
-    subject: `📋 Booking Request Received — ${tenant.name}`,
+    subject: `Booking Request Received — ${tenant.name}`,
     html,
     from,
     replyTo,
@@ -236,7 +236,7 @@ export async function sendAdminNewBookingAlert(
 
   await sendEmail({
     to: ADMIN_EMAILS,
-    subject: `🔔 New Booking — ${booking.customerName} | ${service.name}`,
+    subject: `New Booking — ${booking.customerName} | ${service.name}`,
     html,
     from,
     replyTo,

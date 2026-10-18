@@ -104,7 +104,7 @@ export async function getServices() {
  * Creates a new service.
  * Endpoint: POST /api/services
  */
-export async function createService(data: { name: string; duration: number; price: number; priceMax?: number; description?: string; bufferAfterMinutes?: number }) {
+export async function createService(data: { name: string; duration: number; price: number; priceMax?: number; description?: string; bufferAfterMinutes?: number; canExceedClosingTime?: boolean; latestStartTime?: string }) {
   const res = await fetch(`${API_BASE}/services`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -338,7 +338,7 @@ export async function updateBookingStatus(
  * Admin: Update a service's details (name, duration, price, description).
  * Endpoint: PATCH /api/services/:id
  */
-export async function updateService(id: string, data: Partial<{ name: string; duration: number; price: number; priceMax: number | null; description: string; bufferAfterMinutes: number | null }>) {
+export async function updateService(id: string, data: Partial<{ name: string; duration: number; price: number; priceMax: number | null; description: string; bufferAfterMinutes: number | null; canExceedClosingTime: boolean; latestStartTime: string | null }>) {
   const res = await fetch(`${API_BASE}/services/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

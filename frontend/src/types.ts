@@ -17,6 +17,10 @@ export interface Service {
   image: string;
   /** Minutes of rest/cleanup held after this service before the next slot opens */
   bufferAfterMinutes?: number;
+  /** Whether service can end after salon closing time and stylist shift end */
+  canExceedClosingTime?: boolean;
+  /** Optional latest allowed start time (HH:mm) for long services */
+  latestStartTime?: string;
 }
 
 export interface AttendantBreak {

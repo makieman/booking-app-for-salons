@@ -45,6 +45,9 @@ export const getAvailability = async (req: Request, res: Response) => {
         bookingRules: req.tenant!.bookingRules,
         attendant,
         timezone: req.tenant!.timezone,
+        serviceBufferMinutes: service.bufferAfterMinutes,
+        canExceedClosingTime: service.canExceedClosingTime,
+        latestStartTime: service.latestStartTime,
       }
     );
 
@@ -109,6 +112,9 @@ export const getAnyAvailability = async (req: Request, res: Response) => {
             bookingRules: req.tenant!.bookingRules,
             attendant,
             timezone: req.tenant!.timezone,
+            serviceBufferMinutes: service.bufferAfterMinutes,
+            canExceedClosingTime: service.canExceedClosingTime,
+            latestStartTime: service.latestStartTime,
           }
         );
         return { attendantId: attendant._id.toString(), name: attendant.name, slots };
@@ -192,6 +198,9 @@ export const getMultiAvailability = async (req: Request, res: Response) => {
         serviceId: item.serviceId,
         duration: service.duration,
         requestedAttendantId: item.attendantId || null,
+        bufferAfterMinutes: service.bufferAfterMinutes,
+        canExceedClosingTime: service.canExceedClosingTime,
+        latestStartTime: service.latestStartTime,
         qualifiedAttendants: qualified.map(a => ({
           _id: a._id.toString(),
           name: a.name,
@@ -281,21 +290,34 @@ export const getMonthAvailability = async (req: Request, res: Response) => {
         if (!attendant) continue;
       }
 
-      const qualified = await Attendant.find({
+      let qualified = await Attendant.find({
         tenantId,
         isActive: true,
         serviceIds: item.serviceId,
-      }).select('_id name schedule daysOff');
+      }).select('_id name schedule daysOff timeOff');
+
+      // If no attendants are specifically assigned to this service yet,
+      // fallback to all active salon attendants so the service is immediately bookable
+      if (qualified.length === 0) {
+        qualified = await Attendant.find({
+          tenantId,
+          isActive: true,
+        }).select('_id name schedule daysOff timeOff');
+      }
 
       itemsInput.push({
         serviceId: item.serviceId,
         duration: service.duration,
         requestedAttendantId: item.attendantId || null,
+        bufferAfterMinutes: service.bufferAfterMinutes,
+        canExceedClosingTime: service.canExceedClosingTime,
+        latestStartTime: service.latestStartTime,
         qualifiedAttendants: qualified.map(a => ({
           _id: a._id.toString(),
           name: a.name,
           schedule: a.schedule,
           daysOff: a.daysOff,
+          timeOff: a.timeOff,
         })),
       });
     }

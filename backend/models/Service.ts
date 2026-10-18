@@ -9,7 +9,6 @@ import mongoose, { Schema, Document } from 'mongoose';
  * - price: Base/minimum price in KES
  * - priceMax: Optional maximum price in KES (used for price-range display, e.g. KES 2,000 – 5,000)
  * - description: Optional longer description
- * - image: Optional URL to a service image
  */
 export interface IService extends Document {
   tenantId: mongoose.Types.ObjectId;
@@ -21,6 +20,10 @@ export interface IService extends Document {
   image?: string;
   /** Minutes of rest/cleanup held *after* this service before the next slot */
   bufferAfterMinutes?: number;
+  /** Whether service can end after salon closing time and stylist shift end */
+  canExceedClosingTime?: boolean;
+  /** Optional latest allowed start time (HH:mm) for long services */
+  latestStartTime?: string;
 }
 
 const ServiceSchema: Schema = new Schema({
@@ -32,6 +35,8 @@ const ServiceSchema: Schema = new Schema({
   description: { type: String },
   image: { type: String },
   bufferAfterMinutes: { type: Number, default: 0 }, // per-service rest/cleanup buffer
+  canExceedClosingTime: { type: Boolean, default: false },
+  latestStartTime: { type: String },
 });
 
 export default mongoose.model<IService>('Service', ServiceSchema);
