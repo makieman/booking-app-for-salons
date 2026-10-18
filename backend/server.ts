@@ -257,5 +257,6 @@ async function startServer(): Promise<void> {
   });
 }
 
-startServer();
-// Backend restart trigger
+startServer().catch((err) => {
+  console.error('❌ Fatal error in startServer:', err);
+});
