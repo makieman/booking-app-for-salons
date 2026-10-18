@@ -445,15 +445,16 @@ export default function App() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // 1. Wait state: If tenant resolution is still in progress, wait.
-    if (tenantLoading) {
+    // If on generic multi-tenant selector or registration screen, skip service fetch
+    if (viewMode === 'select' || viewMode === 'register') {
+      setIsLoading(false);
       return () => {
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
       };
     }
 
-    // 2. Outage/Error handling: If tenant resolution failed with an error, fall back to mock data
+    // If tenant resolution failed with an error, fall back to mock data
     if (tenantError) {
       setServices(FALLBACK_SERVICES);
       setApiError('Unable to connect to server. Showing offline data.');
@@ -464,16 +465,17 @@ export default function App() {
       };
     }
 
-    // 3. Un-tenanted routes: If tenant is null and no error (e.g. /select or /register screen)
-    if (!tenant) {
-      setIsLoading(false);
+    // Parallel fetch: As long as we have a tenant slug (from URL, localStorage, or resolved tenant),
+    // start fetching services immediately without waiting for tenant details to finish loading.
+    const effectiveSlug = tenantSlug || tenant?.slug || api.getEffectiveTenantSlug();
+    if (!effectiveSlug) {
+      if (!tenantLoading) setIsLoading(false);
       return () => {
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
       };
     }
 
-    // 4. Active tenant resolved: proceed with live API fetches
     const fetchInitialData = async () => {
       try {
         setIsLoading(true);
@@ -499,7 +501,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [tenantLoading, tenant?._id, tenantError, isAdmin]);
+  }, [tenantSlug, tenant?._id, tenantError, isAdmin, viewMode]);
 
   // Fetch slots when date, services, or attendants change
   useEffect(() => {

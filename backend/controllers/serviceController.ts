@@ -7,7 +7,7 @@ import Service from '../models/Service';
  */
 export const createService = async (req: Request, res: Response) => {
   try {
-    const { name, duration, price, priceMax, description, bufferAfterMinutes } = req.body;
+    const { name, duration, price, priceMax, description, bufferAfterMinutes, canExceedClosingTime, latestStartTime } = req.body;
     if (!name || !duration || price === undefined) {
       return res.status(400).json({ error: 'name, duration, and price are required' });
     }
@@ -19,13 +19,28 @@ export const createService = async (req: Request, res: Response) => {
       priceMax: priceMax !== undefined && priceMax !== null ? Number(priceMax) : undefined,
       description,
       bufferAfterMinutes: bufferAfterMinutes !== undefined ? Number(bufferAfterMinutes) : 0,
+      canExceedClosingTime: canExceedClosingTime !== undefined ? Boolean(canExceedClosingTime) : false,
+      latestStartTime: latestStartTime || undefined,
     });
     await newService.save();
+    invalidateServicesCache(req.tenant!._id.toString());
     res.status(201).json(newService);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create service' });
   }
 };
+
+// ── In-Memory Services Cache ─────────────────────────────────────────────
+const SERVICES_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const servicesCache = new Map<string, { data: any[]; expiresAt: number }>();
+
+export function invalidateServicesCache(tenantId?: string): void {
+  if (tenantId) {
+    servicesCache.delete(tenantId);
+  } else {
+    servicesCache.clear();
+  }
+}
 
 /**
  * GET /api/services
@@ -33,7 +48,18 @@ export const createService = async (req: Request, res: Response) => {
  */
 export const getServices = async (req: Request, res: Response) => {
   try {
-    const services = await Service.find({ tenantId: req.tenant!._id });
+    const tenantIdStr = req.tenant!._id.toString();
+    const cached = servicesCache.get(tenantIdStr);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.json(cached.data);
+    }
+
+    const services = await Service.find({ tenantId: req.tenant!._id }).lean();
+    servicesCache.set(tenantIdStr, {
+      data: services,
+      expiresAt: Date.now() + SERVICES_CACHE_TTL_MS,
+    });
+
     res.json(services);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch services' });
@@ -47,7 +73,7 @@ export const getServices = async (req: Request, res: Response) => {
 export const updateService = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, duration, price, priceMax, description, bufferAfterMinutes } = req.body;
+    const { name, duration, price, priceMax, description, bufferAfterMinutes, canExceedClosingTime, latestStartTime } = req.body;
 
     const updates: Record<string, any> = {};
     if (name !== undefined) updates.name = name;
@@ -60,6 +86,12 @@ export const updateService = async (req: Request, res: Response) => {
     if (bufferAfterMinutes !== undefined) {
       updates.bufferAfterMinutes = bufferAfterMinutes !== null ? Number(bufferAfterMinutes) : 0;
     }
+    if (canExceedClosingTime !== undefined) {
+      updates.canExceedClosingTime = Boolean(canExceedClosingTime);
+    }
+    if (latestStartTime !== undefined) {
+      updates.latestStartTime = latestStartTime || null;
+    }
 
     // Scope to tenant — prevents cross-tenant updates
     const updated = await Service.findOneAndUpdate(
@@ -69,6 +101,7 @@ export const updateService = async (req: Request, res: Response) => {
     );
     if (!updated) return res.status(404).json({ error: 'Service not found' });
 
+    invalidateServicesCache(req.tenant!._id.toString());
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update service' });
