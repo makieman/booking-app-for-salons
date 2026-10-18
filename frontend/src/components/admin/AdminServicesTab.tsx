@@ -259,6 +259,16 @@ function StylistDropdownBadge({
   );
 }
 
+function formatDuration(minutes: number | string): string {
+  const mins = Number(minutes);
+  if (!mins || isNaN(mins) || mins <= 0) return '';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
 export function AdminServicesTab({
   services,
   loading,
@@ -273,6 +283,8 @@ export function AdminServicesTab({
   const [editPriceMaxes, setEditPriceMaxes] = useState<Record<string, string>>({});
   const [editDurations, setEditDurations] = useState<Record<string, string>>({});
   const [editBuffers, setEditBuffers] = useState<Record<string, string>>({});
+  const [editCanExceed, setEditCanExceed] = useState<Record<string, boolean>>({});
+  const [editLatestStarts, setEditLatestStarts] = useState<Record<string, string>>({});
   const [savingPriceId, setSavingPriceId] = useState<string | null>(null);
 
   // New service form state
@@ -283,6 +295,8 @@ export function AdminServicesTab({
     priceMax: '',
     description: '',
     bufferAfterMinutes: '',
+    canExceedClosingTime: false,
+    latestStartTime: '',
   });
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -295,6 +309,8 @@ export function AdminServicesTab({
     const currentPriceMax = editPriceMaxes[service._id] ?? (service.priceMax ? String(service.priceMax) : '');
     const currentDuration = editDurations[service._id] ?? String(service.duration);
     const currentBuffer = editBuffers[service._id] ?? String(service.bufferAfterMinutes ?? 0);
+    const currentCanExceed = editCanExceed[service._id] ?? (service.canExceedClosingTime || false);
+    const currentLatestStart = editLatestStarts[service._id] ?? (service.latestStartTime || '');
 
     const newPrice = Number(currentPrice);
     const newDuration = Number(currentDuration);
@@ -327,6 +343,8 @@ export function AdminServicesTab({
         duration: newDuration,
         priceMax: newPriceMax,
         bufferAfterMinutes: newBuffer,
+        canExceedClosingTime: currentCanExceed,
+        latestStartTime: currentLatestStart || null,
       });
 
       onServicesUpdated(services.map(s => (s._id === service._id ? updated : s)));
@@ -362,6 +380,8 @@ export function AdminServicesTab({
         priceMax: addForm.priceMax ? Number(addForm.priceMax) : undefined,
         description: addForm.description.trim() || undefined,
         bufferAfterMinutes: addForm.bufferAfterMinutes ? Number(addForm.bufferAfterMinutes) : 0,
+        canExceedClosingTime: addForm.canExceedClosingTime,
+        latestStartTime: addForm.latestStartTime || undefined,
       });
 
       // If specific stylists were selected, update their service qualifications
@@ -389,7 +409,16 @@ export function AdminServicesTab({
       }
 
       onServicesUpdated([...services, created]);
-      setAddForm({ name: '', duration: '', price: '', priceMax: '', description: '', bufferAfterMinutes: '' });
+      setAddForm({
+        name: '',
+        duration: '',
+        price: '',
+        priceMax: '',
+        description: '',
+        bufferAfterMinutes: '',
+        canExceedClosingTime: false,
+        latestStartTime: '',
+      });
       setSelectedAttendantIds([]);
       triggerToast('New service created successfully!', 'success');
     } catch (err: any) {
@@ -440,7 +469,11 @@ export function AdminServicesTab({
                 const isPriceMaxDirty = currentPriceMax !== (service.priceMax ? String(service.priceMax) : '');
                 const isDurationDirty = currentDuration !== String(service.duration);
                 const isBufferDirty = currentBuffer !== String(service.bufferAfterMinutes ?? 0);
-                const isDirty = isPriceDirty || isPriceMaxDirty || isDurationDirty || isBufferDirty;
+                const currentCanExceed = editCanExceed[service._id] ?? (service.canExceedClosingTime || false);
+                const currentLatestStart = editLatestStarts[service._id] ?? (service.latestStartTime || '');
+                const isCanExceedDirty = currentCanExceed !== (service.canExceedClosingTime || false);
+                const isLatestStartDirty = currentLatestStart !== (service.latestStartTime || '');
+                const isDirty = isPriceDirty || isPriceMaxDirty || isDurationDirty || isBufferDirty || isCanExceedDirty || isLatestStartDirty;
 
                 return (
                   <div
@@ -475,11 +508,16 @@ export function AdminServicesTab({
                           <input
                             type="number"
                             min="5"
-                            max="720"
+                            max="1440"
                             value={currentDuration}
                             onChange={e => setEditDurations(prev => ({ ...prev, [service._id]: e.target.value }))}
                             className="w-16 text-center font-bold font-mono text-sm border border-brand-gray-200 rounded-lg py-1 bg-brand-gray-50/50 focus:bg-white focus:border-brand-black focus:outline-none transition-colors"
                           />
+                          {formatDuration(currentDuration) && (
+                            <span className="text-[11px] text-brand-gray-500 font-semibold whitespace-nowrap">
+                              {formatDuration(currentDuration)}
+                            </span>
+                          )}
                         </div>
 
                         {/* Min Price */}
@@ -543,6 +581,33 @@ export function AdminServicesTab({
                         )}
                       </div>
                     </div>
+
+                    {/* Long service extension controls */}
+                    <div className="mt-3 pt-3 border-t border-brand-gray-100 flex flex-wrap items-center gap-4 text-xs">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={currentCanExceed}
+                          onChange={e => setEditCanExceed(prev => ({ ...prev, [service._id]: e.target.checked }))}
+                          className="rounded border-brand-gray-300 text-brand-black focus:ring-brand-black cursor-pointer"
+                        />
+                        <span className="font-semibold text-brand-gray-700">Can exceed closing time</span>
+                      </label>
+
+                      {currentCanExceed && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-brand-gray-400">
+                            Latest start time
+                          </span>
+                          <input
+                            type="time"
+                            value={currentLatestStart}
+                            onChange={e => setEditLatestStarts(prev => ({ ...prev, [service._id]: e.target.value }))}
+                            className="border border-brand-gray-200 rounded-lg px-2 py-1 text-xs font-mono font-semibold focus:border-brand-black focus:outline-none bg-brand-gray-50/50"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -581,7 +646,14 @@ export function AdminServicesTab({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">Duration (min)</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">Duration (min)</label>
+                  {formatDuration(addForm.duration) && (
+                    <span className="text-[11px] font-semibold text-brand-gray-500">
+                      {formatDuration(addForm.duration)}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
                   required
@@ -647,6 +719,39 @@ export function AdminServicesTab({
               <p className="text-[11px] text-brand-gray-400">
                 Minutes held after this service ends before the next booking can start (cleanup, reset, etc.).
               </p>
+            </div>
+
+            {/* Long service controls in Add Form */}
+            <div className="space-y-2 pt-2 border-t border-brand-gray-100">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={addForm.canExceedClosingTime}
+                  onChange={e => setAddForm(p => ({ ...p, canExceedClosingTime: e.target.checked }))}
+                  className="rounded border-brand-gray-300 text-brand-black focus:ring-brand-black cursor-pointer"
+                />
+                <span className="text-xs font-bold text-brand-gray-700">Can exceed closing time</span>
+              </label>
+              <p className="text-[11px] text-brand-gray-400">
+                Allows this service to start up to the cutoff time and finish after salon closing and stylist shift end (same calendar day before 24:00).
+              </p>
+
+              {addForm.canExceedClosingTime && (
+                <div className="space-y-1 pt-1">
+                  <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">
+                    Latest start time <span className="text-brand-gray-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={addForm.latestStartTime}
+                    onChange={e => setAddForm(p => ({ ...p, latestStartTime: e.target.value }))}
+                    className="w-full border border-brand-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-brand-black focus:outline-none transition-colors"
+                  />
+                  <p className="text-[11px] text-brand-gray-400">
+                    Latest appointment start time offered (defaults to salon closing time if unset).
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Stylist assignment dropdown / accordion */}

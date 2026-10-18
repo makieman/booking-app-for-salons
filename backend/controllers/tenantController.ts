@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Tenant from '../models/Tenant';
+import { invalidateTenantCache } from '../middleware/resolveTenant';
 
 export const getTenantSettings = async (req: Request, res: Response) => {
   try {
@@ -26,9 +27,9 @@ export const getPublicTenant = async (req: Request, res: Response) => {
       timezone: tenant.timezone,
       workingHours: tenant.workingHours,
       branding: {
-        logoUrl: tenant.branding.logoUrl,
-        faviconUrl: tenant.branding.faviconUrl,
-        primaryColor: tenant.branding.primaryColor,
+        logoUrl: tenant.branding?.logoUrl,
+        faviconUrl: tenant.branding?.faviconUrl,
+        primaryColor: tenant.branding?.primaryColor,
         supportPhone: tenant.supportPhone,
         supportEmail: tenant.supportEmail,
       },
@@ -94,6 +95,7 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
     }
 
     await tenant.save();
+    invalidateTenantCache(tenant.slug);
 
     const safeTenant = await Tenant.findById(tenant._id).select('-ownerPasswordHash');
     return res.json(safeTenant);
@@ -118,6 +120,7 @@ export const uploadLogo = async (req: Request, res: Response) => {
 
     tenant.branding.logoUrl = logoUrl;
     await tenant.save();
+    invalidateTenantCache(tenant.slug);
 
     return res.json({ success: true, logoUrl, branding: tenant.branding });
   } catch (error) {
@@ -141,6 +144,7 @@ export const uploadFavicon = async (req: Request, res: Response) => {
 
     tenant.branding.faviconUrl = faviconUrl;
     await tenant.save();
+    invalidateTenantCache(tenant.slug);
 
     return res.json({ success: true, faviconUrl, branding: tenant.branding });
   } catch (error) {

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import Booking from '../models/Booking';
 import Service from '../models/Service';
 import Attendant from '../models/Attendant';
-import { DateTime } from 'luxon';
+import { DateTime, Interval } from 'luxon';
 import {
   sendBookingRequestReceived,
   sendAdminNewBookingAlert,
@@ -13,7 +13,31 @@ import { sendPushToPhone, sendPushToAdmins, sendPushToAttendant } from '../servi
 import { sendWhatsAppBookingReceived, sendWhatsAppBookingCancelled, sendWhatsAppRescheduled } from '../services/whatsappService';
 
 import mongoose from 'mongoose';
-import { MAX_SERVICES } from '../services/slotService';
+import { MAX_SERVICES, isAttendantFree } from '../services/slotService';
+
+/**
+ * Generates a unique human-friendly booking reference (e.g. LMN-XXXXX) for a tenant.
+ */
+export async function generateUniqueBookingReference(tenantId: mongoose.Types.ObjectId | string): Promise<string> {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let isUnique = false;
+  let reference = '';
+  let attempts = 0;
+  while (!isUnique && attempts < 25) {
+    attempts++;
+    let result = 'LMN-';
+    for (let i = 0; i < 5; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+    const existing = await Booking.findOne({ tenantId, reference: result });
+    if (!existing) {
+      reference = result;
+      isUnique = true;
+    }
+  }
+  if (!reference) {
+    reference = `LMN-${Date.now().toString(36).toUpperCase().slice(-5)}`;
+  }
+  return reference;
+}
 
 /**
  * POST /api/bookings
@@ -33,6 +57,21 @@ export const createBooking = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'customerName, phone, date, and startTime are required' });
     }
 
+    const bookingRules = req.tenant?.bookingRules;
+    const tz = req.tenant?.timezone || 'Africa/Nairobi';
+
+    // Check salon holidays
+    if (bookingRules?.holidays && bookingRules.holidays.includes(date)) {
+      return res.status(400).json({ error: 'Salon is closed on this holiday' });
+    }
+
+    // Check salon closed weekdays
+    const dt = DateTime.fromISO(date, { zone: tz });
+    const dayOfWeek = dt.weekday === 7 ? 0 : dt.weekday;
+    if (bookingRules?.closedWeekdays && bookingRules.closedWeekdays.includes(dayOfWeek)) {
+      return res.status(400).json({ error: 'Salon is closed on this day' });
+    }
+
     // Determine segments: either multi-item `items` or single `serviceId` / `attendantId`
     let rawItems: Array<{ serviceId: string; attendantId?: string | null }> = [];
     if (Array.isArray(req.body.items) && req.body.items.length > 0) {
@@ -48,15 +87,7 @@ export const createBooking = async (req: Request, res: Response) => {
     }
 
     // Generate unique reference for this booking group within the tenant
-    let reference = '';
-    let isUnique = false;
-    while (!isUnique) {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let result = 'LMN-';
-      for (let i = 0; i < 5; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-      const existing = await Booking.findOne({ tenantId, reference: result });
-      if (!existing) { reference = result; isUnique = true; }
-    }
+    const reference = await generateUniqueBookingReference(tenantId);
 
     const groupId = rawItems.length > 1
       ? `grp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
@@ -69,7 +100,7 @@ export const createBooking = async (req: Request, res: Response) => {
       status: { $ne: 'cancelled' },
     });
 
-    let currentCursor = DateTime.fromISO(`${date}T${startTime}`);
+    let currentCursor = DateTime.fromISO(`${date}T${startTime}`, { zone: tz });
     const resolvedSegments: Array<{
       service: any;
       attendant: any;
@@ -79,7 +110,9 @@ export const createBooking = async (req: Request, res: Response) => {
     }> = [];
 
     // Temporary list of intervals reserved within this booking session
-    const newlyBookedIntervals: Array<{ attendantId: string; start: DateTime; end: DateTime }> = [];
+    const newlyBookedIntervals: Array<{ attendantId: string; start: DateTime; end: DateTime; buffer: number }> = [];
+    const salonBreaks = bookingRules?.breaks || [];
+    const tenantBuffer = bookingRules?.bufferMinutes || 0;
 
     for (let i = 0; i < rawItems.length; i++) {
       const item = rawItems[i];
@@ -92,21 +125,48 @@ export const createBooking = async (req: Request, res: Response) => {
       const segEnd = currentCursor.plus({ minutes: service.duration });
       const segStartTimeStr = segStart.toFormat('HH:mm');
       const segEndTimeStr = segEnd.toFormat('HH:mm');
+      const segInterval = Interval.fromDateTimes(segStart, segEnd);
+
+      // Check salon-wide breaks
+      const overlapsSalonBreak = salonBreaks.some(brk => {
+        const brkStart = DateTime.fromISO(`${date}T${brk.start}`, { zone: tz });
+        const brkEnd = DateTime.fromISO(`${date}T${brk.end}`, { zone: tz });
+        return segInterval.overlaps(Interval.fromDateTimes(brkStart, brkEnd));
+      });
+      if (overlapsSalonBreak) {
+        return res.status(400).json({ error: `Time slot ${segStartTimeStr}–${segEndTimeStr} overlaps with a salon break` });
+      }
+
+      const candBuffer = (service.bufferAfterMinutes !== undefined && service.bufferAfterMinutes > 0)
+        ? service.bufferAfterMinutes
+        : tenantBuffer;
+
+      const attendantOptions = {
+        canExceedClosingTime: service.canExceedClosingTime,
+        serviceBufferMinutes: candBuffer,
+      };
 
       // Helper to check if an attendant is free during [segStart, segEnd]
-      const isFree = (attId: string) => {
-        const overlapsDb = existingBookings.some(b => {
-          const bAttId = (b.attendantId as any)?._id?.toString() || b.attendantId?.toString();
-          if (bAttId !== attId) return false;
-          const bStart = DateTime.fromISO(`${date}T${b.startTime}`);
-          const bEnd = DateTime.fromISO(`${date}T${b.endTime}`);
-          return segStart < bEnd && segEnd > bStart;
-        });
-        if (overlapsDb) return false;
+      const isFree = (attendantDoc: any) => {
+        const attId = attendantDoc._id.toString();
 
+        // 1. Attendant schedule, breaks, time off, days off, and existing bookings (with buffers)
+        const freeInSlotService = isAttendantFree(
+          attendantDoc,
+          segInterval,
+          date,
+          existingBookings,
+          tenantBuffer,
+          tz,
+          req.tenant?.workingHours,
+          attendantOptions
+        );
+        if (!freeInSlotService) return false;
+
+        // 2. Newly booked intervals within this booking group (with buffer)
         const overlapsNew = newlyBookedIntervals.some(n => {
           if (n.attendantId !== attId) return false;
-          return segStart < n.end && segEnd > n.start;
+          return segStart < n.end.plus({ minutes: n.buffer }) && segEnd.plus({ minutes: candBuffer }) > n.start;
         });
         return !overlapsNew;
       };
@@ -118,17 +178,25 @@ export const createBooking = async (req: Request, res: Response) => {
         if (!attendant) {
           return res.status(404).json({ error: `Attendant not found or inactive: ${item.attendantId}` });
         }
-        if (!isFree(attendant._id.toString())) {
-          return res.status(400).json({ error: `Time slot ${segStartTimeStr}–${segEndTimeStr} is already booked for ${attendant.name}` });
+        if (!isFree(attendant)) {
+          return res.status(400).json({ error: `Time slot ${segStartTimeStr}–${segEndTimeStr} is unavailable for ${attendant.name}` });
         }
         resolvedAttendant = attendant;
       } else {
         // "Any Available" — resolve to a real concrete attendant
-        const qualifiedAttendants = await Attendant.find({
+        let qualifiedAttendants = await Attendant.find({
           tenantId,
           isActive: true,
           serviceIds: service._id,
         });
+
+        // Fallback to all active stylists if none specifically assigned
+        if (qualifiedAttendants.length === 0) {
+          qualifiedAttendants = await Attendant.find({
+            tenantId,
+            isActive: true,
+          });
+        }
 
         // Prefer keeping previous segment's attendant if qualified and free
         const prevAttId = resolvedSegments[i - 1]?.attendant?._id?.toString();
@@ -136,10 +204,10 @@ export const createBooking = async (req: Request, res: Response) => {
           ? qualifiedAttendants.find(a => a._id.toString() === prevAttId)
           : null;
 
-        if (matchingPrev && isFree(matchingPrev._id.toString())) {
+        if (matchingPrev && isFree(matchingPrev)) {
           resolvedAttendant = matchingPrev;
         } else {
-          resolvedAttendant = qualifiedAttendants.find(a => isFree(a._id.toString()));
+          resolvedAttendant = qualifiedAttendants.find(a => isFree(a));
         }
 
         if (!resolvedAttendant) {
@@ -153,6 +221,7 @@ export const createBooking = async (req: Request, res: Response) => {
         attendantId: resolvedAttendant._id.toString(),
         start: segStart,
         end: segEnd,
+        buffer: candBuffer,
       });
 
       resolvedSegments.push({
@@ -194,6 +263,7 @@ export const createBooking = async (req: Request, res: Response) => {
           date,
           startTime: seg.startTime,
           endTime: seg.endTime,
+          bufferMinutes: seg.service.bufferAfterMinutes ?? 0,
           status: 'pending',
         });
 
@@ -477,12 +547,20 @@ export const rescheduleBookingCustomer = async (req: Request, res: Response) => 
 
       const attId = (b.attendantId as any)?._id?.toString() || b.attendantId?.toString();
       if (attId) {
+        const tenantBuffer = req.tenant?.bookingRules?.bufferMinutes || 0;
+        const candBuffer = (svc?.bufferAfterMinutes !== undefined && svc.bufferAfterMinutes > 0)
+          ? svc.bufferAfterMinutes
+          : tenantBuffer;
+
         const hasOverlap = existingBookings.some(eb => {
           const ebAttId = (eb.attendantId as any)?._id?.toString() || eb.attendantId?.toString();
           if (ebAttId !== attId) return false;
           const ebStart = DateTime.fromISO(`${date}T${eb.startTime}`);
           const ebEnd = DateTime.fromISO(`${date}T${eb.endTime}`);
-          return segStart < ebEnd && segEnd > ebStart;
+          const ebBuffer = (eb.bufferMinutes !== undefined && eb.bufferMinutes > 0)
+            ? eb.bufferMinutes
+            : tenantBuffer;
+          return segStart < ebEnd.plus({ minutes: ebBuffer }) && segEnd.plus({ minutes: candBuffer }) > ebStart;
         });
 
         if (hasOverlap) {

@@ -8,6 +8,7 @@ import {
 import { sendPushToPhone, sendPushToAttendant, sendPushToAdmins } from '../services/pushService';
 import { sendWhatsAppBookingConfirmed, sendWhatsAppBookingCancelled } from '../services/whatsappService';
 import type { IAttendant } from '../models/Attendant';
+import { generateUniqueBookingReference } from './bookingController';
 
 /**
  * GET /api/admin/bookings
@@ -104,6 +105,11 @@ export const createAdminBooking = async (req: Request, res: Response) => {
       sendNotifications = true,
     } = req.body;
 
+    const allowedStatuses = ['pending', 'confirmed', 'cancelled', 'completed', 'no-show'];
+    if (status && !allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: `Status must be one of: ${allowedStatuses.join(', ')}` });
+    }
+
     if (!customerName || !phone || !serviceId || !date || !startTime) {
       return res.status(400).json({
         error: 'Customer name, phone, service, date, and start time are required.',
@@ -130,19 +136,27 @@ export const createAdminBooking = async (req: Request, res: Response) => {
     const endDateTime = startDateTime.plus({ minutes: service.duration });
     const endTime = endDateTime.toFormat('HH:mm');
 
-    // Overlap validation if confirmed & attendant is assigned
-    if (status === 'confirmed' && assignedAttendant) {
+    // Overlap validation: pending or confirmed bookings block admin walk-ins
+    if (assignedAttendant && (status === 'confirmed' || status === 'pending')) {
       const activeBookings = await Booking.find({
         tenantId,
         date,
         attendantId: assignedAttendant._id,
-        status: { $in: ['confirmed'] },
+        status: { $in: ['confirmed', 'pending'] },
       });
+
+      const tenantBuffer = req.tenant?.bookingRules?.bufferMinutes ?? 0;
+      const candBuffer = (service.bufferAfterMinutes !== undefined && service.bufferAfterMinutes > 0)
+        ? service.bufferAfterMinutes
+        : tenantBuffer;
 
       const hasConflict = activeBookings.some(b => {
         const bStart = DateTime.fromISO(`${date}T${b.startTime}`);
         const bEnd = DateTime.fromISO(`${date}T${b.endTime}`);
-        return startDateTime < bEnd && endDateTime > bStart;
+        const bBuffer = (b.bufferMinutes !== undefined && b.bufferMinutes > 0)
+          ? b.bufferMinutes
+          : tenantBuffer;
+        return startDateTime < bEnd.plus({ minutes: bBuffer }) && endDateTime.plus({ minutes: candBuffer }) > bStart;
       });
 
       if (hasConflict) {
@@ -152,8 +166,8 @@ export const createAdminBooking = async (req: Request, res: Response) => {
       }
     }
 
-    // Generate unique reference
-    const reference = `LMN-${Math.floor(10000 + Math.random() * 90000)}`;
+    // Generate unique reference with retry
+    const reference = await generateUniqueBookingReference(tenantId);
 
     const booking = new Booking({
       tenantId,
@@ -166,6 +180,7 @@ export const createAdminBooking = async (req: Request, res: Response) => {
       date,
       startTime,
       endTime,
+      bufferMinutes: service.bufferAfterMinutes ?? 0,
       price: service.price,
       status,
       notes: notes?.trim() || undefined,
@@ -314,12 +329,19 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
         }
 
         if (assignedAttId) {
+          const tenantBuffer = req.tenant?.bookingRules?.bufferMinutes ?? 0;
+          const svcBuffer = (seg.serviceId as any)?.bufferAfterMinutes ?? tenantBuffer;
+          const candBuffer = svcBuffer > 0 ? svcBuffer : tenantBuffer;
+
           const hasConflict = existingActiveBookings.some(eb => {
             const ebAttId = (eb.attendantId as any)?._id?.toString() || eb.attendantId?.toString();
             if (ebAttId !== assignedAttId) return false;
             const ebStart = DateTime.fromISO(`${targetDate}T${eb.startTime}`);
             const ebEnd = DateTime.fromISO(`${targetDate}T${eb.endTime}`);
-            return segStart < ebEnd && segEnd > ebStart;
+            const ebBuffer = (eb.bufferMinutes !== undefined && eb.bufferMinutes > 0)
+              ? eb.bufferMinutes
+              : tenantBuffer;
+            return segStart < ebEnd.plus({ minutes: ebBuffer }) && segEnd.plus({ minutes: candBuffer }) > ebStart;
           });
 
           if (hasConflict) {

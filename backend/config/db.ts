@@ -17,7 +17,7 @@ const connectDB = async (): Promise<void> => {
     console.log('✅ Connected to MongoDB');
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
-    process.exit(1); // Exit if DB connection fails
+    // Keep server running so DB status middleware can handle requests and Mongoose can reconnect
   }
 };
 

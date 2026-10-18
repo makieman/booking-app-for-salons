@@ -29,6 +29,8 @@ export interface IBooking extends Document {
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string;   // HH:mm
+  /** Rest / turnaround buffer minutes held after service */
+  bufferMinutes?: number;
   /** 'completed' is set by attendant/admin, 'no-show' flags unattended bookings */
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
   cancellationReason?: string;
@@ -55,6 +57,7 @@ const BookingSchema: Schema = new Schema(
     date: { type: String, required: true },
     startTime: { type: String, required: true },
     endTime: { type: String, required: true },
+    bufferMinutes: { type: Number, default: 0 },
     cancellationReason: { type: String, default: null },
     completedAt: { type: Date, default: null },
     notes: { type: String, default: null },
