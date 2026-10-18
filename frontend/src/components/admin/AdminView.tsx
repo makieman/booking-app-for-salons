@@ -12,6 +12,7 @@ import { AdminRequestsTab } from './AdminRequestsTab';
 import { AdminServicesTab } from './AdminServicesTab';
 import { AdminStaffTab } from './AdminStaffTab';
 import { AdminSettingsTab } from './AdminSettingsTab';
+import { AdminSearchModal } from './AdminSearchModal';
 
 interface AdminViewProps {
   bookings: Booking[];
@@ -41,6 +42,31 @@ export function AdminView({
   };
 
   const [activeTab, setActiveTab] = useState<AdminTabKey>(getInitialTab);
+
+  // Global search modal state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchSelectedBookingId, setSearchSelectedBookingId] = useState<string | null>(null);
+  const [searchSelectedDate, setSearchSelectedDate] = useState<string | null>(null);
+
+  // Keyboard shortcut Cmd+K / Ctrl+K to open global search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(prev => !prev);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSelectBookingFromSearch = (booking: Booking, targetTab: 'ledger' | 'pending') => {
+    if (targetTab === 'ledger') {
+      setSearchSelectedDate(booking.date);
+      setSearchSelectedBookingId(booking._id);
+    }
+    handleTabChange(targetTab);
+  };
 
   // Sync tab changes with URL query string without reloading
   const handleTabChange = useCallback((tab: AdminTabKey) => {
@@ -273,80 +299,93 @@ export function AdminView({
   };
 
   return (
-    <AdminLayout
-      tenant={tenant}
-      activeTab={activeTab}
-      onTabChange={handleTabChange}
-      pendingCount={pendingBookings.length}
-      onSignOut={handleSignOut}
-      onBackToSalon={handleBackToSalon}
-      adminPush={adminPush}
-      showPushBanner={showPushBanner}
-      onDismissPushBanner={handleDismissPushBanner}
-      onEnablePushFromBanner={handleEnablePushFromBanner}
-    >
-      {activeTab === 'dashboard' && (
-        <AdminDashboardTab
-          bookings={allTenantBookings}
-          pendingCount={pendingBookings.length}
-          services={services}
-          todayBookings={todayConfirmed}
-          onNavigateTab={handleTabChange}
-        />
-      )}
+    <>
+      <AdminLayout
+        tenant={tenant}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        pendingCount={pendingBookings.length}
+        onSignOut={handleSignOut}
+        onBackToSalon={handleBackToSalon}
+        adminPush={adminPush}
+        showPushBanner={showPushBanner}
+        onDismissPushBanner={handleDismissPushBanner}
+        onEnablePushFromBanner={handleEnablePushFromBanner}
+        onOpenSearch={() => setIsSearchOpen(true)}
+      >
+        {activeTab === 'dashboard' && (
+          <AdminDashboardTab
+            bookings={allTenantBookings}
+            pendingCount={pendingBookings.length}
+            services={services}
+            todayBookings={todayConfirmed}
+            onNavigateTab={handleTabChange}
+          />
+        )}
 
-      {activeTab === 'ledger' && (
-        <AdminScheduleTab
-          bookings={allTenantBookings}
-          attendants={attendants}
-          services={services}
-          onUpdateBooking={handleUpdateBooking}
-          onBookingCreated={handleBookingCreated}
-          triggerToast={triggerToast}
-        />
-      )}
+        {activeTab === 'ledger' && (
+          <AdminScheduleTab
+            bookings={allTenantBookings}
+            attendants={attendants}
+            services={services}
+            onUpdateBooking={handleUpdateBooking}
+            onBookingCreated={handleBookingCreated}
+            triggerToast={triggerToast}
+            initialDate={searchSelectedDate}
+            initialBookingId={searchSelectedBookingId}
+          />
+        )}
 
-      {activeTab === 'pending' && (
-        <AdminRequestsTab
-          pendingBookings={pendingBookings}
-          loading={loadingPending}
-          actionLoadingId={actionLoadingId}
-          onStatusUpdate={handleStatusUpdate}
-        />
-      )}
+        {activeTab === 'pending' && (
+          <AdminRequestsTab
+            pendingBookings={pendingBookings}
+            loading={loadingPending}
+            actionLoadingId={actionLoadingId}
+            onStatusUpdate={handleStatusUpdate}
+          />
+        )}
 
-      {activeTab === 'services' && (
-        <AdminServicesTab
-          services={services}
-          attendants={attendants}
-          ownerPin={ownerPin}
-          loading={loadingServices}
-          onServicesUpdated={setServices}
-          onAttendantsUpdated={setAttendants}
-          triggerToast={triggerToast}
-        />
-      )}
+        {activeTab === 'services' && (
+          <AdminServicesTab
+            services={services}
+            attendants={attendants}
+            ownerPin={ownerPin}
+            loading={loadingServices}
+            onServicesUpdated={setServices}
+            onAttendantsUpdated={setAttendants}
+            triggerToast={triggerToast}
+          />
+        )}
 
-      {activeTab === 'staff' && (
-        <AdminStaffTab
-          attendants={attendants}
-          services={services}
-          loading={loadingStaff}
-          ownerPin={ownerPin}
-          onAttendantsUpdated={setAttendants}
-          triggerToast={triggerToast}
-        />
-      )}
+        {activeTab === 'staff' && (
+          <AdminStaffTab
+            attendants={attendants}
+            services={services}
+            loading={loadingStaff}
+            ownerPin={ownerPin}
+            onAttendantsUpdated={setAttendants}
+            triggerToast={triggerToast}
+          />
+        )}
 
-      {activeTab === 'settings' && ownerToken && (
-        <AdminSettingsTab
-          tenant={tenant}
-          ownerToken={ownerToken}
-          onTenantUpdated={setTenant}
-          triggerToast={triggerToast}
-        />
-      )}
-    </AdminLayout>
+        {activeTab === 'settings' && ownerToken && (
+          <AdminSettingsTab
+            tenant={tenant}
+            ownerToken={ownerToken}
+            onTenantUpdated={setTenant}
+            triggerToast={triggerToast}
+          />
+        )}
+      </AdminLayout>
+
+      {/* Global Appointment Search Modal */}
+      <AdminSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        bookings={allTenantBookings}
+        onSelectBooking={handleSelectBookingFromSearch}
+      />
+    </>
   );
 }
 export default AdminView;

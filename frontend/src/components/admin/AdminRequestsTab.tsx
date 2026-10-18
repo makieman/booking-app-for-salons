@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, Clock, User, Scissors, Calendar, Check, X, Loader2 } from 'lucide-react';
+import { Phone, Clock, User, Scissors, Calendar, Check, X, Loader2, Search } from 'lucide-react';
 import { Booking, Service, Attendant } from '../../types';
 import { formatPrice, formatPhone } from '../../utils/formatters';
 import { formatDisplayDate, formatRequestedDate } from '../../utils/dateUtils';
@@ -106,21 +106,59 @@ export function AdminRequestsTab({
     return Object.values(groups);
   }, [pendingBookings]);
 
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredRequests = useMemo(() => {
+    if (!searchQuery.trim()) return groupedRequests;
+    const q = searchQuery.toLowerCase().trim();
+    return groupedRequests.filter(req => {
+      const nameMatch = req.customerName.toLowerCase().includes(q);
+      const phoneMatch = req.phone.toLowerCase().includes(q);
+      const refMatch = req.reference?.toLowerCase().includes(q) || false;
+      const serviceMatch = req.segments.some(s => s.serviceName.toLowerCase().includes(q));
+      return nameMatch || phoneMatch || refMatch || serviceMatch;
+    });
+  }, [groupedRequests, searchQuery]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-brand-gray-100 pb-4 gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-brand-gray-100 pb-4 gap-4">
         <div>
           <h2 className="text-2xl font-serif font-black uppercase text-brand-black">Pending Requests</h2>
           <p className="text-xs font-bold uppercase tracking-wider text-brand-gray-400 mt-1">
             Review and confirm client appointment requests
           </p>
         </div>
-        {groupedRequests.length > 0 && (
-          <div className="bg-amber-50 text-amber-800 border border-amber-200/70 px-3 py-1.5 rounded-xl text-xs font-bold self-start sm:self-auto">
-            {groupedRequests.length} awaiting action
+
+        <div className="flex items-center gap-2.5">
+          {/* Quick Search */}
+          <div className="relative w-full sm:w-64">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search client, phone, or code..."
+              className="w-full bg-white border border-brand-gray-200 rounded-xl pl-8 pr-7 py-1.5 text-xs text-brand-black placeholder:text-brand-gray-400 focus:outline-none focus:border-brand-black shadow-xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-brand-gray-400 hover:text-brand-black text-xs font-bold cursor-pointer"
+              >
+                ×
+              </button>
+            )}
           </div>
-        )}
+
+          {groupedRequests.length > 0 && (
+            <div className="bg-amber-50 text-amber-800 border border-amber-200/70 px-3 py-1.5 rounded-xl text-xs font-bold shrink-0">
+              {groupedRequests.length} awaiting action
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}
@@ -130,14 +168,29 @@ export function AdminRequestsTab({
             <Loader2 size={18} className="animate-spin text-brand-black" />
             <span>Loading pending requests...</span>
           </div>
-        ) : groupedRequests.length === 0 ? (
+        ) : filteredRequests.length === 0 ? (
           <div className="p-16 text-center border-2 border-dashed border-brand-gray-100 bg-white rounded-2xl text-brand-gray-400 space-y-1">
-            <p className="font-serif italic text-lg text-brand-black">All clear</p>
-            <p className="text-xs font-medium text-brand-gray-500">There are no pending booking requests right now.</p>
+            <p className="font-serif italic text-lg text-brand-black">
+              {searchQuery.trim() ? 'No matching requests' : 'All clear'}
+            </p>
+            <p className="text-xs font-medium text-brand-gray-500">
+              {searchQuery.trim()
+                ? `No pending requests found matching "${searchQuery}".`
+                : 'There are no pending booking requests right now.'}
+            </p>
+            {searchQuery.trim() && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="mt-2 text-xs font-bold text-brand-black underline cursor-pointer"
+              >
+                Clear search filter
+              </button>
+            )}
           </div>
         ) : (
           <AnimatePresence>
-            {groupedRequests.map((req, idx) => {
+            {filteredRequests.map((req, idx) => {
               const isActing = req.segments.some(s => s.bookingId === actionLoadingId) || req.primaryId === actionLoadingId;
               const allBookingIds = req.segments.map(s => s.bookingId);
 
