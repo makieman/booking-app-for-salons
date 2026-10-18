@@ -1,4 +1,5 @@
 import { DateTime, Interval } from 'luxon';
+import mongoose from 'mongoose';
 import { IBooking } from '../models/Booking';
 import { ITenantBookingRules } from '../models/Tenant';
 import { IAttendant, IAttendantDaySchedule, IAttendantBreak, ITimeOffEntry } from '../models/Attendant';
@@ -18,12 +19,18 @@ export interface SlotGenerationOptions {
   attendant?: Partial<IAttendant> | null;
   timezone?: string;
   skipNoticeCheck?: boolean;
+  serviceBufferMinutes?: number;
+  canExceedClosingTime?: boolean;
+  latestStartTime?: string;
 }
 
 export interface MultiServiceItemInput {
   serviceId: string;
   duration: number;
   requestedAttendantId?: string | null;
+  bufferAfterMinutes?: number;
+  canExceedClosingTime?: boolean;
+  latestStartTime?: string;
   qualifiedAttendants: Array<{
     _id: string;
     name: string;
@@ -54,15 +61,20 @@ export interface MultiSlotOption {
  * - Weekly working day schedule and shift hours
  * - Daily recurring breaks
  * - Existing bookings plus salon buffer time
+ * - Long service exceedance of shift end (up to same calendar day before 24:00)
  */
 export function isAttendantFree(
-  attendant: { _id: string; name: string; schedule?: IAttendantDaySchedule[]; daysOff?: string[]; timeOff?: ITimeOffEntry[] },
+  attendant: { _id: string | mongoose.Types.ObjectId; name: string; schedule?: IAttendantDaySchedule[]; daysOff?: string[]; timeOff?: ITimeOffEntry[] },
   interval: Interval,
   date: string,
   existingBookings: IBooking[],
   bufferMinutes: number = 0,
   timezone: string = 'Africa/Nairobi',
-  defaultWorkingHours: { start: string; end: string } = DEFAULT_WORKING_HOURS
+  defaultWorkingHours: { start: string; end: string } = DEFAULT_WORKING_HOURS,
+  options?: {
+    canExceedClosingTime?: boolean;
+    serviceBufferMinutes?: number;
+  }
 ): boolean {
   // 1. Days off & structured time off
   if (attendant.daysOff && attendant.daysOff.includes(date)) {
@@ -103,9 +115,27 @@ export function isAttendantFree(
   const shiftStart = DateTime.fromISO(`${date}T${shiftStartStr}`, { zone: timezone });
   const shiftEnd = DateTime.fromISO(`${date}T${shiftEndStr}`, { zone: timezone });
 
-  // Must be completely within shift window
-  if (!interval.start || !interval.end || interval.start < shiftStart || interval.end > shiftEnd) {
+  // Must not start before shift start
+  if (!interval.start || !interval.end || interval.start < shiftStart) {
     return false;
+  }
+
+  // Shift end & closing check
+  if (options?.canExceedClosingTime) {
+    // May start up to shiftEnd
+    if (interval.start > shiftEnd) {
+      return false;
+    }
+    // May end after shift end, but must end on same calendar day before 24:00
+    const nextDayStart = DateTime.fromISO(date, { zone: timezone }).plus({ days: 1 }).startOf('day');
+    if (interval.end > nextDayStart) {
+      return false;
+    }
+  } else {
+    // Standard service: must be completely within shift window
+    if (interval.end > shiftEnd) {
+      return false;
+    }
   }
 
   // 3. Breaks
@@ -120,6 +150,10 @@ export function isAttendantFree(
 
   // 4. Overlap with existing bookings (with buffer)
   const attendantIdStr = attendant._id.toString();
+  const candBuffer = (options?.serviceBufferMinutes !== undefined && options.serviceBufferMinutes > 0)
+    ? options.serviceBufferMinutes
+    : bufferMinutes;
+
   const overlapsBooking = existingBookings.some(booking => {
     if (booking.status === 'cancelled') return false;
     const bAttendantId = (booking.attendantId as any)?._id?.toString() || booking.attendantId?.toString();
@@ -127,9 +161,12 @@ export function isAttendantFree(
 
     const bStart = DateTime.fromISO(`${date}T${booking.startTime}`, { zone: timezone });
     const bEnd = DateTime.fromISO(`${date}T${booking.endTime}`, { zone: timezone });
+    const bBuffer = (booking.bufferMinutes !== undefined && booking.bufferMinutes > 0)
+      ? booking.bufferMinutes
+      : bufferMinutes;
 
-    // Buffer enforcement: candidate cannot start before bEnd + buffer, and candidate + buffer cannot end after bStart
-    return interval.start! < bEnd.plus({ minutes: bufferMinutes }) && interval.end!.plus({ minutes: bufferMinutes }) > bStart;
+    // Buffer enforcement: candidate cannot start before bEnd + bBuffer, and candidate + candBuffer cannot end after bStart
+    return interval.start! < bEnd.plus({ minutes: bBuffer }) && interval.end!.plus({ minutes: candBuffer }) > bStart;
   });
 
   return !overlapsBooking;
@@ -195,7 +232,7 @@ export function generateAvailableSlots(
 
   const slotInterval = bookingRules?.slotInterval || 30;
   const bufferMinutes = bookingRules?.bufferMinutes || 0;
-  const minNoticeHours = bookingRules?.minNoticeHours !== undefined ? bookingRules.minNoticeHours : 2;
+  const minNoticeHours = bookingRules?.minNoticeHours !== undefined ? bookingRules.minNoticeHours : 0;
 
   const now = DateTime.now().setZone(tz);
   const minAllowedDateTime = options?.skipNoticeCheck ? null : now.plus({ hours: minNoticeHours });
@@ -204,8 +241,8 @@ export function generateAvailableSlots(
   const endOfDay   = DateTime.fromISO(`${date}T${shiftEndStr}`, { zone: tz });
   const workingMinutes = endOfDay.diff(startOfDay, 'minutes').minutes;
 
-  // If service takes longer than the working day: offer start of day if free
-  if (duration >= workingMinutes) {
+  // If service takes longer than the working day: offer start of day if free (only when flag is off)
+  if (!options?.canExceedClosingTime && duration >= workingMinutes) {
     const dayAlreadyBooked = existingBookings.some(b => b.status !== 'cancelled');
     if (dayAlreadyBooked) return [];
     if (minAllowedDateTime && startOfDay < minAllowedDateTime) return [];
@@ -214,12 +251,39 @@ export function generateAvailableSlots(
 
   const salonBreaks = bookingRules?.breaks || [];
   const slots: string[] = [];
+  const nextDayStart = DateTime.fromISO(date, { zone: tz }).plus({ days: 1 }).startOf('day');
+  const candBuffer = (options?.serviceBufferMinutes !== undefined && options.serviceBufferMinutes > 0)
+    ? options.serviceBufferMinutes
+    : bufferMinutes;
+
+  let cutoffStartDt = endOfDay;
+  if (options?.canExceedClosingTime) {
+    if (options?.latestStartTime) {
+      cutoffStartDt = DateTime.fromISO(`${date}T${options.latestStartTime}`, { zone: tz });
+    } else {
+      cutoffStartDt = endOfDay;
+    }
+  }
+
   let currentSlot = startOfDay;
 
-  while (currentSlot.plus({ minutes: duration }) <= endOfDay) {
+  const shouldContinue = () => {
+    if (options?.canExceedClosingTime) {
+      return currentSlot <= cutoffStartDt;
+    }
+    return currentSlot.plus({ minutes: duration }) <= endOfDay;
+  };
+
+  while (shouldContinue()) {
     const slotStart = currentSlot;
     const slotEnd   = currentSlot.plus({ minutes: duration });
     const potentialInterval = Interval.fromDateTimes(slotStart, slotEnd);
+
+    // End after midnight rejected (must end the same calendar day before 24:00)
+    if (options?.canExceedClosingTime && slotEnd > nextDayStart) {
+      currentSlot = currentSlot.plus({ minutes: slotInterval });
+      continue;
+    }
 
     // Minimum notice rule
     if (minAllowedDateTime && slotStart < minAllowedDateTime) {
@@ -274,7 +338,11 @@ export function generateAvailableSlots(
 
       const bStart = DateTime.fromISO(`${date}T${booking.startTime}`, { zone: tz });
       const bEnd   = DateTime.fromISO(`${date}T${booking.endTime}`, { zone: tz });
-      return slotStart < bEnd.plus({ minutes: bufferMinutes }) && slotEnd.plus({ minutes: bufferMinutes }) > bStart;
+      const bBuffer = (booking.bufferMinutes !== undefined && booking.bufferMinutes > 0)
+        ? booking.bufferMinutes
+        : bufferMinutes;
+
+      return slotStart < bEnd.plus({ minutes: bBuffer }) && slotEnd.plus({ minutes: candBuffer }) > bStart;
     });
 
     if (!isOverlap) {
@@ -317,27 +385,52 @@ export function generateMultiServiceSlots(
 
   const slotInterval = bookingRules?.slotInterval || 30;
   const bufferMinutes = bookingRules?.bufferMinutes || 0;
-  const minNoticeHours = bookingRules?.minNoticeHours !== undefined ? bookingRules.minNoticeHours : 2;
+  const minNoticeHours = bookingRules?.minNoticeHours !== undefined ? bookingRules.minNoticeHours : 0;
 
   const now = DateTime.now().setZone(tz);
   const minAllowedDateTime = options?.skipNoticeCheck ? null : now.plus({ hours: minNoticeHours });
 
   const startOfDay = DateTime.fromISO(`${date}T${workingHours.start}`, { zone: tz });
   const endOfDay   = DateTime.fromISO(`${date}T${workingHours.end}`, { zone: tz });
+  const nextDayStart = DateTime.fromISO(date, { zone: tz }).plus({ days: 1 }).startOf('day');
   const totalDuration = items.reduce((sum, item) => sum + item.duration, 0);
 
   const salonBreaks = bookingRules?.breaks || [];
   const results: MultiSlotOption[] = [];
+
+  const anyCanExceed = items.some(item => item.canExceedClosingTime);
+  let cutoffStartDt = endOfDay;
+  if (anyCanExceed) {
+    if (items[0]?.canExceedClosingTime && items[0]?.latestStartTime) {
+      cutoffStartDt = DateTime.fromISO(`${date}T${items[0].latestStartTime}`, { zone: tz });
+    } else {
+      cutoffStartDt = endOfDay;
+    }
+  }
+
   let currentStart = startOfDay;
 
-  while (currentStart.plus({ minutes: totalDuration }) <= endOfDay) {
+  const shouldContinue = () => {
+    if (anyCanExceed) {
+      return currentStart <= cutoffStartDt;
+    }
+    return currentStart.plus({ minutes: totalDuration }) <= endOfDay;
+  };
+
+  while (shouldContinue()) {
     if (minAllowedDateTime && currentStart < minAllowedDateTime) {
       currentStart = currentStart.plus({ minutes: slotInterval });
       continue;
     }
 
+    const appointmentEnd = currentStart.plus({ minutes: totalDuration });
+    if (anyCanExceed && appointmentEnd > nextDayStart) {
+      currentStart = currentStart.plus({ minutes: slotInterval });
+      continue;
+    }
+
     // Salon-wide breaks check
-    const appointmentInterval = Interval.fromDateTimes(currentStart, currentStart.plus({ minutes: totalDuration }));
+    const appointmentInterval = Interval.fromDateTimes(currentStart, appointmentEnd);
     const overlapsSalonBreak = salonBreaks.some(brk => {
       const brkStart = DateTime.fromISO(`${date}T${brk.start}`, { zone: tz });
       const brkEnd   = DateTime.fromISO(`${date}T${brk.end}`, { zone: tz });
@@ -357,6 +450,11 @@ export function generateMultiServiceSlots(
       const segStart = segmentCursor;
       const segEnd = segmentCursor.plus({ minutes: item.duration });
       const segInterval = Interval.fromDateTimes(segStart, segEnd);
+      const segBuffer = item.bufferAfterMinutes ?? 0;
+      const attendantOptions = {
+        canExceedClosingTime: item.canExceedClosingTime,
+        serviceBufferMinutes: segBuffer,
+      };
 
       let chosenAttendant: { _id: string; name: string } | null = null;
 
@@ -365,7 +463,7 @@ export function generateMultiServiceSlots(
         const reqAttendant = item.qualifiedAttendants.find(
           a => a._id.toString() === item.requestedAttendantId!.toString()
         );
-        if (reqAttendant && isAttendantFree(reqAttendant, segInterval, date, existingBookings, bufferMinutes, tz, workingHours)) {
+        if (reqAttendant && isAttendantFree(reqAttendant, segInterval, date, existingBookings, bufferMinutes, tz, workingHours, attendantOptions)) {
           chosenAttendant = reqAttendant;
         }
       } else {
@@ -375,11 +473,11 @@ export function generateMultiServiceSlots(
           ? item.qualifiedAttendants.find(a => a._id.toString() === prevAttendantId)
           : null;
 
-        if (matchingPrev && isAttendantFree(matchingPrev, segInterval, date, existingBookings, bufferMinutes, tz, workingHours)) {
+        if (matchingPrev && isAttendantFree(matchingPrev, segInterval, date, existingBookings, bufferMinutes, tz, workingHours, attendantOptions)) {
           chosenAttendant = matchingPrev;
         } else {
           const freeAttendants = item.qualifiedAttendants.filter(
-            a => isAttendantFree(a, segInterval, date, existingBookings, bufferMinutes, tz, workingHours)
+            a => isAttendantFree(a, segInterval, date, existingBookings, bufferMinutes, tz, workingHours, attendantOptions)
           );
           if (freeAttendants.length > 0) {
             chosenAttendant = freeAttendants[0];

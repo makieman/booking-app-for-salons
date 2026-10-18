@@ -305,7 +305,7 @@ export function ScheduleSettings({
             >
               <option value={0}>No minimum (instant)</option>
               <option value={1}>1 hour</option>
-              <option value={2}>2 hours (default)</option>
+              <option value={2}>2 hours (suggested)</option>
               <option value={4}>4 hours</option>
               <option value={12}>12 hours</option>
               <option value={24}>24 hours</option>
