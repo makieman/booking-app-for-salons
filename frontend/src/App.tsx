@@ -316,6 +316,55 @@ export default function App() {
     }
   }, [bookingRef, tenantLoading]);
 
+  // Live polling for booking status updates when on confirmation screen
+  useEffect(() => {
+    if (activeStep !== 'confirmation' || !createdBooking?.reference) return;
+
+    let isCancelled = false;
+    const checkBookingStatus = async () => {
+      try {
+        const results = await api.lookupBookings({ reference: createdBooking.reference });
+        if (!isCancelled && results && results.length > 0) {
+          const latest = results[0];
+          const statusChanged = latest.status !== createdBooking.status;
+          const prevAttId = typeof createdBooking.attendantId === 'object' ? (createdBooking.attendantId as any)?._id : createdBooking.attendantId;
+          const nextAttId = typeof latest.attendantId === 'object' ? (latest.attendantId as any)?._id : latest.attendantId;
+          const attendantChanged = prevAttId !== nextAttId;
+
+          if (statusChanged || attendantChanged) {
+            setCreatedBooking(latest);
+            if (typeof latest.serviceId === 'object' && latest.serviceId) {
+              setSelectedServices([latest.serviceId as Service]);
+            }
+            if (latest.status === 'confirmed' && createdBooking.status === 'pending') {
+              triggerToast('Your appointment has been confirmed!', 'success');
+              try {
+                playNotificationSound('chime');
+              } catch {}
+            }
+          }
+        }
+      } catch {
+        // Silently retry on next interval
+      }
+    };
+
+    const interval = setInterval(checkBookingStatus, 4000);
+
+    const handleFocus = () => {
+      checkBookingStatus();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [activeStep, createdBooking?.reference, createdBooking?.status, createdBooking?.attendantId]);
+
   // Lookup Booking State
   const [lookupQuery, setLookupQuery] = useState('');
   const [lookupType, setLookupType] = useState<'reference' | 'phone'>('reference');
@@ -1600,26 +1649,99 @@ export default function App() {
                     >
                       {/* 1. Heading, Status Badge & Subtitle */}
                       <div className="space-y-3">
-                        <div
-                          role="status"
-                          aria-live="polite"
-                          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
-                        >
-                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
-                          <span>Pending approval</span>
-                        </div>
+                        {createdBooking?.status === 'confirmed' ? (
+                          <>
+                            <div
+                              role="status"
+                              aria-live="polite"
+                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm"
+                            >
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                              <span>Confirmed</span>
+                            </div>
 
-                        <h2
-                          ref={confirmationHeadingRef}
-                          tabIndex={-1}
-                          className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none"
-                        >
-                          Request received
-                        </h2>
-                        <div className="w-16 h-1 bg-brand-black mx-auto" aria-hidden="true" />
-                        <p className="text-brand-gray-500 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                          The salon will review your request shortly.
-                        </p>
+                            <h2
+                              ref={confirmationHeadingRef}
+                              tabIndex={-1}
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-emerald-950"
+                            >
+                              Appointment Confirmed
+                            </h2>
+                            <div className="w-16 h-1 bg-emerald-700 mx-auto" aria-hidden="true" />
+                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+                              Your appointment has been approved! We look forward to seeing you at the salon.
+                            </p>
+                          </>
+                        ) : createdBooking?.status === 'cancelled' ? (
+                          <>
+                            <div
+                              role="status"
+                              aria-live="polite"
+                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-red-100 text-red-900 border border-red-300 shadow-sm"
+                            >
+                              <span className="w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
+                              <span>Cancelled</span>
+                            </div>
+
+                            <h2
+                              ref={confirmationHeadingRef}
+                              tabIndex={-1}
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-red-950"
+                            >
+                              Appointment Cancelled
+                            </h2>
+                            <div className="w-16 h-1 bg-red-600 mx-auto" aria-hidden="true" />
+                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+                              This appointment has been cancelled or declined by the salon.
+                            </p>
+                          </>
+                        ) : createdBooking?.status === 'completed' ? (
+                          <>
+                            <div
+                              role="status"
+                              aria-live="polite"
+                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-blue-100 text-blue-900 border border-blue-300 shadow-sm"
+                            >
+                              <span className="w-2 h-2 rounded-full bg-blue-500" aria-hidden="true" />
+                              <span>Completed</span>
+                            </div>
+
+                            <h2
+                              ref={confirmationHeadingRef}
+                              tabIndex={-1}
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-blue-950"
+                            >
+                              Appointment Completed
+                            </h2>
+                            <div className="w-16 h-1 bg-blue-600 mx-auto" aria-hidden="true" />
+                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+                              Thank you for visiting! We look forward to seeing you again.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <div
+                              role="status"
+                              aria-live="polite"
+                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
+                            >
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
+                              <span>Pending approval</span>
+                            </div>
+
+                            <h2
+                              ref={confirmationHeadingRef}
+                              tabIndex={-1}
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none"
+                            >
+                              Request received
+                            </h2>
+                            <div className="w-16 h-1 bg-brand-black mx-auto" aria-hidden="true" />
+                            <p className="text-brand-gray-500 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+                              The salon will review your request shortly.
+                            </p>
+                          </>
+                        )}
                       </div>
 
                       {/* 3. Prominent Reference */}
@@ -1657,43 +1779,88 @@ export default function App() {
                         <div className="flex items-center gap-2 border-b border-brand-black/10 pb-3">
                           <Clock size={16} className="text-brand-gray-600" aria-hidden="true" />
                           <h3 className="text-xs font-black uppercase tracking-[0.25em] text-brand-gray-700">
-                            What happens next
+                            {createdBooking?.status === 'confirmed' ? 'Appointment Information' : 'What happens next'}
                           </h3>
                         </div>
 
                         <ol className="space-y-3.5 text-xs sm:text-sm text-brand-gray-600">
-                          <li className="flex items-start gap-3">
-                            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                              1
-                            </span>
-                            <div className="pt-0.5 leading-relaxed">
-                              <span className="font-bold text-brand-black">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
-                            </div>
-                          </li>
-                          <li className="flex items-start gap-3">
-                            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                              2
-                            </span>
-                            <div className="pt-0.5 leading-relaxed">
-                              We'll email you a confirmation{clientInfo.email || createdBooking?.email ? (
-                                <>
-                                  {' '}at{' '}
-                                  <strong className="text-brand-black underline decoration-brand-black/30 break-all">
-                                    {createdBooking?.email || clientInfo.email}
-                                  </strong>
-                                </>
-                              ) : null}{' '}
-                              once approved (please check your spam folder).
-                            </div>
-                          </li>
-                          <li className="flex items-start gap-3">
-                            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                              3
-                            </span>
-                            <div className="pt-0.5 leading-relaxed">
-                              If notifications are enabled, you'll also get a notification when it's approved.
-                            </div>
-                          </li>
+                          {createdBooking?.status === 'confirmed' ? (
+                            <>
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-[11px] flex items-center justify-center">
+                                  ✓
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  <span className="font-bold text-brand-black">Your appointment is confirmed.</span> Your stylist and slot have been scheduled.
+                                </div>
+                              </li>
+                              {createdBooking?.attendantId && typeof createdBooking.attendantId === 'object' && (
+                                <li className="flex items-start gap-3">
+                                  <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                    ★
+                                  </span>
+                                  <div className="pt-0.5 leading-relaxed">
+                                    <span className="font-bold text-brand-black">Assigned Stylist:</span>{' '}
+                                    <span className="font-semibold text-emerald-800">
+                                      {(createdBooking.attendantId as any).name}
+                                    </span>
+                                  </div>
+                                </li>
+                              )}
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                  ⏱
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  Please arrive <span className="font-bold text-brand-black">5 minutes early</span> to ensure a smooth session.
+                                </div>
+                              </li>
+                            </>
+                          ) : createdBooking?.status === 'cancelled' ? (
+                            <li className="flex items-start gap-3">
+                              <span className="shrink-0 w-6 h-6 rounded-full bg-red-600 text-white font-bold text-[11px] flex items-center justify-center">
+                                ✕
+                              </span>
+                              <div className="pt-0.5 leading-relaxed">
+                                This booking was cancelled. If you would like to reschedule, please select a new date and time.
+                              </div>
+                            </li>
+                          ) : (
+                            <>
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                  1
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  <span className="font-bold text-brand-black">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
+                                </div>
+                              </li>
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                  2
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  We'll email you a confirmation{clientInfo.email || createdBooking?.email ? (
+                                    <>
+                                      {' '}at{' '}
+                                      <strong className="text-brand-black underline decoration-brand-black/30 break-all">
+                                        {createdBooking?.email || clientInfo.email}
+                                      </strong>
+                                    </>
+                                  ) : null}{' '}
+                                  once approved (please check your spam folder).
+                                </div>
+                              </li>
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                  3
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  If notifications are enabled, you'll also get a notification when it's approved.
+                                </div>
+                              </li>
+                            </>
+                          )}
                         </ol>
                       </div>
 
@@ -1724,7 +1891,10 @@ export default function App() {
                               selectedServices.map((service, idx) => {
                                 const selectedOpt = multiSlotOptions.find(o => o.time === selectedTime);
                                 const seg = selectedOpt?.segments?.find(s => s.serviceId === service._id);
-                                const artistName = seg?.attendantName || serviceAttendants[service._id]?.name || 'Any Available';
+                                const attendantNameFromBooking = createdBooking?.attendantId && typeof createdBooking.attendantId === 'object'
+                                  ? (createdBooking.attendantId as any).name
+                                  : null;
+                                const artistName = seg?.attendantName || serviceAttendants[service._id]?.name || attendantNameFromBooking || 'Any Available';
                                 const serviceTime = seg ? `${seg.startTime} – ${seg.endTime}` : confirmationTimeRange;
 
                                 return (

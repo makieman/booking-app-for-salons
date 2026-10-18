@@ -41,11 +41,20 @@ export function AdminView({
     return 'dashboard';
   };
 
+  // Read initial ref/booking from URL if present
+  const getInitialBookingRef = (): string | null => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('ref') || params.get('reference') || params.get('bookingId') || null;
+    }
+    return null;
+  };
+
   const [activeTab, setActiveTab] = useState<AdminTabKey>(getInitialTab);
 
   // Global search modal state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchSelectedBookingId, setSearchSelectedBookingId] = useState<string | null>(null);
+  const [searchSelectedBookingId, setSearchSelectedBookingId] = useState<string | null>(getInitialBookingRef);
   const [searchSelectedDate, setSearchSelectedDate] = useState<string | null>(null);
 
   // Keyboard shortcut Cmd+K / Ctrl+K to open global search
@@ -66,6 +75,14 @@ export function AdminView({
       setSearchSelectedBookingId(booking._id);
     }
     handleTabChange(targetTab);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', targetTab);
+      if (booking.reference) {
+        url.searchParams.set('ref', booking.reference);
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
   };
 
   // Sync tab changes with URL query string without reloading
@@ -74,6 +91,10 @@ export function AdminView({
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
       url.searchParams.set('tab', tab);
+      if (tab !== 'ledger' && tab !== 'pending') {
+        url.searchParams.delete('ref');
+        url.searchParams.delete('reference');
+      }
       window.history.replaceState({}, '', url.toString());
     }
   }, []);
@@ -94,6 +115,23 @@ export function AdminView({
   const [confirmedBookings, setConfirmedBookings] = useState<Booking[]>(initialBookings);
   const [services, setServices] = useState<Service[]>([]);
   const [attendants, setAttendants] = useState<Attendant[]>([]);
+
+  // Sync URL ref parameter with booking selection and date
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const refParam = params.get('ref') || params.get('reference') || params.get('bookingId');
+    if (refParam && allTenantBookings.length > 0) {
+      const clean = refParam.trim().toUpperCase();
+      const found = allTenantBookings.find(
+        b => b._id === refParam || (b.reference && b.reference.toUpperCase() === clean)
+      );
+      if (found) {
+        setSearchSelectedBookingId(found._id);
+        setSearchSelectedDate(found.date);
+      }
+    }
+  }, [allTenantBookings]);
 
   const [loadingPending, setLoadingPending] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);

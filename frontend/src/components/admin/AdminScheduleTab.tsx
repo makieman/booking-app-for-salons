@@ -110,10 +110,14 @@ export function AdminScheduleTab({
     }
   }, [initialDate]);
 
-  // Sync initial booking from external search
+  // Sync initial booking from external search or URL query
   useEffect(() => {
-    if (initialBookingId) {
-      const match = bookings.find(b => b._id === initialBookingId);
+    const targetRef = initialBookingId || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ref') || new URLSearchParams(window.location.search).get('reference') : null);
+    if (targetRef && bookings.length > 0) {
+      const clean = targetRef.trim().toUpperCase();
+      const match = bookings.find(
+        b => b._id === targetRef || (b.reference && b.reference.toUpperCase() === clean)
+      );
       if (match) {
         setSelectedBooking(match);
         if (match.date) setSelectedDate(match.date);
@@ -270,7 +274,14 @@ export function AdminScheduleTab({
     }, 0);
 
     // Days grid array
-    const calendarCells: Array<{ dayNum?: number; dateStr?: string; isToday?: boolean; bookingsCount?: number; revenue?: number }> = [];
+    const calendarCells: Array<{
+      dayNum?: number;
+      dateStr?: string;
+      isToday?: boolean;
+      bookingsCount?: number;
+      revenue?: number;
+      bookings?: Booking[];
+    }> = [];
     // Padding before 1st of month
     for (let i = 0; i < firstDayOfWeek; i++) {
       calendarCells.push({});
@@ -290,6 +301,7 @@ export function AdminScheduleTab({
         isToday: dateStr === todayStr,
         bookingsCount: dayBks.length,
         revenue: rev,
+        bookings: dayBks,
       });
     }
 
@@ -975,7 +987,11 @@ export function AdminScheduleTab({
                 key={day.dateStr}
                 onClick={() => {
                   setSelectedDate(day.dateStr);
-                  setScope('day');
+                  if (dayBookings.length === 1) {
+                    setSelectedBooking(dayBookings[0]);
+                  } else {
+                    setScope('day');
+                  }
                 }}
                 className={`p-4 rounded-2xl border cursor-pointer transition-all shadow-xs space-y-3 ${
                   day.isSelected
@@ -1009,10 +1025,19 @@ export function AdminScheduleTab({
                     {dayBookings.slice(0, 3).map(b => (
                       <div
                         key={b._id}
-                        className="text-[11px] truncate py-0.5 px-1 rounded bg-black/5 dark:bg-white/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDate(day.dateStr);
+                          setSelectedBooking(b);
+                        }}
+                        className="text-[11px] truncate py-1 px-1.5 rounded bg-black/5 dark:bg-white/10 hover:bg-black/15 cursor-pointer flex items-center justify-between transition-colors"
+                        title={`Click to view booking details for ${b.customerName}`}
                       >
-                        <span className="font-mono font-bold mr-1">{b.startTime}</span>
-                        <span>{b.customerName}</span>
+                        <span className="truncate">
+                          <span className="font-mono font-bold mr-1">{b.startTime}</span>
+                          <span className="font-semibold">{b.customerName}</span>
+                        </span>
+                        <span className="text-[9px] opacity-60 ml-1">→</span>
                       </div>
                     ))}
                     {dayBookings.length > 3 && (
@@ -1085,10 +1110,11 @@ export function AdminScheduleTab({
             <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {monthInfo.calendarCells.map((cell, idx) => {
                 if (!cell.dayNum) {
-                  return <div key={`empty-${idx}`} className="h-16 sm:h-20 bg-brand-gray-50/40 rounded-xl" />;
+                  return <div key={`empty-${idx}`} className="h-16 sm:h-24 bg-brand-gray-50/40 rounded-xl" />;
                 }
 
                 const hasBookings = (cell.bookingsCount || 0) > 0;
+                const cellBookings = cell.bookings || [];
 
                 return (
                   <div
@@ -1096,37 +1122,105 @@ export function AdminScheduleTab({
                     onClick={() => {
                       if (cell.dateStr) {
                         setSelectedDate(cell.dateStr);
-                        setScope('day');
+                        if (cellBookings.length === 1) {
+                          setSelectedBooking(cellBookings[0]);
+                        } else {
+                          setScope('day');
+                        }
                       }
                     }}
-                    className={`h-16 sm:h-24 p-1.5 sm:p-2.5 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
+                    className={`min-h-[85px] sm:min-h-[110px] p-1.5 sm:p-2 rounded-xl border flex flex-col justify-between cursor-pointer transition-all ${
                       cell.isToday
-                        ? 'bg-emerald-50/80 border-emerald-400 ring-1 ring-emerald-400'
+                        ? 'bg-emerald-50/70 border-emerald-400 ring-1 ring-emerald-400'
                         : hasBookings
-                        ? 'bg-white border-brand-gray-200 hover:border-brand-black hover:shadow-sm'
+                        ? 'bg-white border-brand-gray-200 hover:border-brand-black hover:shadow-md'
                         : 'bg-white/60 border-brand-gray-100 hover:border-brand-gray-300'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-bold ${cell.isToday ? 'text-emerald-800' : 'text-brand-black'}`}>
-                        {cell.dayNum}
-                      </span>
-                      {cell.isToday && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Today" />
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1">
+                        <span className={`text-xs font-bold ${cell.isToday ? 'text-emerald-800 font-black' : 'text-brand-black'}`}>
+                          {cell.dayNum}
+                        </span>
+                        {cell.isToday && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Today" />
+                        )}
+                      </div>
+                      {hasBookings && (
+                        <span className="text-[9px] font-mono font-bold text-brand-gray-500 hidden sm:inline">
+                          {formatPrice(cell.revenue || 0)}
+                        </span>
                       )}
                     </div>
 
                     {hasBookings ? (
-                      <div className="space-y-0.5">
-                        <span className="block text-[10px] font-bold text-brand-black bg-brand-gray-100 rounded px-1 text-center truncate">
-                          {cell.bookingsCount} apt{cell.bookingsCount! > 1 ? 's' : ''}
-                        </span>
-                        <span className="hidden sm:block text-[9px] font-mono font-semibold text-brand-gray-500 truncate text-right">
-                          {formatPrice(cell.revenue || 0)}
-                        </span>
+                      <div className="space-y-1 overflow-hidden flex-1 flex flex-col justify-end">
+                        {cellBookings.slice(0, 2).map((b) => {
+                          const svc = typeof b.serviceId === 'object' ? (b.serviceId as Service) : services.find(s => s._id === b.serviceId);
+                          const att = typeof b.attendantId === 'object' ? (b.attendantId as Attendant) : attendants.find(a => a._id === b.attendantId);
+                          const isConfirmed = b.status === 'confirmed';
+                          const isCompleted = b.status === 'completed';
+
+                          return (
+                            <div
+                              key={b._id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (cell.dateStr) setSelectedDate(cell.dateStr);
+                                setSelectedBooking(b);
+                              }}
+                              title={`Click for details: ${b.customerName || 'Client'} - ${svc?.name || 'Service'} with ${att?.name || 'Stylist'} @ ${b.startTime}`}
+                              className={`px-1.5 py-1 rounded-lg text-left transition-all border shadow-2xs hover:scale-[1.02] cursor-pointer ${
+                                isConfirmed
+                                  ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-950'
+                                  : isCompleted
+                                  ? 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-950'
+                                  : 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-950'
+                              }`}
+                            >
+                              {/* Customer Name & Time */}
+                              <div className="flex items-center justify-between gap-1 leading-tight">
+                                <span className="text-[10px] font-black truncate max-w-[65px] sm:max-w-[85px]">
+                                  {b.customerName || 'Client'}
+                                </span>
+                                <span className="text-[9px] font-mono font-bold opacity-75 shrink-0">
+                                  {b.startTime}
+                                </span>
+                              </div>
+
+                              {/* Service & Stylist (visible on sm+) */}
+                              <div className="hidden sm:flex items-center justify-between gap-1 text-[9px] opacity-85 mt-0.5">
+                                <span className="truncate max-w-[60px] font-medium" title={svc?.name}>
+                                  {svc?.name || 'Service'}
+                                </span>
+                                {att && (
+                                  <span className="font-bold truncate max-w-[55px] text-brand-black flex items-center gap-0.5" title={`Stylist: ${att.name}`}>
+                                    ★ {att.name}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* More bookings pill */}
+                        {cellBookings.length > 2 && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (cell.dateStr) {
+                                setSelectedDate(cell.dateStr);
+                                setScope('day');
+                              }
+                            }}
+                            className="text-[9px] font-bold text-center py-0.5 rounded bg-brand-gray-100 hover:bg-brand-gray-200 text-brand-gray-700 transition-colors"
+                          >
+                            +{cellBookings.length - 2} more →
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <span className="text-[10px] text-brand-gray-300 hidden sm:block">No appts</span>
+                      <span className="text-[10px] text-brand-gray-300 hidden sm:block pb-1">No appts</span>
                     )}
                   </div>
                 );
