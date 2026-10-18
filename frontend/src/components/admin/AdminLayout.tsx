@@ -91,22 +91,6 @@ export function AdminLayout({
             </div>
           </div>
 
-          {/* Quick Search Button */}
-          {onOpenSearch && (
-            <button
-              type="button"
-              onClick={onOpenSearch}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 bg-brand-gray-50 hover:bg-brand-gray-100 border border-brand-gray-200 rounded-xl text-xs text-brand-gray-600 hover:text-brand-black transition-all cursor-pointer group shadow-2xs"
-            >
-              <div className="flex items-center gap-2.5">
-                <Search size={14} className="text-brand-gray-400 group-hover:text-brand-black transition-colors" />
-                <span className="font-semibold">Search bookings...</span>
-              </div>
-              <kbd className="text-[10px] bg-white border border-brand-gray-200 px-1.5 py-0.5 rounded font-mono text-brand-gray-400 group-hover:border-brand-gray-300">
-                ⌘K
-              </kbd>
-            </button>
-          )}
 
           {/* Navigation Items */}
           <nav className="space-y-1">
