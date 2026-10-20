@@ -1068,13 +1068,7 @@ export default function App() {
 
   try {
     return (
-      <div className={`min-h-screen ${viewMode === 'admin' && ownerToken ? 'w-full lg:max-w-none' : 'max-w-lg'} mx-auto bg-[#FAF8F5] relative flex flex-col font-sans tracking-tight`}>
-        {/* Subtle Ambient Glows (#D4A359 at 15% opacity) */}
-        <div className="ambient-glow-mesh" aria-hidden="true">
-          <div className="ambient-orb-1" />
-          <div className="ambient-orb-2" />
-          <div className="ambient-orb-3" />
-        </div>
+      <div className={`min-h-screen ${viewMode === 'admin' && ownerToken ? 'w-full lg:max-w-none' : 'max-w-lg'} mx-auto bg-brand-white relative flex flex-col font-sans tracking-tight`}>
         <AnimatePresence>
           {apiError && (
             <motion.div
@@ -1240,27 +1234,27 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <header className={`px-4 sm:px-8 py-6 sm:py-10 flex justify-between items-center bg-[#FAF8F5]/85 backdrop-blur-md sticky top-0 z-40 border-b border-[rgba(232,226,217,0.65)] ${viewMode === 'admin' && ownerToken ? 'lg:hidden' : ''}`}>
+        <header className={`px-4 sm:px-8 py-6 sm:py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100 ${viewMode === 'admin' && ownerToken ? 'lg:hidden' : ''}`}>
           <div className="flex items-center gap-5 cursor-pointer group" onClick={resetFlow}>
             <div className="h-16 w-16 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
               <img
                 src={tenant?.branding?.logoUrl || "/logo-bg.jpg"}
                 alt={tenant?.name || "Salon Logo"}
-                className="h-full w-auto object-contain rounded-full shadow-xs"
+                className="h-full w-auto object-contain rounded-full"
               />
             </div>
             {/* Show attendant name badge when in staff mode */}
             {userMode === 'attendant' && attendantSession && (
               <div className="hidden sm:flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#231F1D]" />
-                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[#6E655F]">{attendantSession.name}</span>
+                <div className="w-2 h-2 rounded-full bg-brand-black" />
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-gray-600">{attendantSession.name}</span>
               </div>
             )}
             {/* Show admin badge when in owner mode */}
             {userMode === 'owner' && (
               <div className="hidden sm:flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-amber-500" />
-                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[#6E655F]">Admin Portal</span>
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-brand-gray-600">Admin Portal</span>
               </div>
             )}
           </div>
@@ -1280,13 +1274,13 @@ export default function App() {
                   setActiveStep('lookup');
                 }}
                 title="Lookup your bookings"
-                className="p-3 bg-white/70 backdrop-blur-md border border-[rgba(232,226,217,0.65)] text-[#231F1D] rounded-full hover:bg-[#231F1D] hover:text-white transition-all duration-300 shadow-xs cursor-pointer"
+                className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500"
               >
                 <Search size={18} />
               </button>
             )}
             {userMode === 'customer' && (
-              <a href={`tel:${tenant?.supportPhone || "0721530120"}`} className="p-3 bg-white/70 backdrop-blur-md border border-[rgba(232,226,217,0.65)] text-[#231F1D] rounded-full hover:bg-[#231F1D] hover:text-white transition-all duration-300 shadow-xs">
+              <a href={`tel:${tenant?.supportPhone || "0721530120"}`} className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500">
                 <Phone size={18} />
               </a>
             )}
@@ -1296,11 +1290,11 @@ export default function App() {
                 onClick={() => setShowCustomerAccountModal(true)}
                 title="My Account & Bookings"
                 aria-label="My Account & Bookings"
-                className="p-3 bg-white/70 backdrop-blur-md border border-[rgba(232,226,217,0.65)] text-[#231F1D] rounded-full hover:bg-[#231F1D] hover:text-white transition-all duration-300 relative shadow-xs cursor-pointer"
+                className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500 relative"
               >
                 <User size={18} />
                 {clientInfo.name && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-[#FAF8F5]" />
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-brand-white" />
                 )}
               </button>
             )}
@@ -1383,9 +1377,9 @@ export default function App() {
               />
             )
           ) : (
-            <div className="flex-1 flex flex-col relative z-10">
+            <div className="flex-1 flex flex-col">
               {activeStep !== 'confirmation' && activeStep !== 'lookup' && (
-                <div className="bg-transparent px-8 pt-6 pb-8">
+                <div className="bg-brand-white px-8 pt-6 pb-12">
                   <StepIndicator activeStep={activeStep} />
                 </div>
               )}
@@ -1402,18 +1396,18 @@ export default function App() {
                     >
                       <div className="space-y-4">
                         <div className="relative group">
-                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6E655F]" size={16} />
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6E5660]" size={16} />
                           <input
                             type="text"
                             placeholder="Search services..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-white/70 backdrop-blur-md border border-[rgba(232,226,217,0.65)] rounded-full py-3.5 pl-12 pr-10 focus:outline-none focus:border-[#D4A359] focus:bg-white/95 transition-all font-semibold text-[15px] text-[#231F1D] placeholder:text-[#6E655F]/75 shadow-xs"
+                            className="w-full bg-[#FAF0F3] border border-[#EEDBE1] rounded-full py-3.5 pl-12 pr-10 focus:outline-none focus:border-[#B86B7C] focus:bg-white transition-all font-semibold text-[15px] text-[#1A1215] placeholder:text-[#6E5660]/70"
                           />
                           {searchQuery && (
                             <button
                               onClick={() => setSearchQuery('')}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6E655F] hover:text-[#231F1D] cursor-pointer"
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6E5660] hover:text-[#1A1215]"
                             >
                               <X size={14} />
                             </button>
@@ -1430,9 +1424,9 @@ export default function App() {
                               if (cat === 'All Services') setSearchQuery('');
                               else setSearchQuery(cat.split(' ')[0]);
                             }}
-                            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 border cursor-pointer ${(cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()))
-                                ? 'bg-[#8C4A32] text-white border-[#8C4A32] shadow-sm'
-                                : 'bg-white/70 backdrop-blur-md text-[#231F1D] border-[rgba(232,226,217,0.65)] hover:border-[#D4A359] hover:bg-white/90'
+                            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 border ${(cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()))
+                              ? 'bg-[#B86B7C] text-white border-[#B86B7C] shadow-sm'
+                              : 'bg-white text-[#523E46] border-[#EEDBE1] hover:border-[#B86B7C]'
                               }`}
                           >
                             {cat}
@@ -1461,8 +1455,8 @@ export default function App() {
                             );
                           })
                         ) : (
-                          <div className="py-12 text-center border border-dashed border-[rgba(232,226,217,0.65)] rounded-2xl bg-white/60 backdrop-blur-md">
-                            <p className="text-[#6E655F] text-sm font-medium">No services found matching your criteria.</p>
+                          <div className="py-12 text-center border border-dashed border-[#EEDBE1] rounded-2xl bg-white">
+                            <p className="text-[#523E46] text-sm font-medium">No services found matching your criteria.</p>
                           </div>
                         )}
                       </div>
@@ -1475,10 +1469,10 @@ export default function App() {
                             transition={{ type: 'spring', damping: 25, stiffness: 250 }}
                             className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-50"
                           >
-                            <div className="bg-[rgba(44,34,30,0.88)] backdrop-blur-[16px] text-white p-4.5 rounded-2xl shadow-2xl border border-white/12 space-y-3">
+                            <div className="bg-[#1A1215] text-white p-4.5 rounded-2xl shadow-2xl border border-white/10 backdrop-blur-md space-y-3">
                               {selectedServices.length === 2 && (
                                 <div className="flex items-center justify-between text-xs border-b border-white/10 pb-2.5">
-                                  <span className="text-white/85 truncate pr-2">
+                                  <span className="text-white/80 truncate pr-2">
                                     <strong className="text-white">1st:</strong> {selectedServices[0].name} ➔ <strong className="text-white">2nd:</strong> {selectedServices[1].name}
                                   </span>
                                   <button
@@ -1493,7 +1487,7 @@ export default function App() {
                               )}
                               <div className="flex items-center justify-between">
                                 <div>
-                                  <p className="text-xs text-white/75 uppercase tracking-wider font-semibold">
+                                  <p className="text-xs text-white/60 uppercase tracking-wider font-semibold">
                                     {selectedServices.length === 1 ? '1 Service Selected' : '2 Services Selected'}
                                   </p>
                                   <p className="text-sm font-bold text-white mt-0.5">
@@ -1502,7 +1496,7 @@ export default function App() {
                                 </div>
                                 <button
                                   onClick={() => navigateStep('date')}
-                                  className="bg-[#8C4A32] text-white px-6 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-[#783E2A] active:scale-95 transition-all cursor-pointer shadow-lg"
+                                  className="bg-[#B86B7C] text-white px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-[#A55566] active:scale-95 transition-all cursor-pointer shadow-lg"
                                 >
                                   {selectedServices.length === 1 ? 'Continue (1)' : 'Continue (2)'}
                                 </button>
@@ -1552,27 +1546,27 @@ export default function App() {
                       exit={{ opacity: 0, y: -10 }}
                       className="space-y-12"
                     >
-                      <button onClick={handleStepBack} className="flex items-center gap-3 text-[#231F1D] hover:translate-x-[-4px] transition-all duration-300 cursor-pointer">
+                      <button onClick={handleStepBack} className="flex items-center gap-3 text-brand-black hover:translate-x-[-4px] transition-all duration-300">
                         <ArrowLeft size={16} strokeWidth={3} />
                         <span className="text-sm font-black uppercase tracking-[0.2em]">Previous</span>
                       </button>
 
                       <div className="space-y-10">
-                        <section className="bg-white/75 backdrop-blur-md p-6 sm:p-8 flex items-center justify-between rounded-2xl border border-[rgba(232,226,217,0.65)] shadow-xs">
+                        <section className="bg-brand-gray-50 p-6 sm:p-8 flex items-center justify-between rounded-2xl border border-brand-gray-100 shadow-xs">
                           <div className="space-y-1">
-                            <p className="text-xs uppercase font-bold tracking-wider text-[#6E655F]">Appointment Detail</p>
-                            <p className="font-serif text-2xl font-bold leading-snug text-[#231F1D]">
+                            <p className="text-xs uppercase font-bold tracking-wider text-brand-gray-600">Appointment Detail</p>
+                            <p className="font-serif text-2xl font-bold leading-snug text-brand-black">
                               {selectedServices.map(s => s.name).join(' + ')}
                             </p>
-                            <p className="text-xs font-semibold text-[#6E655F] mt-2">
+                            <p className="text-xs font-semibold text-brand-gray-500 mt-2">
                               {new Date(selectedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {selectedTime}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-black tracking-tight text-[#231F1D]">
+                            <p className="text-2xl font-black tracking-tight text-brand-black">
                               KES {totalServicePrice.toLocaleString()}
                             </p>
-                            <p className="text-xs text-[#6E655F] font-semibold mt-0.5">
+                            <p className="text-xs text-brand-gray-500 font-semibold mt-0.5">
                               {Math.floor(totalServiceDuration / 60) > 0 ? `${Math.floor(totalServiceDuration / 60)}h ` : ''}{totalServiceDuration % 60 > 0 ? `${totalServiceDuration % 60}m` : ''}
                             </p>
                           </div>
@@ -1580,43 +1574,43 @@ export default function App() {
 
                         <section className="space-y-8">
                           <div className="space-y-2">
-                            <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight text-[#231F1D]">Client Details</h2>
-                            <div className="w-12 h-1 bg-[#8C4A32] rounded-full"></div>
+                            <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight text-brand-black">Client Details</h2>
+                            <div className="w-12 h-1 bg-primary rounded-full"></div>
                           </div>
                           <div className="space-y-6">
                             <div className="space-y-2 group">
-                              <label className="text-xs font-bold uppercase tracking-wider text-[#6E655F] group-focus-within:text-[#231F1D] transition-colors">Full Name</label>
+                              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Full Name</label>
                               <div className="relative">
                                 <input
                                   type="text"
                                   placeholder="e.g. Jane Doe"
                                   value={clientInfo.name}
                                   onChange={e => setClientInfo(prev => ({ ...prev, name: e.target.value }))}
-                                  className="w-full bg-transparent border-b-2 border-[rgba(232,226,217,0.65)] py-3.5 focus:outline-none focus:border-[#8C4A32] transition-all font-semibold text-base text-[#231F1D] placeholder:text-[#6E655F]/50"
+                                  className="w-full bg-transparent border-b-2 border-brand-gray-100 py-3.5 focus:outline-none focus:border-primary transition-all font-semibold text-base text-brand-black placeholder:text-brand-gray-400/50"
                                 />
                               </div>
                             </div>
                             <div className="space-y-2 group">
-                              <label className="text-xs font-bold uppercase tracking-wider text-[#6E655F] group-focus-within:text-[#231F1D] transition-colors">Phone Number</label>
+                              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Phone Number</label>
                               <div className="relative">
                                 <input
                                   type="tel"
                                   placeholder="e.g. 0712 345 678"
                                   value={clientInfo.phone}
                                   onChange={e => setClientInfo(prev => ({ ...prev, phone: e.target.value }))}
-                                  className="w-full bg-transparent border-b-2 border-[rgba(232,226,217,0.65)] py-3.5 focus:outline-none focus:border-[#8C4A32] transition-all font-semibold text-base text-[#231F1D] placeholder:text-[#6E655F]/50"
+                                  className="w-full bg-transparent border-b-2 border-brand-gray-100 py-3.5 focus:outline-none focus:border-primary transition-all font-semibold text-base text-brand-black placeholder:text-brand-gray-400/50"
                                 />
                               </div>
                             </div>
                             <div className="space-y-2 group">
-                              <label className="text-xs font-bold uppercase tracking-wider text-[#6E655F] group-focus-within:text-[#231F1D] transition-colors">Email Address</label>
+                              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Email Address</label>
                               <div className="relative">
                                 <input
                                   type="email"
                                   placeholder="e.g. jane@example.com"
                                   value={clientInfo.email}
                                   onChange={e => setClientInfo(prev => ({ ...prev, email: e.target.value }))}
-                                  className="w-full bg-transparent border-b-2 border-[rgba(232,226,217,0.65)] py-3.5 focus:outline-none focus:border-[#8C4A32] transition-all font-semibold text-base text-[#231F1D] placeholder:text-[#6E655F]/50"
+                                  className="w-full bg-transparent border-b-2 border-brand-gray-100 py-3.5 focus:outline-none focus:border-primary transition-all font-semibold text-base text-brand-black placeholder:text-brand-gray-400/50"
                                 />
                               </div>
                             </div>
@@ -1628,13 +1622,13 @@ export default function App() {
                         disabled={!clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline || isSubmittingBooking}
                         onClick={handleConfirmBooking}
                         aria-busy={isSubmittingBooking}
-                        className="w-full bg-[#8C4A32] hover:bg-black text-white py-5 rounded-xl font-bold uppercase tracking-wider text-xs transition-all shadow-md disabled:opacity-30 active:scale-[0.99] flex items-center justify-center gap-3 cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full bg-brand-black hover:bg-black text-brand-white py-5 rounded-xl font-bold uppercase tracking-wider text-xs transition-all shadow-md disabled:opacity-30 active:scale-[0.99] flex items-center justify-center gap-3 cursor-pointer disabled:cursor-not-allowed"
                       >
                         {isOffline ? (
                           'Offline - Booking Disabled'
                         ) : isSubmittingBooking ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin text-white shrink-0" />
+                            <Loader2 className="w-4 h-4 animate-spin text-brand-white shrink-0" />
                             <span>Finalizing Booking...</span>
                           </>
                         ) : (
@@ -1749,19 +1743,19 @@ export default function App() {
                       </div>
 
                       {/* 3. Prominent Reference */}
-                      <div className="w-full bg-white/75 backdrop-blur-md border border-[rgba(232,226,217,0.65)] rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-xs">
+                      <div className="w-full bg-brand-white border-2 border-brand-black rounded-xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-sm">
                         <div>
-                          <p className="text-[11px] uppercase tracking-[0.3em] font-black text-[#6E655F]">
+                          <p className="text-[11px] uppercase tracking-[0.3em] font-black text-brand-gray-500">
                             Booking Reference
                           </p>
-                          <p className="text-2xl sm:text-3xl font-mono font-black tracking-wider text-[#231F1D] mt-0.5">
+                          <p className="text-2xl sm:text-3xl font-mono font-black tracking-wider text-brand-black mt-0.5">
                             #{createdBooking?.reference || 'PENDING'}
                           </p>
                         </div>
                         <button
                           type="button"
                           onClick={handleCopyReference}
-                          className="inline-flex items-center justify-center gap-2 self-start sm:self-auto px-4 py-2.5 rounded-xl border border-[rgba(232,226,217,0.85)] bg-white/80 hover:bg-[#231F1D] hover:text-white transition-all text-xs font-black uppercase tracking-widest active:scale-95 shadow-xs cursor-pointer text-[#231F1D]"
+                          className="inline-flex items-center justify-center gap-2 self-start sm:self-auto px-4 py-2.5 rounded-lg border-2 border-brand-black bg-brand-white hover:bg-brand-black hover:text-white transition-all text-xs font-black uppercase tracking-widest active:scale-95 shadow-sm"
                           aria-label={copiedReference ? 'Reference copied to clipboard' : 'Copy reference to clipboard'}
                         >
                           {copiedReference ? (
@@ -1779,15 +1773,15 @@ export default function App() {
                       </div>
 
                       {/* 2. What happens next */}
-                      <div className="w-full bg-white/75 backdrop-blur-md border border-[rgba(232,226,217,0.65)] rounded-2xl p-6 sm:p-7 text-left space-y-4 shadow-xs">
-                        <div className="flex items-center gap-2 border-b border-[rgba(232,226,217,0.65)] pb-3">
-                          <Clock size={16} className="text-[#6E655F]" aria-hidden="true" />
-                          <h3 className="text-xs font-black uppercase tracking-[0.25em] text-[#231F1D]">
+                      <div className="w-full bg-brand-gray-50 border-2 border-brand-black/15 rounded-xl p-6 sm:p-7 text-left space-y-4">
+                        <div className="flex items-center gap-2 border-b border-brand-black/10 pb-3">
+                          <Clock size={16} className="text-brand-gray-600" aria-hidden="true" />
+                          <h3 className="text-xs font-black uppercase tracking-[0.25em] text-brand-gray-700">
                             {createdBooking?.status === 'confirmed' ? 'Appointment Information' : 'What happens next'}
                           </h3>
                         </div>
 
-                        <ol className="space-y-3.5 text-xs sm:text-sm text-[#6E655F]">
+                        <ol className="space-y-3.5 text-xs sm:text-sm text-brand-gray-600">
                           {createdBooking?.status === 'confirmed' ? (
                             <>
                               <li className="flex items-start gap-3">
@@ -1795,16 +1789,16 @@ export default function App() {
                                   ✓
                                 </span>
                                 <div className="pt-0.5 leading-relaxed">
-                                  <span className="font-bold text-[#231F1D]">Your appointment is confirmed.</span> Your stylist and slot have been scheduled.
+                                  <span className="font-bold text-brand-black">Your appointment is confirmed.</span> Your stylist and slot have been scheduled.
                                 </div>
                               </li>
                               {createdBooking?.attendantId && typeof createdBooking.attendantId === 'object' && (
                                 <li className="flex items-start gap-3">
-                                  <span className="shrink-0 w-6 h-6 rounded-full bg-[#8C4A32] text-white font-bold text-[11px] flex items-center justify-center">
+                                  <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
                                     ★
                                   </span>
                                   <div className="pt-0.5 leading-relaxed">
-                                    <span className="font-bold text-[#231F1D]">Assigned Stylist:</span>{' '}
+                                    <span className="font-bold text-brand-black">Assigned Stylist:</span>{' '}
                                     <span className="font-semibold text-emerald-800">
                                       {(createdBooking.attendantId as any).name}
                                     </span>
@@ -1812,11 +1806,11 @@ export default function App() {
                                 </li>
                               )}
                               <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-[#2C221E] text-white font-bold text-[11px] flex items-center justify-center">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
                                   ⏱
                                 </span>
                                 <div className="pt-0.5 leading-relaxed">
-                                  Please arrive <span className="font-bold text-[#231F1D]">5 minutes early</span> to ensure a smooth session.
+                                  Please arrive <span className="font-bold text-brand-black">5 minutes early</span> to ensure a smooth session.
                                 </div>
                               </li>
                             </>
@@ -1832,22 +1826,22 @@ export default function App() {
                           ) : (
                             <>
                               <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-[#8C4A32] text-white font-bold text-[11px] flex items-center justify-center">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
                                   1
                                 </span>
                                 <div className="pt-0.5 leading-relaxed">
-                                  <span className="font-bold text-[#231F1D]">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
+                                  <span className="font-bold text-brand-black">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
                                 </div>
                               </li>
                               <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-[#8C4A32] text-white font-bold text-[11px] flex items-center justify-center">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
                                   2
                                 </span>
                                 <div className="pt-0.5 leading-relaxed">
                                   We'll email you a confirmation{clientInfo.email || createdBooking?.email ? (
                                     <>
                                       {' '}at{' '}
-                                      <strong className="text-[#231F1D] underline decoration-[#8C4A32]/40 break-all">
+                                      <strong className="text-brand-black underline decoration-brand-black/30 break-all">
                                         {createdBooking?.email || clientInfo.email}
                                       </strong>
                                     </>
@@ -1856,7 +1850,7 @@ export default function App() {
                                 </div>
                               </li>
                               <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-[#8C4A32] text-white font-bold text-[11px] flex items-center justify-center">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
                                   3
                                 </span>
                                 <div className="pt-0.5 leading-relaxed">
@@ -1869,25 +1863,25 @@ export default function App() {
                       </div>
 
                       {/* 4. Details Card */}
-                      <div className="bg-white/75 backdrop-blur-md w-full p-6 sm:p-8 text-left space-y-6 border border-[rgba(232,226,217,0.65)] rounded-2xl shadow-xs">
-                        <div className="border-b border-[rgba(232,226,217,0.65)] pb-4 flex flex-row items-center justify-between gap-3">
+                      <div className="bg-brand-gray-50 w-full p-6 sm:p-8 text-left space-y-6 border-2 border-brand-black rounded-xl">
+                        <div className="border-b border-brand-black/10 pb-4 flex flex-row items-center justify-between gap-3">
                           <div>
-                            <span className="text-[11px] uppercase tracking-[0.25em] font-black text-[#6E655F] block">
+                            <span className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500 block">
                               Scheduled Date & Time
                             </span>
-                            <p className="font-serif font-black text-lg sm:text-xl text-[#231F1D] mt-1">
+                            <p className="font-serif font-black text-lg sm:text-xl text-brand-black mt-1">
                               {confirmationFriendlyDate}
                             </p>
                           </div>
                           <div className="shrink-0 text-right">
-                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-[#2C221E] text-white text-xs font-mono font-bold tracking-wider rounded-lg border border-white/10 shadow-xs">
+                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-brand-black text-white text-xs font-mono font-bold tracking-wider border-2 border-brand-black transition-all duration-300 hover:bg-brand-white hover:text-brand-black cursor-default select-none shadow-sm hover:shadow-md">
                               {confirmationTimeRange}
                             </span>
                           </div>
                         </div>
 
                         <div className="space-y-4">
-                          <p className="text-[11px] uppercase tracking-[0.25em] font-black text-[#6E655F]">
+                          <p className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500">
                             Requested Services ({selectedServices.length > 0 ? selectedServices.length : 1})
                           </p>
                           <div className="space-y-3">
@@ -1904,23 +1898,23 @@ export default function App() {
                                 return (
                                   <div
                                     key={service._id || idx}
-                                    className="p-4 bg-white/60 border border-[rgba(232,226,217,0.65)] rounded-xl space-y-2"
+                                    className="p-4 bg-brand-white border border-brand-black/10 rounded-lg space-y-2"
                                   >
                                     <div className="flex justify-between items-start gap-3">
-                                      <span className="font-bold text-sm text-[#231F1D] leading-snug">
+                                      <span className="font-black text-sm uppercase text-brand-black leading-snug">
                                         {service.name}
                                       </span>
-                                      <span className="font-bold text-xs text-[#231F1D] shrink-0">
+                                      <span className="font-bold text-xs text-brand-black shrink-0">
                                         {formatPrice(service.price, service.priceMax)}
                                       </span>
                                     </div>
-                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6E655F]">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
                                       <span className="inline-flex items-center gap-1.5">
-                                        <User size={13} className="text-[#6E655F]" />
-                                        <span>Artist: <strong className="text-[#231F1D] font-semibold">{artistName}</strong></span>
+                                        <User size={13} className="text-brand-gray-400" />
+                                        <span>Artist: <strong className="text-brand-black font-semibold">{artistName}</strong></span>
                                       </span>
                                       <span className="inline-flex items-center gap-1.5">
-                                        <Clock size={13} className="text-[#6E655F]" />
+                                        <Clock size={13} className="text-brand-gray-400" />
                                         <span>{serviceTime}</span>
                                       </span>
                                     </div>
@@ -1928,23 +1922,23 @@ export default function App() {
                                 );
                               })
                             ) : (
-                              <div className="p-4 bg-white/60 border border-[rgba(232,226,217,0.65)] rounded-xl space-y-2">
+                              <div className="p-4 bg-brand-white border border-brand-black/10 rounded-lg space-y-2">
                                 <div className="flex justify-between items-start gap-3">
-                                  <span className="font-bold text-sm text-[#231F1D] leading-snug">
+                                  <span className="font-black text-sm uppercase text-brand-black leading-snug">
                                     {typeof createdBooking?.serviceId === 'object' && createdBooking?.serviceId ? createdBooking.serviceId.name : 'Appointment'}
                                   </span>
                                   {createdBooking?.price !== undefined && (
-                                    <span className="font-bold text-xs text-[#231F1D] shrink-0">
+                                    <span className="font-bold text-xs text-brand-black shrink-0">
                                       KES {createdBooking.price.toLocaleString()}
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6E655F]">
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
                                   <span className="inline-flex items-center gap-1.5">
-                                    <User size={13} className="text-[#6E655F]" />
+                                    <User size={13} className="text-brand-gray-400" />
                                     <span>
                                       Artist:{' '}
-                                      <strong className="text-[#231F1D] font-semibold">
+                                      <strong className="text-brand-black font-semibold">
                                         {typeof createdBooking?.attendantId === 'object' && createdBooking?.attendantId
                                           ? createdBooking.attendantId.name
                                           : 'Any Available'}
@@ -1952,7 +1946,7 @@ export default function App() {
                                     </span>
                                   </span>
                                   <span className="inline-flex items-center gap-1.5">
-                                    <Clock size={13} className="text-[#6E655F]" />
+                                    <Clock size={13} className="text-brand-gray-400" />
                                     <span>{confirmationTimeRange}</span>
                                   </span>
                                 </div>
@@ -1961,11 +1955,11 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="border-t border-[rgba(232,226,217,0.65)] pt-5 flex justify-between items-center">
-                          <span className="text-xs uppercase tracking-[0.25em] font-black text-[#6E655F]">
+                        <div className="border-t border-brand-black/15 pt-5 flex justify-between items-center">
+                          <span className="text-xs uppercase tracking-[0.25em] font-black text-brand-gray-600">
                             Total Cost
                           </span>
-                          <span className="font-black text-base sm:text-lg text-[#231F1D]">
+                          <span className="font-black text-base sm:text-lg text-brand-black">
                             KES {(totalServicePrice || createdBooking?.price || 0).toLocaleString()}
                           </span>
                         </div>
@@ -1977,7 +1971,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => handleCheckBookingStatus(createdBooking?.reference)}
-                          className="w-full bg-[#8C4A32] text-white py-5 rounded-xl font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-[#783E2A] hover:tracking-[0.3em] active:scale-[0.98] shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full bg-brand-black text-brand-white py-5 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-brand-gray-800 hover:tracking-[0.3em] active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
                         >
                           <Search size={15} />
                           <span>Check booking status</span>
@@ -1989,7 +1983,7 @@ export default function App() {
                             href={whatsAppUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full bg-[#25D366] text-white py-4 rounded-xl font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-[#20ba59] active:scale-[0.98] shadow-sm flex items-center justify-center gap-2"
+                            className="w-full bg-[#25D366] text-white py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-[#20ba59] active:scale-[0.98] shadow-sm flex items-center justify-center gap-2"
                           >
                             <MessageCircle size={16} />
                             <span>Message us on WhatsApp</span>
@@ -2000,7 +1994,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={resetFlow}
-                          className="w-full bg-white/70 backdrop-blur-md border border-[rgba(232,226,217,0.85)] text-[#231F1D] py-4 rounded-xl font-black uppercase tracking-[0.25em] text-xs transition-all hover:border-[#8C4A32] hover:bg-white active:scale-[0.98] cursor-pointer"
+                          className="w-full bg-transparent border-2 border-brand-black/30 text-brand-black py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:border-brand-black hover:bg-brand-black hover:text-white active:scale-[0.98]"
                         >
                           Book another appointment
                         </button>
@@ -2016,11 +2010,11 @@ export default function App() {
                       exit={{ opacity: 0, y: -10 }}
                       className="space-y-8"
                     >
-                      <div className="flex justify-between items-center border-b border-[rgba(232,226,217,0.65)] pb-4">
-                        <h2 className="text-3xl font-serif font-black uppercase tracking-tight text-[#231F1D]">Lookup Booking</h2>
+                      <div className="flex justify-between items-center border-b border-brand-black pb-4">
+                        <h2 className="text-3xl font-serif font-black uppercase tracking-tight">Lookup Booking</h2>
                         <button
                           onClick={resetFlow}
-                          className="text-xs font-black uppercase tracking-widest bg-white/70 backdrop-blur-md border border-[rgba(232,226,217,0.85)] text-[#231F1D] py-2 px-4 rounded-xl hover:bg-[#231F1D] hover:text-white transition-all cursor-pointer"
+                          className="text-xs font-black uppercase tracking-widest bg-brand-gray-50 border border-brand-gray-200 py-2 px-3 hover:bg-brand-black hover:text-white transition-all"
                         >
                           Back
                         </button>
@@ -2028,28 +2022,28 @@ export default function App() {
 
                       {/* Reschedule Overlay Panel */}
                       {reschedulingBooking && (
-                        <div className="border border-[rgba(232,226,217,0.65)] bg-white/85 backdrop-blur-md p-6 space-y-6 rounded-2xl shadow-sm">
-                          <div className="border-b border-[rgba(232,226,217,0.65)] pb-3 flex justify-between items-center">
-                            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-[#231F1D]">Reschedule Slot</h3>
-                            <span className="text-xs font-serif italic text-[#6E655F]">#{reschedulingBooking.reference}</span>
+                        <div className="border-2 border-brand-black bg-brand-white p-6 space-y-6 rounded-xl">
+                          <div className="border-b border-brand-black/10 pb-3 flex justify-between items-center">
+                            <h3 className="text-sm font-black uppercase tracking-[0.2em]">Reschedule Slot</h3>
+                            <span className="text-xs font-serif italic">#{reschedulingBooking.reference}</span>
                           </div>
 
                           <div className="space-y-4">
                             <div>
-                              <label className="block text-[11px] font-black uppercase tracking-widest text-[#6E655F] mb-2">New Date</label>
+                              <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">New Date</label>
                               <input
                                 type="date"
                                 value={rescheduleDate}
                                 min={formatDateInTimezone(Date.now() + 86400000)} // from tomorrow
                                 onChange={e => handleRescheduleDateChange(e.target.value)}
-                                className="w-full bg-white/80 border border-[rgba(232,226,217,0.85)] p-4 text-[13px] font-black uppercase tracking-widest text-[#231F1D] rounded-xl focus:outline-none focus:border-[#8C4A32]"
+                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none"
                               />
                             </div>
 
                             <div>
-                              <label className="block text-[11px] font-black uppercase tracking-widest text-[#6E655F] mb-2">New Time Slot</label>
+                              <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">New Time Slot</label>
                               {rescheduleSlotsLoading ? (
-                                <div className="text-center py-6 text-xs font-serif italic text-[#6E655F]">Checking availability...</div>
+                                <div className="text-center py-6 text-xs font-serif italic text-brand-gray-400">Checking availability...</div>
                               ) : rescheduleSlots.length > 0 ? (
                                 <div className="grid grid-cols-3 gap-2">
                                   {rescheduleSlots.map(slot => (
@@ -2057,9 +2051,9 @@ export default function App() {
                                       key={slot}
                                       type="button"
                                       onClick={() => setRescheduleTime(slot)}
-                                      className={`py-3 text-xs font-black tracking-widest border transition-all rounded-xl cursor-pointer ${rescheduleTime === slot
-                                        ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#8C4A32]/40'
-                                        : 'bg-white/70 text-[#231F1D] border-[rgba(232,226,217,0.65)] hover:border-[#D4A359]'
+                                      className={`py-3 text-xs font-black tracking-widest border transition-all rounded-lg ${rescheduleTime === slot
+                                        ? 'bg-brand-black text-white border-brand-black'
+                                        : 'bg-transparent text-brand-black border-brand-gray-200 hover:border-brand-black'
                                         }`}
                                     >
                                       {slot}
@@ -2067,7 +2061,7 @@ export default function App() {
                                   ))}
                                 </div>
                               ) : (
-                                <div className="text-center py-6 text-xs font-serif italic text-[#6E655F] border border-dashed border-[rgba(232,226,217,0.65)] rounded-xl bg-white/50">
+                                <div className="text-center py-6 text-xs font-serif italic text-brand-gray-400 border border-dashed border-brand-gray-200">
                                   No available slots for this date.
                                 </div>
                               )}
@@ -2079,14 +2073,14 @@ export default function App() {
                               type="button"
                               disabled={!rescheduleTime || rescheduleSubmitting}
                               onClick={handleConfirmReschedule}
-                              className="flex-1 bg-[#8C4A32] text-white py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-[#783E2A] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl cursor-pointer shadow-md"
+                              className="flex-1 bg-brand-black text-white py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
                             >
                               {rescheduleSubmitting ? 'Updating...' : 'Confirm Reschedule'}
                             </button>
                             <button
                               type="button"
                               onClick={() => setReschedulingBooking(null)}
-                              className="flex-1 bg-white/70 border border-[rgba(232,226,217,0.85)] text-[#231F1D] py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-[#231F1D] hover:text-white rounded-xl cursor-pointer"
+                              className="flex-1 bg-transparent border-2 border-brand-black text-brand-black py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-black hover:text-white rounded-[10px]"
                             >
                               Cancel
                             </button>
@@ -2098,11 +2092,11 @@ export default function App() {
                         <>
                           {/* Search Forms */}
                           <form onSubmit={handleLookup} className="space-y-6">
-                            <div className="flex border border-[rgba(232,226,217,0.85)] rounded-xl overflow-hidden bg-white/60 p-1 gap-1">
+                            <div className="flex border-2 border-brand-black rounded-[10px] overflow-hidden">
                               <button
                                 type="button"
                                 onClick={() => { setLookupType('reference'); setLookupResults([]); setLookupError(null); }}
-                                className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lookupType === 'reference' ? 'bg-[rgba(44,34,30,0.88)] text-white shadow-xs' : 'bg-transparent text-[#231F1D] hover:bg-white/60'
+                                className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest border-r-2 border-brand-black transition-all ${lookupType === 'reference' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
                                   }`}
                               >
                                 Search Reference
@@ -2110,7 +2104,7 @@ export default function App() {
                               <button
                                 type="button"
                                 onClick={() => { setLookupType('phone'); setLookupResults([]); setLookupError(null); }}
-                                className={`flex-1 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer ${lookupType === 'phone' ? 'bg-[rgba(44,34,30,0.88)] text-white shadow-xs' : 'bg-transparent text-[#231F1D] hover:bg-white/60'
+                                className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${lookupType === 'phone' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
                                   }`}
                               >
                                 Search Phone
@@ -2118,7 +2112,7 @@ export default function App() {
                             </div>
 
                             <div className="space-y-4">
-                              <label className="block text-[11px] font-black uppercase tracking-widest text-[#6E655F] mb-2">
+                              <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">
                                 {lookupType === 'reference' ? 'Service Reference Number' : 'Customer Phone Number'}
                               </label>
                               <input
@@ -2126,12 +2120,12 @@ export default function App() {
                                 value={lookupQuery}
                                 onChange={e => setLookupQuery(e.target.value)}
                                 placeholder={lookupType === 'reference' ? 'e.g. LMN-XXXXX' : 'e.g. 07XXXXXXXX'}
-                                className="w-full bg-white/70 backdrop-blur-md border border-[rgba(232,226,217,0.65)] rounded-xl p-4 text-[13px] font-bold text-[#231F1D] focus:outline-none focus:border-[#8C4A32] placeholder:text-[#6E655F]/50 shadow-xs"
+                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none placeholder:text-brand-gray-300 animate-none"
                               />
                               <button
                                 type="submit"
                                 disabled={lookupLoading || !lookupQuery.trim()}
-                                className="w-full bg-[#8C4A32] text-white py-4.5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#783E2A] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl cursor-pointer shadow-md"
+                                className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
                               >
                                 {lookupLoading ? 'Searching...' : 'Find Booking'}
                               </button>
@@ -2140,15 +2134,15 @@ export default function App() {
 
                           {/* Lookup Errors */}
                           {lookupError && (
-                            <div className="p-5 border border-dashed border-red-400 bg-red-50/70 text-center rounded-xl">
-                              <p className="font-serif italic text-sm text-red-700">{lookupError}</p>
+                            <div className="p-5 border-2 border-dashed border-red-500 bg-red-50/50 text-center">
+                              <p className="font-serif italic text-sm text-red-600">{lookupError}</p>
                             </div>
                           )}
 
                           {/* Results Listing */}
                           {lookupResults.length > 0 && (
                             <div className="space-y-6 pt-4">
-                              <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[#6E655F] border-b border-[rgba(232,226,217,0.65)] pb-2">
+                              <h3 className="text-xs font-black uppercase tracking-[0.3em] text-brand-gray-500 border-b border-brand-black/5 pb-2">
                                 Appointments Found ({lookupResults.length})
                               </h3>
                               <div className="space-y-4">
@@ -2157,16 +2151,16 @@ export default function App() {
                                   const attendant = typeof booking.attendantId === 'object' ? booking.attendantId : null;
 
                                   return (
-                                    <div key={booking._id} className="border border-[rgba(232,226,217,0.65)] p-6 space-y-4 bg-white/75 backdrop-blur-md rounded-2xl shadow-xs">
-                                      <div className="flex justify-between items-center border-b border-[rgba(232,226,217,0.65)] pb-3">
-                                        <span className="font-mono font-black text-xs uppercase text-[#231F1D]">#{booking.reference || 'LMN-LEGACY'}</span>
-                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${booking.status === 'confirmed'
-                                          ? 'bg-emerald-600 text-white border-emerald-600'
+                                    <div key={booking._id} className="border-2 border-brand-black p-6 space-y-4 bg-brand-gray-50 rounded-xl">
+                                      <div className="flex justify-between items-center border-b border-brand-black/10 pb-3">
+                                        <span className="font-black text-xs uppercase italic">#{booking.reference || 'LMN-LEGACY'}</span>
+                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 border ${booking.status === 'confirmed'
+                                          ? 'bg-green-500 text-white border-green-500'
                                           : booking.status === 'cancelled'
                                             ? 'bg-red-500 text-white border-red-500'
                                             : booking.status === 'completed'
-                                              ? 'bg-blue-600 text-white border-blue-600'
-                                              : 'bg-amber-500 text-white border-amber-500'
+                                              ? 'bg-brand-gray-400 text-white border-brand-gray-400'
+                                              : 'bg-yellow-500 text-white border-yellow-500'
                                           }`}>
                                           {booking.status}
                                         </span>
@@ -2174,30 +2168,30 @@ export default function App() {
 
                                       <div className="grid grid-cols-2 gap-y-3 text-xs">
                                         <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-[#6E655F] mb-1">Service</p>
-                                          <p className="font-bold text-[#231F1D]">{svc ? svc.name : 'Unknown Service'}</p>
+                                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Service</p>
+                                          <p className="font-bold uppercase">{svc ? svc.name : 'Unknown Service'}</p>
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-[#6E655F] mb-1">Cost</p>
-                                          <p className="font-bold text-[#231F1D]">{svc ? formatPrice(svc.price, svc.priceMax) : 'KES 0'}</p>
+                                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Cost</p>
+                                          <p className="font-bold">{svc ? formatPrice(svc.price, svc.priceMax) : 'KES 0'}</p>
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-[#6E655F] mb-1">Stylist / Artist</p>
-                                          <p className="font-serif italic text-sm text-[#231F1D]">{attendant ? attendant.name : 'Any Available'}</p>
+                                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Stylist / Artist</p>
+                                          <p className="font-serif italic text-sm">{attendant ? attendant.name : 'Any Available'}</p>
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-[#6E655F] mb-1">Schedule</p>
-                                          <p className="font-bold text-[#231F1D]">{booking.date} @ {booking.startTime}</p>
+                                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Schedule</p>
+                                          <p className="font-bold">{booking.date} @ {booking.startTime}</p>
                                         </div>
                                       </div>
 
                                       {/* Action items for active bookings */}
                                       {booking.status !== 'cancelled' && booking.status !== 'completed' && (
-                                        <div className="flex gap-2 pt-2 border-t border-[rgba(232,226,217,0.65)]">
+                                        <div className="flex gap-2 pt-2 border-t border-brand-black/5">
                                           <button
                                             type="button"
                                             onClick={() => handleStartReschedule(booking)}
-                                            className="flex-1 bg-white/70 border border-[rgba(232,226,217,0.85)] text-[#231F1D] py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-[#231F1D] hover:text-white rounded-xl cursor-pointer"
+                                            className="flex-1 bg-brand-white border border-brand-black text-brand-black py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-brand-black hover:text-white rounded-[10px]"
                                           >
                                             Reschedule
                                           </button>
@@ -2205,7 +2199,7 @@ export default function App() {
                                             type="button"
                                             disabled={cancelLoading}
                                             onClick={() => handleCancelBooking(booking._id)}
-                                            className="flex-1 bg-transparent border border-red-500/80 text-red-600 py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-red-600 hover:text-white disabled:opacity-55 rounded-xl cursor-pointer"
+                                            className="flex-1 bg-transparent border border-red-500 text-red-500 py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-red-500 hover:text-white disabled:opacity-55 rounded-[10px]"
                                           >
                                             Cancel Appt
                                           </button>
@@ -2277,9 +2271,9 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
 
   return (
     <div className="flex items-center justify-between relative max-w-[340px] mx-auto px-2">
-      <div className="absolute top-[8px] left-4 right-4 h-[2px] bg-[rgba(232,226,217,0.65)] -z-10">
+      <div className="absolute top-[8px] left-4 right-4 h-[2px] bg-[#EEDBE1] -z-10">
         <div
-          className="h-full bg-[#8C4A32] transition-all duration-700 ease-out"
+          className="h-full bg-[#B86B7C] transition-all duration-700 ease-out"
           style={{ width: `${(Math.max(0, Math.min(activeIndex, steps.length - 1)) / (steps.length - 1)) * 100}%` }}
         />
       </div>
@@ -2288,8 +2282,8 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
         const isActive = idx === activeIndex;
         return (
           <div key={idx} className="flex flex-col items-center gap-2">
-            <div className={`w-[14px] h-[14px] rounded-full transition-all duration-500 ${isCompleted || isActive ? 'bg-[#8C4A32] scale-110 shadow-sm ring-4 ring-[#8C4A32]/20' : 'bg-[#E0D7CC]'}`}></div>
-            <span className={`text-[11px] tracking-normal transition-colors duration-500 ${isActive ? 'text-[#231F1D] font-bold' : 'text-[#6E655F] font-medium'}`}>
+            <div className={`w-[14px] h-[14px] rounded-full transition-all duration-500 ${isCompleted || isActive ? 'bg-[#B86B7C] scale-110 shadow-sm' : 'bg-[#EEDBE1]'}`}></div>
+            <span className={`text-[11px] tracking-normal transition-colors duration-500 ${isActive ? 'text-[#1A1215] font-bold' : 'text-[#523E46] font-medium'}`}>
               {step.label}
             </span>
           </div>
@@ -2301,14 +2295,14 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
 
 function ServiceSelectionCardSkeleton() {
   return (
-    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[rgba(232,226,217,0.65)] bg-white/70 backdrop-blur-md overflow-hidden animate-pulse shadow-xs">
+    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[#EEDBE1] bg-white overflow-hidden animate-pulse">
       <div className="flex-1 space-y-2.5">
-        <div className="h-4 w-2/3 bg-[#E0D7CC]/60 rounded-full" />
-        <div className="h-3 w-1/3 bg-[#E0D7CC]/40 rounded-full" />
+        <div className="h-4 w-2/3 bg-[#F5E1E6] rounded-full" />
+        <div className="h-3 w-1/3 bg-[#F5E1E6] rounded-full" />
       </div>
       <div className="flex flex-col items-end gap-3">
-        <div className="w-5 h-5 rounded-full bg-[#E0D7CC]/60" />
-        <div className="h-3.5 w-14 bg-[#E0D7CC]/60 rounded-full" />
+        <div className="w-5 h-5 rounded-full bg-[#F5E1E6]" />
+        <div className="h-3.5 w-14 bg-[#F5E1E6] rounded-full" />
       </div>
     </div>
   );
@@ -2332,29 +2326,29 @@ function ServiceSelectionCard({
       className={`
         flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden backdrop-blur-md
         ${isSelected
-          ? 'bg-white/85 border-[#8C4A32]/60 shadow-md ring-2 ring-[#8C4A32]/20'
-          : 'bg-white/70 border-[rgba(232,226,217,0.65)] hover:bg-white/85 hover:border-[#D4A359]/60 hover:shadow-xs'}
+          ? 'bg-[#FFF5F7]/90 border-[#B86B7C] shadow-md ring-2 ring-[#B86B7C]/25'
+          : 'bg-white/80 border-[#EEDBE1] hover:bg-white hover:border-[#B86B7C] hover:shadow-xs'}
       `}
       onClick={onSelect}
     >
       <div className="flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-sans font-semibold text-[16px] text-[#231F1D] leading-tight transition-transform duration-300">{service.name}</h3>
+          <h3 className="font-sans font-semibold text-[16px] text-[#1A1215] leading-tight transition-transform duration-300">{service.name}</h3>
           {selectionOrder && (
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white shadow-xs ${selectionOrder === 1 ? 'bg-[#8C4A32]' : 'bg-[#2C221E]'}`}>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white shadow-xs ${selectionOrder === 1 ? 'bg-[#B86B7C]' : 'bg-[#4A2D35]'}`}>
               {selectionOrder === 1 ? '1st Service' : '2nd Service'}
             </span>
           )}
         </div>
-        <p className="mt-1.5 text-xs font-medium text-[#6E655F]">
+        <p className="mt-1.5 text-xs font-medium text-[#523E46]">
           {service.duration > 60 ? `${Math.round(service.duration / 60)} hrs` : `${service.duration} min`}
         </p>
       </div>
       <div className="flex flex-col items-end gap-3">
-        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-[#8C4A32] bg-[#8C4A32]' : 'border-[rgba(232,226,217,0.85)] group-hover:border-[#8C4A32]'}`}>
+        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-[#B86B7C] bg-[#B86B7C]' : 'border-[#DFBFC7] group-hover:border-[#B86B7C]'}`}>
           {isSelected && <CheckCircle2 size={12} strokeWidth={3} className="text-white" />}
         </div>
-        <p className="font-bold text-sm text-[#231F1D] tracking-tight">{formatPrice(service.price, service.priceMax)}</p>
+        <p className="font-bold text-sm text-[#1A1215] tracking-tight">{formatPrice(service.price, service.priceMax)}</p>
       </div>
     </motion.div>
   );
@@ -2386,7 +2380,7 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
     <div className="space-y-8 h-[350px] overflow-y-auto pr-2 scrollbar-hide">
       {months.map(([month, monthDates], i) => (
         <div key={i} className="space-y-4">
-          <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-[#231F1D] border-b border-[rgba(232,226,217,0.65)] pb-2">{month}</h3>
+          <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-[#3D2D34] border-b border-[#EEDBE1] pb-2">{month}</h3>
           <div className="grid grid-cols-4 gap-3">
             {monthDates.map((d, j) => {
               const dateStr = formatDateInTimezone(d);
@@ -2397,12 +2391,12 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
                 <button
                   key={j}
                   onClick={() => onDateSelect(dateStr)}
-                  className={`flex flex-col items-center justify-center p-4 transition-all duration-300 border rounded-xl cursor-pointer ${isSelected
-                      ? 'bg-[#2C221E] text-white scale-105 border-[#2C221E] shadow-xl ring-2 ring-[#8C4A32]/40 z-10'
-                      : 'bg-white/70 backdrop-blur-md border-[rgba(232,226,217,0.65)] hover:border-[#D4A359] text-[#231F1D]'
+                  className={`flex flex-col items-center justify-center p-4 transition-all duration-300 border rounded-xl ${isSelected
+                    ? 'bg-[#1A1215] text-[#FDF8F9] scale-105 border-[#1A1215] shadow-xl ring-2 ring-[#B86B7C]/40 z-10'
+                    : 'bg-white border-[#EEDBE1] hover:border-[#B86B7C] text-[#1A1215]'
                     }`}
                 >
-                  <span className={`text-[11px] uppercase font-bold tracking-normal leading-none mb-1 ${isSelected ? 'text-white/80' : 'text-[#6E655F]'}`}>{dayName}</span>
+                  <span className={`text-[11px] uppercase font-bold tracking-normal leading-none mb-1 ${isSelected ? 'text-[#F5E1E6]' : 'text-[#523E46]'}`}>{dayName}</span>
                   <span className="text-xl font-black italic font-serif leading-none">{dayNum}</span>
                 </button>
               );
