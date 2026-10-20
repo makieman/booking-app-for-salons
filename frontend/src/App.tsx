@@ -2332,14 +2332,11 @@ function ServiceSelectionCard({
       className={`
         flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden backdrop-blur-md
         ${isSelected
-          ? 'bg-white/90 border-[#8C4A32] shadow-md ring-1 ring-[#8C4A32]/30'
+          ? 'bg-white/85 border-[#8C4A32]/60 shadow-md ring-2 ring-[#8C4A32]/20'
           : 'bg-white/70 border-[rgba(232,226,217,0.65)] hover:bg-white/85 hover:border-[#D4A359]/60 hover:shadow-xs'}
       `}
       onClick={onSelect}
     >
-      {isSelected && (
-        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#8C4A32]" />
-      )}
       <div className="flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-sans font-semibold text-[16px] text-[#231F1D] leading-tight transition-transform duration-300">{service.name}</h3>
