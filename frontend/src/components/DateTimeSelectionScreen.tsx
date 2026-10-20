@@ -330,22 +330,22 @@ export function DateTimeSelectionScreen({
               aria-checked={selectedAttendant === null}
               aria-label="Any professional (first available)"
               onClick={() => handleAttendantChange(null)}
-              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-200 shrink-0 min-h-[44px] ${selectedAttendant === null
-                  ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
-                  : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border backdrop-blur-md transition-all duration-200 shrink-0 min-h-[44px] ${selectedAttendant === null
+                  ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#8C4A32]/40'
+                  : 'bg-white/70 border-[rgba(232,226,217,0.65)] hover:border-[#D4A359] hover:bg-white/90 text-[#231F1D]'
                 }`}
             >
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs border ${selectedAttendant === null
                     ? 'border-white/30 bg-white/10 text-white'
-                    : 'border-brand-gray-200 bg-brand-gray-50 text-brand-black'
+                    : 'border-[rgba(232,226,217,0.8)] bg-brand-gray-50 text-[#231F1D]'
                   }`}
               >
                 <Users size={14} />
               </div>
               <div className="text-left leading-tight pr-1">
                 <span className="text-xs font-bold block">Any professional</span>
-                <span className={`text-[10px] block ${selectedAttendant === null ? 'text-white/70' : 'text-brand-gray-400'}`}>
+                <span className={`text-[10px] block ${selectedAttendant === null ? 'text-white/80' : 'text-[#6E655F]'}`}>
                   First available
                 </span>
               </div>
@@ -363,22 +363,22 @@ export function DateTimeSelectionScreen({
                   aria-checked={isSelected}
                   aria-label={`Staff member ${att.name}`}
                   onClick={() => handleAttendantChange(att)}
-                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-200 shrink-0 min-h-[44px] ${isSelected
-                      ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
-                      : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border backdrop-blur-md transition-all duration-200 shrink-0 min-h-[44px] ${isSelected
+                      ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#8C4A32]/40'
+                      : 'bg-white/70 border-[rgba(232,226,217,0.65)] hover:border-[#D4A359] hover:bg-white/90 text-[#231F1D]'
                     }`}
                 >
                   <div
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border ${isSelected
                         ? 'border-white/30 bg-white/10 text-white'
-                        : 'border-brand-gray-200 bg-brand-gray-50 text-brand-black'
+                        : 'border-[rgba(232,226,217,0.8)] bg-brand-gray-50 text-[#231F1D]'
                       }`}
                   >
                     {initials}
                   </div>
                   <div className="text-left leading-tight pr-1">
                     <span className="text-xs font-bold block">{att.name}</span>
-                    <span className={`text-[10px] block ${isSelected ? 'text-white/70' : 'text-brand-gray-400'}`}>
+                    <span className={`text-[10px] block ${isSelected ? 'text-white/80' : 'text-[#6E655F]'}`}>
                       Certified
                     </span>
                   </div>
@@ -403,8 +403,8 @@ export function DateTimeSelectionScreen({
                 aria-label={`Staff page ${idx + 1}`}
                 onClick={() => scrollToStaffSegment(idx)}
                 className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${isActive
-                    ? 'w-4 bg-brand-black shadow-xs'
-                    : 'w-1.5 bg-brand-gray-300 hover:bg-brand-gray-400'
+                    ? 'w-4 bg-[#8C4A32] shadow-xs'
+                    : 'w-1.5 bg-[#E0D7CC] hover:bg-[#C2B6A7]'
                   }`}
               />
             );
@@ -413,12 +413,12 @@ export function DateTimeSelectionScreen({
       </section>
 
       {/* Month Calendar Grid */}
-      <section aria-labelledby="calendar-heading" className="bg-white rounded-2xl border border-brand-gray-100 p-4 sm:p-5 shadow-soft space-y-4">
+      <section aria-labelledby="calendar-heading" className="bg-white/75 backdrop-blur-md rounded-2xl border border-[rgba(232,226,217,0.65)] p-4 sm:p-5 shadow-soft space-y-4">
         {/* Month Header & Controls */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CalendarIcon size={16} className="text-brand-gray-400" />
-            <h2 id="calendar-heading" className="text-base font-serif font-black tracking-tight text-brand-black">
+            <CalendarIcon size={16} className="text-[#6E655F]" />
+            <h2 id="calendar-heading" className="text-base font-serif font-black tracking-tight text-[#231F1D]">
               {monthTitle}
             </h2>
           </div>
@@ -428,7 +428,7 @@ export function DateTimeSelectionScreen({
               onClick={handlePrevMonth}
               disabled={isCurrentNairobiMonth}
               aria-label="Previous month"
-              className="w-11 h-11 flex items-center justify-center rounded-lg border border-brand-gray-100 hover:border-brand-black disabled:opacity-20 disabled:hover:border-brand-gray-100 transition-colors text-brand-black"
+              className="w-11 h-11 flex items-center justify-center rounded-lg border border-[rgba(232,226,217,0.65)] bg-white/60 hover:bg-white disabled:opacity-20 disabled:hover:border-[rgba(232,226,217,0.65)] transition-colors text-[#231F1D]"
             >
               <ChevronLeft size={18} />
             </button>
@@ -436,7 +436,7 @@ export function DateTimeSelectionScreen({
               type="button"
               onClick={handleNextMonth}
               aria-label="Next month"
-              className="w-11 h-11 flex items-center justify-center rounded-lg border border-brand-gray-100 hover:border-brand-black transition-colors text-brand-black"
+              className="w-11 h-11 flex items-center justify-center rounded-lg border border-[rgba(232,226,217,0.65)] bg-white/60 hover:bg-white transition-colors text-[#231F1D]"
             >
               <ChevronRight size={18} />
             </button>
@@ -446,7 +446,7 @@ export function DateTimeSelectionScreen({
         {/* Days of Week Header */}
         <div className="grid grid-cols-7 text-center">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-            <span key={d} className="text-[11px] font-bold uppercase tracking-wider text-brand-gray-400 py-1">
+            <span key={d} className="text-[11px] font-bold uppercase tracking-wider text-[#6E655F] py-1">
               {d}
             </span>
           ))}
@@ -491,11 +491,11 @@ export function DateTimeSelectionScreen({
                 aria-label={ariaLabel}
                 aria-selected={isSelected}
                 aria-disabled={isDisabled}
-                className={`relative aspect-square min-h-[44px] min-w-[44px] rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${isDisabled
-                    ? 'opacity-25 cursor-not-allowed text-brand-gray-400 bg-transparent'
+                className={`relative aspect-square min-h-[44px] min-w-[44px] rounded-xl flex flex-col items-center justify-center transition-all duration-200 border ${isDisabled
+                    ? 'opacity-25 cursor-not-allowed text-[#6E655F]/60 bg-transparent border-transparent'
                     : isSelected
-                      ? 'bg-brand-black text-brand-white shadow-md font-bold ring-2 ring-brand-black/20 scale-[1.03] z-10'
-                      : 'hover:bg-brand-gray-100/60 text-brand-black font-semibold bg-white'
+                      ? 'bg-[rgba(44,34,30,0.88)] text-white shadow-md font-bold ring-2 ring-[#8C4A32]/40 scale-[1.03] z-10 border-white/20'
+                      : 'hover:bg-white/90 hover:border-[#D4A359] text-[#231F1D] font-semibold bg-white/60 border-[rgba(232,226,217,0.65)]'
                   }`}
               >
                 <span className="text-sm leading-none font-medium">{dayNum}</span>
@@ -517,7 +517,7 @@ export function DateTimeSelectionScreen({
         </div>
 
         {/* Legend */}
-        <div className="pt-2 border-t border-brand-gray-100 flex items-center justify-between flex-wrap gap-2 text-[11px] text-brand-gray-500 font-medium">
+        <div className="pt-2 border-t border-[rgba(232,226,217,0.65)] flex items-center justify-between flex-wrap gap-2 text-[11px] text-[#6E655F] font-medium">
           <span>Available slots:</span>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5">
@@ -543,7 +543,7 @@ export function DateTimeSelectionScreen({
         </h2>
 
         {/* Morning / Afternoon / Evening filter container matching calendar width with centered items */}
-        <div className="w-full bg-brand-gray-100/70 p-1.5 rounded-2xl flex items-center justify-center">
+        <div className="w-full bg-white/60 backdrop-blur-md border border-[rgba(232,226,217,0.65)] p-1.5 rounded-2xl flex items-center justify-center">
           <div className="flex items-center justify-center gap-1.5 sm:gap-2 max-w-full overflow-x-auto scrollbar-hide">
             {(['all', 'morning', 'afternoon', 'evening'] as const).map(period => {
               const isActive = periodFilter === period;
@@ -560,8 +560,8 @@ export function DateTimeSelectionScreen({
                   onClick={() => setPeriodFilter(period)}
                   aria-pressed={isActive}
                   className={`text-xs px-3.5 sm:px-4 py-2 rounded-xl font-bold capitalize transition-all min-h-[38px] text-center whitespace-nowrap ${isActive
-                      ? 'bg-brand-black text-brand-white shadow-sm'
-                      : 'text-brand-gray-600 hover:text-brand-black hover:bg-white/60'
+                      ? 'bg-[rgba(44,34,30,0.88)] text-white shadow-sm'
+                      : 'text-[#6E655F] hover:text-[#231F1D] hover:bg-white/70'
                     }`}
                 >
                   {labels[period]}
@@ -575,7 +575,7 @@ export function DateTimeSelectionScreen({
         {isLoadingSlots ? (
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 pt-2 animate-pulse">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-12 bg-white rounded-xl border border-brand-gray-100" />
+              <div key={i} className="h-12 bg-white/60 rounded-xl border border-[rgba(232,226,217,0.65)]" />
             ))}
           </div>
         ) : filteredTimeSlots.length > 0 ? (
@@ -591,9 +591,9 @@ export function DateTimeSelectionScreen({
                   aria-checked={isSelected}
                   aria-label={`Select time slot at ${timeDisplay}`}
                   onClick={() => onSelectTime(time)}
-                  className={`min-h-[46px] px-3 py-2.5 rounded-xl border-2 text-xs font-black tracking-wider transition-all duration-200 flex items-center justify-center ${isSelected
-                      ? 'bg-brand-black text-brand-white border-brand-black shadow-md ring-2 ring-brand-black/10 scale-[1.02]'
-                      : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
+                  className={`min-h-[46px] px-3 py-2.5 rounded-xl border backdrop-blur-md text-xs font-black tracking-wider transition-all duration-200 flex items-center justify-center ${isSelected
+                      ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#8C4A32]/40 scale-[1.02]'
+                      : 'bg-white/75 border-[rgba(232,226,217,0.65)] hover:border-[#D4A359] text-[#231F1D]'
                     }`}
                 >
                   {timeDisplay}
@@ -602,13 +602,13 @@ export function DateTimeSelectionScreen({
             })}
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-brand-gray-100 p-6 text-center space-y-2">
-            <Clock size={28} className="mx-auto text-brand-gray-400 stroke-1" />
-            <p className="text-sm font-serif italic text-brand-gray-600">
+          <div className="bg-white/75 backdrop-blur-md rounded-2xl border border-[rgba(232,226,217,0.65)] p-6 text-center space-y-2">
+            <Clock size={28} className="mx-auto text-[#6E655F] stroke-1" />
+            <p className="text-sm font-serif italic text-[#231F1D]">
               No available slots for {formattedSelectedDate}
               {periodFilter !== 'all' ? ` in the ${periodFilter}` : ''}.
             </p>
-            <p className="text-xs text-brand-gray-400 max-w-xs mx-auto">
+            <p className="text-xs text-[#6E655F] max-w-xs mx-auto">
               Please choose another day on the calendar or try selecting &ldquo;Any professional&rdquo; to unlock more openings.
             </p>
           </div>
@@ -616,8 +616,8 @@ export function DateTimeSelectionScreen({
 
         {/* Schedule Preview for Multi-service bookings */}
         {selectedTime && multiSlotOptions.length > 0 && (
-          <div className="bg-brand-gray-50 border border-brand-gray-200 rounded-2xl p-4 space-y-2.5 mt-3">
-            <div className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">
+          <div className="bg-white/75 backdrop-blur-md border border-[rgba(232,226,217,0.65)] rounded-2xl p-4 space-y-2.5 mt-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-[#6E655F]">
               <span>Appointment Schedule Preview</span>
             </div>
             {(() => {
@@ -630,12 +630,12 @@ export function DateTimeSelectionScreen({
                       return (
                         <div
                           key={idx}
-                          className="flex items-center justify-between text-xs py-1 border-b border-brand-gray-100 last:border-b-0"
+                          className="flex items-center justify-between text-xs py-1 border-b border-[rgba(232,226,217,0.5)] last:border-b-0"
                         >
-                          <span className="font-semibold text-brand-black">
+                          <span className="font-semibold text-[#231F1D]">
                             {idx + 1}. {svc?.name} ({formatTime12(seg.startTime)} – {formatTime12(seg.endTime)})
                           </span>
-                          <span className="text-brand-gray-500 font-medium">with {seg.attendantName}</span>
+                          <span className="text-[#6E655F] font-medium">with {seg.attendantName}</span>
                         </div>
                       );
                     })}
@@ -643,7 +643,7 @@ export function DateTimeSelectionScreen({
                 );
               }
               return (
-                <p className="text-xs text-brand-black">
+                <p className="text-xs text-[#231F1D]">
                   Starts at <strong>{formatTime12(selectedTime)}</strong> ({totalDuration} min)
                 </p>
               );
@@ -652,14 +652,14 @@ export function DateTimeSelectionScreen({
         )}
       </section>
 
-      {/* Sticky Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-brand-gray-100 shadow-lg">
-        <div className="max-w-md mx-auto px-4 py-3 sm:py-3.5 flex items-center justify-between gap-4">
+      {/* Sticky Bottom Bar: Dark Espresso Glass with Terracotta Continue button */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[rgba(44,34,30,0.88)] backdrop-blur-[16px] border-t border-white/12 shadow-2xl">
+        <div className="max-w-md mx-auto px-4 py-3 sm:py-3.5 flex items-center justify-between gap-4 text-white">
           <div className="space-y-0.5">
-            <p className="text-[11px] uppercase tracking-wider font-bold text-brand-gray-500">
+            <p className="text-[11px] uppercase tracking-wider font-bold text-white/75">
               {selectedServices.length} {selectedServices.length === 1 ? 'service' : 'services'} • {formatDuration(totalDuration)}
             </p>
-            <p className="text-base font-black tracking-tight text-brand-black">
+            <p className="text-base font-black tracking-tight text-white">
               KES {totalPrice.toLocaleString()}
             </p>
           </div>
@@ -668,7 +668,7 @@ export function DateTimeSelectionScreen({
             type="button"
             disabled={!selectedTime}
             onClick={onContinue}
-            className="min-h-[48px] px-6 bg-brand-black text-brand-white font-bold text-xs uppercase tracking-[0.2em] rounded-xl transition-all disabled:opacity-25 hover:tracking-[0.25em] active:scale-[0.98] shadow-md shrink-0"
+            className="min-h-[46px] px-7 bg-[#8C4A32] text-white font-bold text-xs uppercase tracking-[0.2em] rounded-xl transition-all disabled:opacity-30 hover:bg-[#783E2A] hover:tracking-[0.25em] active:scale-[0.98] shadow-lg shrink-0 cursor-pointer disabled:cursor-not-allowed"
           >
             Continue
           </button>

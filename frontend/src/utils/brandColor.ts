@@ -9,15 +9,16 @@
  * and similar utility follows the salon automatically.
  */
 
-/** Default brand colour of the built-in "Cocoa & Copper" palette (see index.css). */
-export const DEFAULT_PRIMARY = '#9A5532';
+/** Default brand colour of the built-in "Terracotta & Espresso" palette (see index.css). */
+export const DEFAULT_PRIMARY = '#8C4A32';
 
-/** Previous default. Tenants that never customised their colour have this saved. */
+/** Previous defaults. Tenants that never customised their colour have this saved. */
 const LEGACY_DEFAULT_PRIMARY = '#B08968';
+const LEGACY_DEFAULT_PRIMARY_V2 = '#9A5532';
 
 // Fixed palette colours the derived tokens are checked against.
-const INK = '#2B1F19'; // main text colour, used as the label on accent buttons
-const DARK_SURFACE = '#33241D'; // booking bar, the surface accent buttons sit on
+const INK = '#231F1D'; // main text colour, used as the label on accent buttons
+const DARK_SURFACE = '#2C221E'; // dark espresso booking bar, the surface accent buttons sit on
 const WHITE = '#FFFFFF';
 const BLACK = '#000000';
 
@@ -69,7 +70,7 @@ export interface BrandTokens {
 export function usesDefaultBrand(hex?: string | null): boolean {
   if (!hex) return true;
   const normalised = hex.trim().toUpperCase();
-  return normalised === LEGACY_DEFAULT_PRIMARY || normalised === DEFAULT_PRIMARY || parse(normalised) === null;
+  return normalised === LEGACY_DEFAULT_PRIMARY || normalised === LEGACY_DEFAULT_PRIMARY_V2 || normalised === DEFAULT_PRIMARY || parse(normalised) === null;
 }
 
 /**
