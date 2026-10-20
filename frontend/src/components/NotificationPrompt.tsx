@@ -42,7 +42,7 @@ export function NotificationPrompt({
   if (step === 'prompt') {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center p-4">
-        <div className="w-full max-w-lg bg-brand-white border-2 border-brand-black shadow-2xl p-6 flex flex-col gap-5">
+        <div className="w-full max-w-lg bg-brand-white border-2 border-brand-black rounded-2xl shadow-2xl p-6 flex flex-col gap-5">
           {/* Header */}
           <div className="flex items-start gap-4">
             <div className="shrink-0 w-10 h-10 bg-brand-black rounded-full flex items-center justify-center">
@@ -66,13 +66,13 @@ export function NotificationPrompt({
             <button
               onClick={handleEnable}
               disabled={isLoading}
-              className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.25em] text-xs transition-all hover:tracking-[0.35em] active:scale-[0.98] disabled:opacity-50"
+              className="w-full bg-brand-black text-white py-4 rounded-xl font-black uppercase tracking-[0.25em] text-xs transition-all hover:tracking-[0.35em] active:scale-[0.98] disabled:opacity-50"
             >
               {isLoading ? 'Setting up…' : 'Enable Notifications'}
             </button>
             <button
               onClick={onDismiss}
-              className="w-full py-3 font-black uppercase tracking-[0.25em] text-xs text-brand-gray-400 hover:text-brand-black transition-colors"
+              className="w-full py-3 rounded-xl font-black uppercase tracking-[0.25em] text-xs text-brand-gray-400 hover:text-brand-black transition-colors"
             >
               Later
             </button>
@@ -86,7 +86,7 @@ export function NotificationPrompt({
   if (step === 'success') {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center p-4">
-        <div className="w-full max-w-lg bg-brand-black text-white border-2 border-brand-black shadow-2xl p-6 flex items-center gap-4">
+        <div className="w-full max-w-lg bg-brand-black text-white border-2 border-brand-black rounded-2xl shadow-2xl p-6 flex items-center gap-4">
           <div className="shrink-0 w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
             <Bell size={18} className="text-white" />
           </div>
@@ -106,7 +106,7 @@ export function NotificationPrompt({
   // ── Denied card ─────────────────────────────────────────────────────────────
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center p-4">
-      <div className="w-full max-w-lg bg-brand-white border-2 border-brand-black shadow-2xl p-6 flex flex-col gap-4">
+      <div className="w-full max-w-lg bg-brand-white border-2 border-brand-black rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
         <div className="flex items-start gap-4">
           <div className="shrink-0 w-10 h-10 bg-brand-gray-100 rounded-full flex items-center justify-center">
             <Bell size={18} className="text-brand-gray-400" />
@@ -123,7 +123,7 @@ export function NotificationPrompt({
         </div>
         <button
           onClick={onDismiss}
-          className="w-full py-3 font-black uppercase tracking-[0.25em] text-xs text-brand-gray-400 hover:text-brand-black transition-colors border border-brand-gray-100 hover:border-brand-black"
+          className="w-full py-3 rounded-xl font-black uppercase tracking-[0.25em] text-xs text-brand-gray-400 hover:text-brand-black transition-colors border border-brand-gray-100 hover:border-brand-black"
         >
           Dismiss
         </button>
