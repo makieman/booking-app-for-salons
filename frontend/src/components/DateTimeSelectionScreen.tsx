@@ -318,7 +318,7 @@ export function DateTimeSelectionScreen({
         </div>
 
         <div className="relative">
-          <div 
+          <div
             ref={staffScrollRef}
             onScroll={handleStaffScroll}
             className="flex items-center gap-3 overflow-x-auto scrollbar-hide py-1 -mx-2 px-2 scroll-smooth"
@@ -330,18 +330,16 @@ export function DateTimeSelectionScreen({
               aria-checked={selectedAttendant === null}
               aria-label="Any professional (first available)"
               onClick={() => handleAttendantChange(null)}
-              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-200 shrink-0 min-h-[44px] ${
-                selectedAttendant === null
+              className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-200 shrink-0 min-h-[44px] ${selectedAttendant === null
                   ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
                   : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
-              }`}
+                }`}
             >
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs border ${
-                  selectedAttendant === null
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs border ${selectedAttendant === null
                     ? 'border-white/30 bg-white/10 text-white'
                     : 'border-brand-gray-200 bg-brand-gray-50 text-brand-black'
-                }`}
+                  }`}
               >
                 <Users size={14} />
               </div>
@@ -365,18 +363,16 @@ export function DateTimeSelectionScreen({
                   aria-checked={isSelected}
                   aria-label={`Staff member ${att.name}`}
                   onClick={() => handleAttendantChange(att)}
-                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-200 shrink-0 min-h-[44px] ${
-                    isSelected
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-200 shrink-0 min-h-[44px] ${isSelected
                       ? 'bg-brand-black text-brand-white border-brand-black shadow-md'
                       : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
-                  }`}
+                    }`}
                 >
                   <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border ${
-                      isSelected
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border ${isSelected
                         ? 'border-white/30 bg-white/10 text-white'
                         : 'border-brand-gray-200 bg-brand-gray-50 text-brand-black'
-                    }`}
+                      }`}
                   >
                     {initials}
                   </div>
@@ -393,8 +389,8 @@ export function DateTimeSelectionScreen({
         </div>
 
         {/* 3 Pagination / swipe indicator dots */}
-        <div 
-          className="flex items-center justify-center gap-1.5 pt-1" 
+        <div
+          className="flex items-center justify-center gap-1.5 pt-1"
           role="navigation"
           aria-label="Staff carousel pagination"
         >
@@ -406,11 +402,10 @@ export function DateTimeSelectionScreen({
                 type="button"
                 aria-label={`Staff page ${idx + 1}`}
                 onClick={() => scrollToStaffSegment(idx)}
-                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                  isActive 
-                    ? 'w-4 bg-brand-black shadow-xs' 
+                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${isActive
+                    ? 'w-4 bg-brand-black shadow-xs'
                     : 'w-1.5 bg-brand-gray-300 hover:bg-brand-gray-400'
-                }`}
+                  }`}
               />
             );
           })}
@@ -481,9 +476,8 @@ export function DateTimeSelectionScreen({
               else indicatorBg = 'bg-[#F97316]'; // Orange
             }
 
-            const ariaLabel = `${dayNum} ${monthTitle}${
-              freeSlots !== undefined ? `, ${freeSlots} slots available` : ''
-            }${isToday ? ', Today' : ''}`;
+            const ariaLabel = `${dayNum} ${monthTitle}${freeSlots !== undefined ? `, ${freeSlots} slots available` : ''
+              }${isToday ? ', Today' : ''}`;
 
             return (
               <button
@@ -497,22 +491,20 @@ export function DateTimeSelectionScreen({
                 aria-label={ariaLabel}
                 aria-selected={isSelected}
                 aria-disabled={isDisabled}
-                className={`relative aspect-square min-h-[44px] min-w-[44px] rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${
-                  isDisabled
+                className={`relative aspect-square min-h-[44px] min-w-[44px] rounded-xl flex flex-col items-center justify-center transition-all duration-200 ${isDisabled
                     ? 'opacity-25 cursor-not-allowed text-brand-gray-400 bg-transparent'
                     : isSelected
-                    ? 'bg-brand-black text-brand-white shadow-md font-bold ring-2 ring-brand-black/20 scale-[1.03] z-10'
-                    : 'hover:bg-brand-gray-100/60 text-brand-black font-semibold bg-white'
-                }`}
+                      ? 'bg-brand-black text-brand-white shadow-md font-bold ring-2 ring-brand-black/20 scale-[1.03] z-10'
+                      : 'hover:bg-brand-gray-100/60 text-brand-black font-semibold bg-white'
+                  }`}
               >
                 <span className="text-sm leading-none font-medium">{dayNum}</span>
 
                 {/* Capacity indicator bar under available days */}
                 {!isDisabled && indicatorBg && (
                   <span
-                    className={`mt-1 h-[3px] w-3.5 rounded-full ${indicatorBg} ${
-                      isSelected ? 'ring-1 ring-white/50' : ''
-                    }`}
+                    className={`mt-1 h-[3px] w-3.5 rounded-full ${indicatorBg} ${isSelected ? 'ring-1 ring-white/50' : ''
+                      }`}
                     aria-hidden="true"
                   />
                 )}
@@ -567,11 +559,10 @@ export function DateTimeSelectionScreen({
                   type="button"
                   onClick={() => setPeriodFilter(period)}
                   aria-pressed={isActive}
-                  className={`text-xs px-3.5 sm:px-4 py-2 rounded-xl font-bold capitalize transition-all min-h-[38px] text-center whitespace-nowrap ${
-                    isActive
+                  className={`text-xs px-3.5 sm:px-4 py-2 rounded-xl font-bold capitalize transition-all min-h-[38px] text-center whitespace-nowrap ${isActive
                       ? 'bg-brand-black text-brand-white shadow-sm'
                       : 'text-brand-gray-600 hover:text-brand-black hover:bg-white/60'
-                  }`}
+                    }`}
                 >
                   {labels[period]}
                 </button>
@@ -600,11 +591,10 @@ export function DateTimeSelectionScreen({
                   aria-checked={isSelected}
                   aria-label={`Select time slot at ${timeDisplay}`}
                   onClick={() => onSelectTime(time)}
-                  className={`min-h-[46px] px-3 py-2.5 rounded-xl border-2 text-xs font-black tracking-wider transition-all duration-200 flex items-center justify-center ${
-                    isSelected
+                  className={`min-h-[46px] px-3 py-2.5 rounded-xl border-2 text-xs font-black tracking-wider transition-all duration-200 flex items-center justify-center ${isSelected
                       ? 'bg-brand-black text-brand-white border-brand-black shadow-md ring-2 ring-brand-black/10 scale-[1.02]'
                       : 'bg-white border-brand-gray-100 hover:border-brand-black text-brand-black'
-                  }`}
+                    }`}
                 >
                   {timeDisplay}
                 </button>
