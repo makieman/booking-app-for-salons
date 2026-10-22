@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -1284,20 +1284,6 @@ export default function App() {
                 <Phone size={18} />
               </a>
             )}
-            {userMode === 'customer' && (
-              <button
-                type="button"
-                onClick={() => setShowCustomerAccountModal(true)}
-                title="My Account & Bookings"
-                aria-label="My Account & Bookings"
-                className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500 relative"
-              >
-                <User size={18} />
-                {clientInfo.name && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-brand-white" />
-                )}
-              </button>
-            )}
             <NotificationCenter
               onNavigate={handleNotificationNavigate}
               token={userMode === 'owner' ? (ownerToken || undefined) : userMode === 'attendant' ? (attendantSession?.token || undefined) : undefined}
@@ -1333,6 +1319,20 @@ export default function App() {
                   <LogOut size={16} />
                 </button>
               </>
+            )}
+            {userMode === 'customer' && (
+              <button
+                type="button"
+                onClick={() => setShowCustomerAccountModal(true)}
+                title="My Account & Bookings"
+                aria-label="My Account & Bookings"
+                className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500 relative"
+              >
+                <CircleUserRound size={19} />
+                {clientInfo.name && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-brand-white" />
+                )}
+              </button>
             )}
           </div>
         </header>
