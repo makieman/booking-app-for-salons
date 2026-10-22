@@ -42,20 +42,20 @@ export function NotificationPrompt({
   if (step === 'prompt') {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center p-4">
-        <div className="w-full max-w-lg bg-brand-white border-2 border-brand-black shadow-2xl p-6 flex flex-col gap-5">
+        <div className="w-full max-w-lg bg-white/90 backdrop-blur-xl border border-[rgba(240,213,222,0.75)] rounded-2xl shadow-luxury p-6 flex flex-col gap-5">
           {/* Header */}
           <div className="flex items-start gap-4">
-            <div className="shrink-0 w-10 h-10 bg-brand-black rounded-full flex items-center justify-center">
-              <Bell size={18} className="text-white" />
+            <div className="shrink-0 w-10 h-10 bg-[#C4466F]/10 text-[#C4466F] rounded-full flex items-center justify-center">
+              <Bell size={18} />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.35em] text-brand-gray-400 mb-0.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#C4466F] mb-0.5">
                 Notifications
               </p>
-              <h3 className="font-serif italic text-xl font-black tracking-tight leading-tight">
+              <h3 className="font-serif italic text-xl font-bold text-[#231F1D] tracking-tight leading-tight">
                 {title}
               </h3>
-              <p className="text-xs text-brand-gray-500 mt-1.5 leading-relaxed">
+              <p className="text-xs text-[#6E655F] mt-1.5 leading-relaxed font-sans">
                 {description}
               </p>
             </div>
@@ -66,13 +66,13 @@ export function NotificationPrompt({
             <button
               onClick={handleEnable}
               disabled={isLoading}
-              className="w-full bg-brand-black text-white py-4 font-black uppercase tracking-[0.25em] text-xs transition-all hover:tracking-[0.35em] active:scale-[0.98] disabled:opacity-50"
+              className="w-full bg-[#C4466F] hover:bg-[#A83257] text-white py-3.5 rounded-xl font-bold uppercase tracking-[0.2em] text-xs transition-all active:scale-[0.98] shadow-md hover:shadow-lg disabled:opacity-50 cursor-pointer"
             >
               {isLoading ? 'Setting up…' : 'Enable Notifications'}
             </button>
             <button
               onClick={onDismiss}
-              className="w-full py-3 font-black uppercase tracking-[0.25em] text-xs text-brand-gray-400 hover:text-brand-black transition-colors"
+              className="w-full py-2.5 rounded-xl font-bold uppercase tracking-[0.18em] text-xs text-[#6E655F] hover:text-[#231F1D] hover:bg-[#C4466F]/5 transition-colors cursor-pointer"
             >
               Later
             </button>
@@ -86,15 +86,15 @@ export function NotificationPrompt({
   if (step === 'success') {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center p-4">
-        <div className="w-full max-w-lg bg-brand-black text-white border-2 border-brand-black shadow-2xl p-6 flex items-center gap-4">
-          <div className="shrink-0 w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
-            <Bell size={18} className="text-white" />
+        <div className="w-full max-w-lg bg-[rgba(44,34,30,0.92)] backdrop-blur-xl text-white border border-white/15 rounded-2xl shadow-luxury p-5 flex items-center gap-4">
+          <div className="shrink-0 w-10 h-10 bg-[#C4466F]/20 text-[#E8829F] rounded-full flex items-center justify-center">
+            <Bell size={18} />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.35em] text-white/50 mb-0.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/50 mb-0.5">
               All Set
             </p>
-            <p className="font-black text-sm tracking-tight">
+            <p className="font-medium text-sm tracking-tight">
               You'll be notified when your booking is approved or updated.
             </p>
           </div>
@@ -106,16 +106,16 @@ export function NotificationPrompt({
   // ── Denied card ─────────────────────────────────────────────────────────────
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center p-4">
-      <div className="w-full max-w-lg bg-brand-white border-2 border-brand-black shadow-2xl p-6 flex flex-col gap-4">
+      <div className="w-full max-w-lg bg-white/90 backdrop-blur-xl border border-[rgba(240,213,222,0.75)] rounded-2xl shadow-luxury p-6 flex flex-col gap-4">
         <div className="flex items-start gap-4">
-          <div className="shrink-0 w-10 h-10 bg-brand-gray-100 rounded-full flex items-center justify-center">
-            <Bell size={18} className="text-brand-gray-400" />
+          <div className="shrink-0 w-10 h-10 bg-[#C4466F]/10 text-[#C4466F] rounded-full flex items-center justify-center">
+            <Bell size={18} />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.35em] text-brand-gray-400 mb-0.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#C4466F] mb-0.5">
               Notifications Blocked
             </p>
-            <p className="text-xs text-brand-gray-500 leading-relaxed">
+            <p className="text-xs text-[#6E655F] leading-relaxed">
               To enable notifications, open your browser settings and allow
               notifications for this site.
             </p>
@@ -123,7 +123,7 @@ export function NotificationPrompt({
         </div>
         <button
           onClick={onDismiss}
-          className="w-full py-3 font-black uppercase tracking-[0.25em] text-xs text-brand-gray-400 hover:text-brand-black transition-colors border border-brand-gray-100 hover:border-brand-black"
+          className="w-full py-3 rounded-xl font-bold uppercase tracking-[0.18em] text-xs text-[#6E655F] hover:text-[#231F1D] hover:bg-[#C4466F]/5 transition-colors border border-[rgba(240,213,222,0.8)] cursor-pointer"
         >
           Dismiss
         </button>

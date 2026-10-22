@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -169,7 +169,7 @@ export default function App() {
     setActiveStep(step);
     try {
       window.history.pushState({ step }, '', window.location.href);
-    } catch {}
+    } catch { }
   }, []);
 
   // Data from API
@@ -258,7 +258,7 @@ export default function App() {
           };
         }
       }
-    } catch {}
+    } catch { }
     return { name: '', phone: '', email: '' };
   });
   const [showCustomerAccountModal, setShowCustomerAccountModal] = useState(false);
@@ -316,6 +316,55 @@ export default function App() {
     }
   }, [bookingRef, tenantLoading]);
 
+  // Live polling for booking status updates when on confirmation screen
+  useEffect(() => {
+    if (activeStep !== 'confirmation' || !createdBooking?.reference) return;
+
+    let isCancelled = false;
+    const checkBookingStatus = async () => {
+      try {
+        const results = await api.lookupBookings({ reference: createdBooking.reference });
+        if (!isCancelled && results && results.length > 0) {
+          const latest = results[0];
+          const statusChanged = latest.status !== createdBooking.status;
+          const prevAttId = typeof createdBooking.attendantId === 'object' ? (createdBooking.attendantId as any)?._id : createdBooking.attendantId;
+          const nextAttId = typeof latest.attendantId === 'object' ? (latest.attendantId as any)?._id : latest.attendantId;
+          const attendantChanged = prevAttId !== nextAttId;
+
+          if (statusChanged || attendantChanged) {
+            setCreatedBooking(latest);
+            if (typeof latest.serviceId === 'object' && latest.serviceId) {
+              setSelectedServices([latest.serviceId as Service]);
+            }
+            if (latest.status === 'confirmed' && createdBooking.status === 'pending') {
+              triggerToast('Your appointment has been confirmed!', 'success');
+              try {
+                playNotificationSound('chime');
+              } catch { }
+            }
+          }
+        }
+      } catch {
+        // Silently retry on next interval
+      }
+    };
+
+    const interval = setInterval(checkBookingStatus, 4000);
+
+    const handleFocus = () => {
+      checkBookingStatus();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [activeStep, createdBooking?.reference, createdBooking?.status, createdBooking?.attendantId]);
+
   // Lookup Booking State
   const [lookupQuery, setLookupQuery] = useState('');
   const [lookupType, setLookupType] = useState<'reference' | 'phone'>('reference');
@@ -331,7 +380,7 @@ export default function App() {
           setLookupQuery(saved);
           setLookupType('reference');
         }
-      } catch {}
+      } catch { }
     }
   }, [activeStep, lookupQuery]);
 
@@ -612,14 +661,14 @@ export default function App() {
           }
         }
         localStorage.setItem('customerProfile', JSON.stringify(clientInfo));
-      } catch {}
+      } catch { }
       // Sync URL with ?ref=... so a page refresh immediately restores the confirmation screen
       if (newBooking?.reference) {
         try {
           const url = new URL(window.location.href);
           url.searchParams.set('ref', newBooking.reference);
           window.history.pushState({}, '', url.toString());
-        } catch {}
+        } catch { }
       }
       setActiveStep('confirmation');
       setTimeout(() => setShowNotificationPrompt(true), 800);
@@ -676,7 +725,7 @@ export default function App() {
         url.searchParams.delete('reference');
         window.history.pushState({}, '', url.pathname + (url.search ? url.search : ''));
       }
-    } catch {}
+    } catch { }
   };
 
   // ── Confirmation Screen Helpers & Action Handlers ─────────────────────────
@@ -712,7 +761,7 @@ export default function App() {
     if (referenceToSearch) {
       try {
         localStorage.setItem('lastBookingReference', referenceToSearch);
-      } catch {}
+      } catch { }
       setLookupLoading(true);
       api.lookupBookings({ reference: referenceToSearch })
         .then(results => {
@@ -735,7 +784,7 @@ export default function App() {
       const url = new URL(window.location.href);
       url.searchParams.set('ref', reference);
       window.history.pushState({}, '', url.toString());
-    } catch {}
+    } catch { }
     api.lookupBookings({ reference }).then(results => {
       if (results && results.length > 0) {
         const b = results[0];
@@ -1052,9 +1101,8 @@ export default function App() {
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               className="fixed top-6 left-1/2 -translate-x-1/2 z-[250] w-[85%] max-w-xs pointer-events-none"
             >
-              <div className={`px-4 py-3 flex items-center gap-3 shadow-xl rounded-xl border text-white ${
-                toast.type === 'success' ? 'bg-[#2E7D32]/95 border-[#4CAF50]/20' : 'bg-[#C62828]/95 border-[#EF5350]/20'
-              }`}>
+              <div className={`px-4 py-3 flex items-center gap-3 shadow-xl rounded-xl border text-white ${toast.type === 'success' ? 'bg-[#2E7D32]/95 border-[#4CAF50]/20' : 'bg-[#C62828]/95 border-[#EF5350]/20'
+                }`}>
                 {toast.type === 'success' ? (
                   <CheckCircle2 size={16} className="text-white shrink-0" />
                 ) : (
@@ -1221,7 +1269,7 @@ export default function App() {
                         setLookupQuery(saved);
                         setLookupType('reference');
                       }
-                    } catch {}
+                    } catch { }
                   }
                   setActiveStep('lookup');
                 }}
@@ -1236,24 +1284,10 @@ export default function App() {
                 <Phone size={18} />
               </a>
             )}
-            {userMode === 'customer' && (
-              <button
-                type="button"
-                onClick={() => setShowCustomerAccountModal(true)}
-                title="My Account & Bookings"
-                aria-label="My Account & Bookings"
-                className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500 relative"
-              >
-                <User size={18} />
-                {clientInfo.name && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-brand-white" />
-                )}
-              </button>
-            )}
-            <NotificationCenter 
-              onNavigate={handleNotificationNavigate} 
-              token={userMode === 'owner' ? (ownerToken || undefined) : userMode === 'attendant' ? (attendantSession?.token || undefined) : undefined} 
-              ownerPin={userMode === 'owner' ? ownerSessionPin : undefined} 
+            <NotificationCenter
+              onNavigate={handleNotificationNavigate}
+              token={userMode === 'owner' ? (ownerToken || undefined) : userMode === 'attendant' ? (attendantSession?.token || undefined) : undefined}
+              ownerPin={userMode === 'owner' ? ownerSessionPin : undefined}
             />
             {userMode !== 'customer' && (
               <>
@@ -1285,6 +1319,20 @@ export default function App() {
                   <LogOut size={16} />
                 </button>
               </>
+            )}
+            {userMode === 'customer' && (
+              <button
+                type="button"
+                onClick={() => setShowCustomerAccountModal(true)}
+                title="My Account & Bookings"
+                aria-label="My Account & Bookings"
+                className="p-3 bg-brand-gray-50 rounded-full hover:bg-brand-black hover:text-white transition-all duration-500 relative"
+              >
+                <CircleUserRound size={19} />
+                {clientInfo.name && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-brand-white" />
+                )}
+              </button>
             )}
           </div>
         </header>
@@ -1348,18 +1396,18 @@ export default function App() {
                     >
                       <div className="space-y-4">
                         <div className="relative group">
-                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6B6B6B]" size={16} />
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6E5660]" size={16} />
                           <input
                             type="text"
                             placeholder="Search services..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#FAF7F3] border border-[#E6D3C3] rounded-full py-3.5 pl-12 pr-10 focus:outline-none focus:border-[#B08968] focus:bg-white transition-all font-medium text-[15px] text-[#1F1F1F] placeholder:text-[#6B6B6B]/60"
+                            className="w-full bg-[#FFF0F3] border border-[#F0D5DE] rounded-full py-3.5 pl-12 pr-10 focus:outline-none focus:border-[#C4466F] focus:bg-white transition-all font-semibold text-[15px] text-[#1A1215] placeholder:text-[#6E5660]/70"
                           />
                           {searchQuery && (
                             <button
                               onClick={() => setSearchQuery('')}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B6B6B] hover:text-[#1F1F1F]"
+                              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6E5660] hover:text-[#1A1215]"
                             >
                               <X size={14} />
                             </button>
@@ -1376,11 +1424,10 @@ export default function App() {
                               if (cat === 'All Services') setSearchQuery('');
                               else setSearchQuery(cat.split(' ')[0]);
                             }}
-                            className={`px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-300 border ${
-                              (cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()))
-                                ? 'bg-[#B08968] text-white border-[#B08968]'
-                                : 'bg-white text-[#6B6B6B] border-[#E6D3C3] hover:border-[#B08968]'
-                            }`}
+                            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 border ${(cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()))
+                              ? 'bg-[#C4466F] text-white border-[#C4466F] shadow-sm'
+                              : 'bg-white text-[#523E46] border-[#F0D5DE] hover:border-[#C4466F]'
+                              }`}
                           >
                             {cat}
                           </button>
@@ -1408,8 +1455,8 @@ export default function App() {
                             );
                           })
                         ) : (
-                          <div className="py-12 text-center border border-dashed border-[#E6D3C3] rounded-2xl bg-white">
-                            <p className="text-[#6B6B6B] text-sm">No services found matching your criteria.</p>
+                          <div className="py-12 text-center border border-dashed border-[#F0D5DE] rounded-2xl bg-white">
+                            <p className="text-[#523E46] text-sm font-medium">No services found matching your criteria.</p>
                           </div>
                         )}
                       </div>
@@ -1422,7 +1469,7 @@ export default function App() {
                             transition={{ type: 'spring', damping: 25, stiffness: 250 }}
                             className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-50"
                           >
-                            <div className="bg-[#1F1F1F] text-white p-4.5 rounded-2xl shadow-2xl border border-white/10 backdrop-blur-md space-y-3">
+                            <div className="bg-[#1A1215] text-white p-4.5 rounded-2xl shadow-2xl border border-white/10 backdrop-blur-md space-y-3">
                               {selectedServices.length === 2 && (
                                 <div className="flex items-center justify-between text-xs border-b border-white/10 pb-2.5">
                                   <span className="text-white/80 truncate pr-2">
@@ -1449,7 +1496,7 @@ export default function App() {
                                 </div>
                                 <button
                                   onClick={() => navigateStep('date')}
-                                  className="bg-[#B08968] text-white px-5 py-2.5 rounded-full font-semibold text-xs uppercase tracking-wider hover:bg-[#9c7554] active:scale-95 transition-all cursor-pointer shadow-lg"
+                                  className="bg-[#C4466F] text-white px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-[#A83257] active:scale-95 transition-all cursor-pointer shadow-lg"
                                 >
                                   {selectedServices.length === 1 ? 'Continue (1)' : 'Continue (2)'}
                                 </button>
@@ -1505,21 +1552,21 @@ export default function App() {
                       </button>
 
                       <div className="space-y-10">
-                        <section className="bg-brand-gray-50 p-8 flex items-center justify-between">
+                        <section className="bg-brand-gray-50 p-6 sm:p-8 flex items-center justify-between rounded-2xl border border-brand-gray-100 shadow-xs">
                           <div className="space-y-1">
-                            <p className="text-[13px] uppercase font-black tracking-widest text-brand-gray-600">Appointment Detail</p>
-                            <p className="font-serif italic text-2xl leading-none">
+                            <p className="text-xs uppercase font-bold tracking-wider text-brand-gray-600">Appointment Detail</p>
+                            <p className="font-serif text-2xl font-bold leading-snug text-brand-black">
                               {selectedServices.map(s => s.name).join(' + ')}
                             </p>
-                            <p className="text-xs font-bold text-brand-black/40 mt-2">
+                            <p className="text-xs font-semibold text-brand-gray-500 mt-2">
                               {new Date(selectedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {selectedTime}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-black tracking-tighter">
+                            <p className="text-2xl font-black tracking-tight text-brand-black">
                               KES {totalServicePrice.toLocaleString()}
                             </p>
-                            <p className="text-xs text-brand-gray-500 font-medium">
+                            <p className="text-xs text-brand-gray-500 font-semibold mt-0.5">
                               {Math.floor(totalServiceDuration / 60) > 0 ? `${Math.floor(totalServiceDuration / 60)}h ` : ''}{totalServiceDuration % 60 > 0 ? `${totalServiceDuration % 60}m` : ''}
                             </p>
                           </div>
@@ -1527,43 +1574,43 @@ export default function App() {
 
                         <section className="space-y-8">
                           <div className="space-y-2">
-                            <h2 className="text-4xl font-serif font-black tracking-tight leading-none">Register</h2>
-                            <div className="w-12 h-1 bg-brand-black"></div>
+                            <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight text-brand-black">Client Details</h2>
+                            <div className="w-12 h-1 bg-primary rounded-full"></div>
                           </div>
-                          <div className="space-y-8">
+                          <div className="space-y-6">
                             <div className="space-y-2 group">
-                              <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Full Name</label>
+                              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Full Name</label>
                               <div className="relative">
                                 <input
                                   type="text"
-                                  placeholder="FULL NAME"
+                                  placeholder="e.g. Jane Doe"
                                   value={clientInfo.name}
                                   onChange={e => setClientInfo(prev => ({ ...prev, name: e.target.value }))}
-                                  className="w-full bg-brand-white border-b-2 border-brand-gray-100 py-5 focus:outline-none focus:border-brand-black transition-all font-black text-base uppercase tracking-widest placeholder:text-brand-gray-200 placeholder:font-normal"
+                                  className="w-full bg-transparent border-b-2 border-brand-gray-100 py-3.5 focus:outline-none focus:border-primary transition-all font-semibold text-base text-brand-black placeholder:text-brand-gray-400/50"
                                 />
                               </div>
                             </div>
                             <div className="space-y-2 group">
-                              <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Phone Number</label>
+                              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Phone Number</label>
                               <div className="relative">
                                 <input
                                   type="tel"
-                                  placeholder="MOBILE NUMBER"
+                                  placeholder="e.g. 0712 345 678"
                                   value={clientInfo.phone}
                                   onChange={e => setClientInfo(prev => ({ ...prev, phone: e.target.value }))}
-                                  className="w-full bg-brand-white border-b-2 border-brand-gray-100 py-5 focus:outline-none focus:border-brand-black transition-all font-black text-base uppercase tracking-widest placeholder:text-brand-gray-200 placeholder:font-normal"
+                                  className="w-full bg-transparent border-b-2 border-brand-gray-100 py-3.5 focus:outline-none focus:border-primary transition-all font-semibold text-base text-brand-black placeholder:text-brand-gray-400/50"
                                 />
                               </div>
                             </div>
                             <div className="space-y-2 group">
-                              <label className="text-[12px] font-black uppercase tracking-[0.3em] text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Email</label>
+                              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Email Address</label>
                               <div className="relative">
                                 <input
                                   type="email"
-                                  placeholder="email@example.com"
+                                  placeholder="e.g. jane@example.com"
                                   value={clientInfo.email}
                                   onChange={e => setClientInfo(prev => ({ ...prev, email: e.target.value }))}
-                                  className="w-full bg-brand-white border-b-2 border-brand-gray-100 py-5 focus:outline-none focus:border-brand-black transition-all font-black text-base lowercase tracking-normal placeholder:text-brand-gray-200 placeholder:font-normal"
+                                  className="w-full bg-transparent border-b-2 border-brand-gray-100 py-3.5 focus:outline-none focus:border-primary transition-all font-semibold text-base text-brand-black placeholder:text-brand-gray-400/50"
                                 />
                               </div>
                             </div>
@@ -1575,7 +1622,7 @@ export default function App() {
                         disabled={!clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline || isSubmittingBooking}
                         onClick={handleConfirmBooking}
                         aria-busy={isSubmittingBooking}
-                        className="w-full bg-brand-black text-brand-white py-6 rounded-[10px] font-bold uppercase tracking-[0.3em] text-xs transition-all disabled:opacity-20 hover:tracking-[0.4em] active:scale-[0.98] flex items-center justify-center gap-3 cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full bg-brand-black hover:bg-black text-brand-white py-5 rounded-xl font-bold uppercase tracking-wider text-xs transition-all shadow-md disabled:opacity-30 active:scale-[0.99] flex items-center justify-center gap-3 cursor-pointer disabled:cursor-not-allowed"
                       >
                         {isOffline ? (
                           'Offline - Booking Disabled'
@@ -1600,30 +1647,103 @@ export default function App() {
                     >
                       {/* 1. Heading, Status Badge & Subtitle */}
                       <div className="space-y-3">
-                        <div
-                          role="status"
-                          aria-live="polite"
-                          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
-                        >
-                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
-                          <span>Pending approval</span>
-                        </div>
+                        {createdBooking?.status === 'confirmed' ? (
+                          <>
+                            <div
+                              role="status"
+                              aria-live="polite"
+                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm"
+                            >
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                              <span>Confirmed</span>
+                            </div>
 
-                        <h2
-                          ref={confirmationHeadingRef}
-                          tabIndex={-1}
-                          className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none"
-                        >
-                          Request received
-                        </h2>
-                        <div className="w-16 h-1 bg-brand-black mx-auto" aria-hidden="true" />
-                        <p className="text-brand-gray-500 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                          The salon will review your request shortly.
-                        </p>
+                            <h2
+                              ref={confirmationHeadingRef}
+                              tabIndex={-1}
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-emerald-950"
+                            >
+                              Appointment Confirmed
+                            </h2>
+                            <div className="w-16 h-1 bg-emerald-700 mx-auto" aria-hidden="true" />
+                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+                              Your appointment has been approved! We look forward to seeing you at the salon.
+                            </p>
+                          </>
+                        ) : createdBooking?.status === 'cancelled' ? (
+                          <>
+                            <div
+                              role="status"
+                              aria-live="polite"
+                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-red-100 text-red-900 border border-red-300 shadow-sm"
+                            >
+                              <span className="w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
+                              <span>Cancelled</span>
+                            </div>
+
+                            <h2
+                              ref={confirmationHeadingRef}
+                              tabIndex={-1}
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-red-950"
+                            >
+                              Appointment Cancelled
+                            </h2>
+                            <div className="w-16 h-1 bg-red-600 mx-auto" aria-hidden="true" />
+                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+                              This appointment has been cancelled or declined by the salon.
+                            </p>
+                          </>
+                        ) : createdBooking?.status === 'completed' ? (
+                          <>
+                            <div
+                              role="status"
+                              aria-live="polite"
+                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-blue-100 text-blue-900 border border-blue-300 shadow-sm"
+                            >
+                              <span className="w-2 h-2 rounded-full bg-blue-500" aria-hidden="true" />
+                              <span>Completed</span>
+                            </div>
+
+                            <h2
+                              ref={confirmationHeadingRef}
+                              tabIndex={-1}
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-blue-950"
+                            >
+                              Appointment Completed
+                            </h2>
+                            <div className="w-16 h-1 bg-blue-600 mx-auto" aria-hidden="true" />
+                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+                              Thank you for visiting! We look forward to seeing you again.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <div
+                              role="status"
+                              aria-live="polite"
+                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
+                            >
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
+                              <span>Pending approval</span>
+                            </div>
+
+                            <h2
+                              ref={confirmationHeadingRef}
+                              tabIndex={-1}
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none"
+                            >
+                              Request received
+                            </h2>
+                            <div className="w-16 h-1 bg-brand-black mx-auto" aria-hidden="true" />
+                            <p className="text-brand-gray-500 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+                              The salon will review your request shortly.
+                            </p>
+                          </>
+                        )}
                       </div>
 
                       {/* 3. Prominent Reference */}
-                      <div className="w-full bg-brand-white border-2 border-brand-black rounded-xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-sm">
+                      <div className="w-full bg-brand-white border-2 border-brand-black rounded-lg p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-sm">
                         <div>
                           <p className="text-[11px] uppercase tracking-[0.3em] font-black text-brand-gray-500">
                             Booking Reference
@@ -1653,52 +1773,97 @@ export default function App() {
                       </div>
 
                       {/* 2. What happens next */}
-                      <div className="w-full bg-brand-gray-50 border-2 border-brand-black/15 rounded-xl p-6 sm:p-7 text-left space-y-4">
+                      <div className="w-full bg-brand-gray-50 border-2 border-brand-black/15 rounded-lg p-6 sm:p-7 text-left space-y-4">
                         <div className="flex items-center gap-2 border-b border-brand-black/10 pb-3">
                           <Clock size={16} className="text-brand-gray-600" aria-hidden="true" />
                           <h3 className="text-xs font-black uppercase tracking-[0.25em] text-brand-gray-700">
-                            What happens next
+                            {createdBooking?.status === 'confirmed' ? 'Appointment Information' : 'What happens next'}
                           </h3>
                         </div>
 
                         <ol className="space-y-3.5 text-xs sm:text-sm text-brand-gray-600">
-                          <li className="flex items-start gap-3">
-                            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                              1
-                            </span>
-                            <div className="pt-0.5 leading-relaxed">
-                              <span className="font-bold text-brand-black">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
-                            </div>
-                          </li>
-                          <li className="flex items-start gap-3">
-                            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                              2
-                            </span>
-                            <div className="pt-0.5 leading-relaxed">
-                              We'll email you a confirmation{clientInfo.email || createdBooking?.email ? (
-                                <>
-                                  {' '}at{' '}
-                                  <strong className="text-brand-black underline decoration-brand-black/30 break-all">
-                                    {createdBooking?.email || clientInfo.email}
-                                  </strong>
-                                </>
-                              ) : null}{' '}
-                              once approved (please check your spam folder).
-                            </div>
-                          </li>
-                          <li className="flex items-start gap-3">
-                            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                              3
-                            </span>
-                            <div className="pt-0.5 leading-relaxed">
-                              If notifications are enabled, you'll also get a notification when it's approved.
-                            </div>
-                          </li>
+                          {createdBooking?.status === 'confirmed' ? (
+                            <>
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-[11px] flex items-center justify-center">
+                                  ✓
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  <span className="font-bold text-brand-black">Your appointment is confirmed.</span> Your stylist and slot have been scheduled.
+                                </div>
+                              </li>
+                              {createdBooking?.attendantId && typeof createdBooking.attendantId === 'object' && (
+                                <li className="flex items-start gap-3">
+                                  <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                    ★
+                                  </span>
+                                  <div className="pt-0.5 leading-relaxed">
+                                    <span className="font-bold text-brand-black">Assigned Stylist:</span>{' '}
+                                    <span className="font-semibold text-emerald-800">
+                                      {(createdBooking.attendantId as any).name}
+                                    </span>
+                                  </div>
+                                </li>
+                              )}
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                  ⏱
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  Please arrive <span className="font-bold text-brand-black">5 minutes early</span> to ensure a smooth session.
+                                </div>
+                              </li>
+                            </>
+                          ) : createdBooking?.status === 'cancelled' ? (
+                            <li className="flex items-start gap-3">
+                              <span className="shrink-0 w-6 h-6 rounded-full bg-red-600 text-white font-bold text-[11px] flex items-center justify-center">
+                                ✕
+                              </span>
+                              <div className="pt-0.5 leading-relaxed">
+                                This booking was cancelled. If you would like to reschedule, please select a new date and time.
+                              </div>
+                            </li>
+                          ) : (
+                            <>
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                  1
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  <span className="font-bold text-brand-black">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
+                                </div>
+                              </li>
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                  2
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  We'll email you a confirmation{clientInfo.email || createdBooking?.email ? (
+                                    <>
+                                      {' '}at{' '}
+                                      <strong className="text-brand-black underline decoration-brand-black/30 break-all">
+                                        {createdBooking?.email || clientInfo.email}
+                                      </strong>
+                                    </>
+                                  ) : null}{' '}
+                                  once approved (please check your spam folder).
+                                </div>
+                              </li>
+                              <li className="flex items-start gap-3">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
+                                  3
+                                </span>
+                                <div className="pt-0.5 leading-relaxed">
+                                  If notifications are enabled, you'll also get a notification when it's approved.
+                                </div>
+                              </li>
+                            </>
+                          )}
                         </ol>
                       </div>
 
                       {/* 4. Details Card */}
-                      <div className="bg-brand-gray-50 w-full p-6 sm:p-8 text-left space-y-6 border-2 border-brand-black rounded-xl">
+                      <div className="bg-brand-gray-50 w-full p-6 sm:p-7 text-left space-y-6 border-2 border-brand-black/15 rounded-lg">
                         <div className="border-b border-brand-black/10 pb-4 flex flex-row items-center justify-between gap-3">
                           <div>
                             <span className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500 block">
@@ -1709,7 +1874,7 @@ export default function App() {
                             </p>
                           </div>
                           <div className="shrink-0 text-right">
-                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-brand-black text-white text-xs font-mono font-bold tracking-wider border-2 border-brand-black transition-all duration-300 hover:bg-brand-white hover:text-brand-black cursor-default select-none shadow-sm hover:shadow-md">
+                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-brand-black text-white text-xs font-mono font-bold tracking-wider border-2 border-brand-black rounded-lg transition-all duration-300 hover:bg-brand-white hover:text-brand-black cursor-default select-none shadow-sm hover:shadow-md">
                               {confirmationTimeRange}
                             </span>
                           </div>
@@ -1724,13 +1889,16 @@ export default function App() {
                               selectedServices.map((service, idx) => {
                                 const selectedOpt = multiSlotOptions.find(o => o.time === selectedTime);
                                 const seg = selectedOpt?.segments?.find(s => s.serviceId === service._id);
-                                const artistName = seg?.attendantName || serviceAttendants[service._id]?.name || 'Any Available';
+                                const attendantNameFromBooking = createdBooking?.attendantId && typeof createdBooking.attendantId === 'object'
+                                  ? (createdBooking.attendantId as any).name
+                                  : null;
+                                const artistName = seg?.attendantName || serviceAttendants[service._id]?.name || attendantNameFromBooking || 'Any Available';
                                 const serviceTime = seg ? `${seg.startTime} – ${seg.endTime}` : confirmationTimeRange;
 
                                 return (
                                   <div
                                     key={service._id || idx}
-                                    className="p-4 bg-brand-white border border-brand-black/10 rounded-lg space-y-2"
+                                    className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2"
                                   >
                                     <div className="flex justify-between items-start gap-3">
                                       <span className="font-black text-sm uppercase text-brand-black leading-snug">
@@ -1754,7 +1922,7 @@ export default function App() {
                                 );
                               })
                             ) : (
-                              <div className="p-4 bg-brand-white border border-brand-black/10 rounded-lg space-y-2">
+                              <div className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2">
                                 <div className="flex justify-between items-start gap-3">
                                   <span className="font-black text-sm uppercase text-brand-black leading-snug">
                                     {typeof createdBooking?.serviceId === 'object' && createdBooking?.serviceId ? createdBooking.serviceId.name : 'Appointment'}
@@ -1854,7 +2022,7 @@ export default function App() {
 
                       {/* Reschedule Overlay Panel */}
                       {reschedulingBooking && (
-                        <div className="border-2 border-brand-black bg-brand-white p-6 space-y-6 rounded-xl">
+                        <div className="border-2 border-brand-black bg-brand-white p-6 space-y-6 rounded-lg">
                           <div className="border-b border-brand-black/10 pb-3 flex justify-between items-center">
                             <h3 className="text-sm font-black uppercase tracking-[0.2em]">Reschedule Slot</h3>
                             <span className="text-xs font-serif italic">#{reschedulingBooking.reference}</span>
@@ -1884,8 +2052,8 @@ export default function App() {
                                       type="button"
                                       onClick={() => setRescheduleTime(slot)}
                                       className={`py-3 text-xs font-black tracking-widest border transition-all rounded-lg ${rescheduleTime === slot
-                                          ? 'bg-brand-black text-white border-brand-black'
-                                          : 'bg-transparent text-brand-black border-brand-gray-200 hover:border-brand-black'
+                                        ? 'bg-brand-black text-white border-brand-black'
+                                        : 'bg-transparent text-brand-black border-brand-gray-200 hover:border-brand-black'
                                         }`}
                                     >
                                       {slot}
@@ -1983,16 +2151,16 @@ export default function App() {
                                   const attendant = typeof booking.attendantId === 'object' ? booking.attendantId : null;
 
                                   return (
-                                    <div key={booking._id} className="border-2 border-brand-black p-6 space-y-4 bg-brand-gray-50 rounded-xl">
+                                    <div key={booking._id} className="border-2 border-brand-black p-6 space-y-4 bg-brand-gray-50 rounded-lg">
                                       <div className="flex justify-between items-center border-b border-brand-black/10 pb-3">
                                         <span className="font-black text-xs uppercase italic">#{booking.reference || 'LMN-LEGACY'}</span>
                                         <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 border ${booking.status === 'confirmed'
-                                            ? 'bg-green-500 text-white border-green-500'
-                                            : booking.status === 'cancelled'
-                                              ? 'bg-red-500 text-white border-red-500'
-                                              : booking.status === 'completed'
-                                                ? 'bg-brand-gray-400 text-white border-brand-gray-400'
-                                                : 'bg-yellow-500 text-white border-yellow-500'
+                                          ? 'bg-green-500 text-white border-green-500'
+                                          : booking.status === 'cancelled'
+                                            ? 'bg-red-500 text-white border-red-500'
+                                            : booking.status === 'completed'
+                                              ? 'bg-brand-gray-400 text-white border-brand-gray-400'
+                                              : 'bg-yellow-500 text-white border-yellow-500'
                                           }`}>
                                           {booking.status}
                                         </span>
@@ -2103,9 +2271,9 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
 
   return (
     <div className="flex items-center justify-between relative max-w-[340px] mx-auto px-2">
-      <div className="absolute top-[8px] left-4 right-4 h-[2px] bg-[#E6D3C3] -z-10">
+      <div className="absolute top-[8px] left-4 right-4 h-[2px] bg-[#F0D5DE] -z-10">
         <div
-          className="h-full bg-[#B08968] transition-all duration-700 ease-out"
+          className="h-full bg-[#C4466F] transition-all duration-700 ease-out"
           style={{ width: `${(Math.max(0, Math.min(activeIndex, steps.length - 1)) / (steps.length - 1)) * 100}%` }}
         />
       </div>
@@ -2114,8 +2282,8 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
         const isActive = idx === activeIndex;
         return (
           <div key={idx} className="flex flex-col items-center gap-2">
-            <div className={`w-[14px] h-[14px] rounded-full transition-all duration-500 ${isCompleted || isActive ? 'bg-[#B08968] scale-110 shadow-sm' : 'bg-[#E6D3C3]'}`}></div>
-            <span className={`text-[10px] tracking-tight transition-colors duration-500 font-medium ${isActive ? 'text-[#1F1F1F] font-semibold' : 'text-[#6B6B6B]'}`}>
+            <div className={`w-[14px] h-[14px] rounded-full transition-all duration-500 ${isCompleted || isActive ? 'bg-[#C4466F] scale-110 shadow-sm' : 'bg-[#F0D5DE]'}`}></div>
+            <span className={`text-[11px] tracking-normal transition-colors duration-500 ${isActive ? 'text-[#1A1215] font-bold' : 'text-[#523E46] font-medium'}`}>
               {step.label}
             </span>
           </div>
@@ -2127,14 +2295,14 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
 
 function ServiceSelectionCardSkeleton() {
   return (
-    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[#E6D3C3] bg-white overflow-hidden animate-pulse">
+    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[#F0D5DE] bg-white overflow-hidden animate-pulse">
       <div className="flex-1 space-y-2.5">
-        <div className="h-4 w-2/3 bg-[#EFE7DD] rounded-full" />
-        <div className="h-3 w-1/3 bg-[#EFE7DD] rounded-full" />
+        <div className="h-4 w-2/3 bg-[#FCE2EA] rounded-full" />
+        <div className="h-3 w-1/3 bg-[#FCE2EA] rounded-full" />
       </div>
       <div className="flex flex-col items-end gap-3">
-        <div className="w-5 h-5 rounded-full bg-[#EFE7DD]" />
-        <div className="h-3.5 w-14 bg-[#EFE7DD] rounded-full" />
+        <div className="w-5 h-5 rounded-full bg-[#FCE2EA]" />
+        <div className="h-3.5 w-14 bg-[#FCE2EA] rounded-full" />
       </div>
     </div>
   );
@@ -2156,32 +2324,31 @@ function ServiceSelectionCard({
     <motion.div
       whileTap={{ scale: 0.99 }}
       className={`
-        flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden
-        ${isSelected ? 'bg-[#FAF7F3] border-[#B08968] shadow-sm' : 'bg-white border-[#E6D3C3] hover:border-[#B08968]'}
+        flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden backdrop-blur-md
+        ${isSelected
+          ? 'bg-[#FFF5F8]/90 border-[#C4466F] shadow-md ring-2 ring-[#C4466F]/25'
+          : 'bg-white/80 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F] hover:shadow-xs'}
       `}
       onClick={onSelect}
     >
-      {isSelected && (
-        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#B08968]" />
-      )}
       <div className="flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-sans font-medium text-[16px] text-[#1F1F1F] leading-tight transition-transform duration-300">{service.name}</h3>
+          <h3 className="font-sans font-semibold text-[16px] text-[#1A1215] leading-tight transition-transform duration-300">{service.name}</h3>
           {selectionOrder && (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white ${selectionOrder === 1 ? 'bg-[#B08968]' : 'bg-[#5E503F]'}`}>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white shadow-xs ${selectionOrder === 1 ? 'bg-[#C4466F]' : 'bg-[#4A2D35]'}`}>
               {selectionOrder === 1 ? '1st Service' : '2nd Service'}
             </span>
           )}
         </div>
-        <p className="mt-1.5 text-xs text-[#6B6B6B]">
+        <p className="mt-1.5 text-xs font-medium text-[#523E46]">
           {service.duration > 60 ? `${Math.round(service.duration / 60)} hrs` : `${service.duration} min`}
         </p>
       </div>
       <div className="flex flex-col items-end gap-3">
-        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-[#B08968] bg-[#B08968]' : 'border-[#E6D3C3] group-hover:border-[#B08968]'}`}>
+        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-[#C4466F] bg-[#C4466F]' : 'border-[#F0D5DE] group-hover:border-[#C4466F]'}`}>
           {isSelected && <CheckCircle2 size={12} strokeWidth={3} className="text-white" />}
         </div>
-        <p className="font-semibold text-sm text-[#1F1F1F] tracking-tight">{formatPrice(service.price, service.priceMax)}</p>
+        <p className="font-bold text-sm text-[#1A1215] tracking-tight">{formatPrice(service.price, service.priceMax)}</p>
       </div>
     </motion.div>
   );
@@ -2213,7 +2380,7 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
     <div className="space-y-8 h-[350px] overflow-y-auto pr-2 scrollbar-hide">
       {months.map(([month, monthDates], i) => (
         <div key={i} className="space-y-4">
-          <h3 className="text-[13px] font-black uppercase tracking-[0.4em] text-brand-gray-600 border-b border-brand-gray-100 pb-2">{month}</h3>
+          <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-[#3D2D34] border-b border-[#F0D5DE] pb-2">{month}</h3>
           <div className="grid grid-cols-4 gap-3">
             {monthDates.map((d, j) => {
               const dateStr = formatDateInTimezone(d);
@@ -2224,9 +2391,12 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
                 <button
                   key={j}
                   onClick={() => onDateSelect(dateStr)}
-                  className={`flex flex-col items-center justify-center p-4 transition-all duration-500 border rounded-xl ${isSelected ? 'bg-brand-black text-brand-white scale-105 border-brand-black shadow-xl z-10' : 'bg-brand-white border-brand-gray-100 hover:border-brand-black text-brand-black'}`}
+                  className={`flex flex-col items-center justify-center p-4 transition-all duration-300 border rounded-xl ${isSelected
+                    ? 'bg-[#1A1215] text-[#FDF8F9] scale-105 border-[#1A1215] shadow-xl ring-2 ring-[#C4466F]/40 z-10'
+                    : 'bg-white border-[#F0D5DE] hover:border-[#C4466F] text-[#1A1215]'
+                    }`}
                 >
-                  <span className={`text-[11px] uppercase font-black tracking-tighter leading-none mb-1 ${isSelected ? 'opacity-80' : 'text-brand-gray-600'}`}>{dayName}</span>
+                  <span className={`text-[11px] uppercase font-bold tracking-normal leading-none mb-1 ${isSelected ? 'text-[#FCE2EA]' : 'text-[#523E46]'}`}>{dayName}</span>
                   <span className="text-xl font-black italic font-serif leading-none">{dayNum}</span>
                 </button>
               );
@@ -2319,8 +2489,8 @@ function AttendantView({ session }: { session: { _id: string; name: string; toke
               disabled={attendantPush.isLoading}
               title={attendantPush.isSubscribed ? 'Disable notifications' : 'Enable notifications'}
               className={`flex items-center gap-1.5 py-2 px-2.5 sm:px-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.15em] transition-all border rounded-[10px] ${attendantPush.isSubscribed
-                  ? 'bg-brand-black text-white border-brand-black shadow-sm'
-                  : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
+                ? 'bg-brand-black text-white border-brand-black shadow-sm'
+                : 'bg-transparent text-brand-gray-400 border-brand-gray-200 hover:border-brand-black hover:text-brand-black'
                 } disabled:opacity-40 active:scale-95`}
             >
               {attendantPush.isSubscribed

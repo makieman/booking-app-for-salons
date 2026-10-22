@@ -6,14 +6,14 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
-    react(), 
+    react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       // Use our custom service worker so we can handle push events
       strategies: 'injectManifest',
-      srcDir:     'src',
-      filename:   'sw.ts',
+      srcDir: 'src',
+      filename: 'sw.ts',
       devOptions: {
         enabled: true,
         type: 'module',
