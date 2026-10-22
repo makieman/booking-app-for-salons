@@ -1402,7 +1402,7 @@ export default function App() {
                             placeholder="Search services..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#FAF0F3] border border-[#EEDBE1] rounded-full py-3.5 pl-12 pr-10 focus:outline-none focus:border-[#B86B7C] focus:bg-white transition-all font-semibold text-[15px] text-[#1A1215] placeholder:text-[#6E5660]/70"
+                            className="w-full bg-[#FFF0F3] border border-[#F0D5DE] rounded-full py-3.5 pl-12 pr-10 focus:outline-none focus:border-[#C4466F] focus:bg-white transition-all font-semibold text-[15px] text-[#1A1215] placeholder:text-[#6E5660]/70"
                           />
                           {searchQuery && (
                             <button
@@ -1425,8 +1425,8 @@ export default function App() {
                               else setSearchQuery(cat.split(' ')[0]);
                             }}
                             className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 border ${(cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()))
-                              ? 'bg-[#B86B7C] text-white border-[#B86B7C] shadow-sm'
-                              : 'bg-white text-[#523E46] border-[#EEDBE1] hover:border-[#B86B7C]'
+                              ? 'bg-[#C4466F] text-white border-[#C4466F] shadow-sm'
+                              : 'bg-white text-[#523E46] border-[#F0D5DE] hover:border-[#C4466F]'
                               }`}
                           >
                             {cat}
@@ -1455,7 +1455,7 @@ export default function App() {
                             );
                           })
                         ) : (
-                          <div className="py-12 text-center border border-dashed border-[#EEDBE1] rounded-2xl bg-white">
+                          <div className="py-12 text-center border border-dashed border-[#F0D5DE] rounded-2xl bg-white">
                             <p className="text-[#523E46] text-sm font-medium">No services found matching your criteria.</p>
                           </div>
                         )}
@@ -1496,7 +1496,7 @@ export default function App() {
                                 </div>
                                 <button
                                   onClick={() => navigateStep('date')}
-                                  className="bg-[#B86B7C] text-white px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-[#A55566] active:scale-95 transition-all cursor-pointer shadow-lg"
+                                  className="bg-[#C4466F] text-white px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-[#A83257] active:scale-95 transition-all cursor-pointer shadow-lg"
                                 >
                                   {selectedServices.length === 1 ? 'Continue (1)' : 'Continue (2)'}
                                 </button>
@@ -1743,7 +1743,7 @@ export default function App() {
                       </div>
 
                       {/* 3. Prominent Reference */}
-                      <div className="w-full bg-brand-white border-2 border-brand-black rounded-xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-sm">
+                      <div className="w-full bg-brand-white border-2 border-brand-black rounded-lg p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-sm">
                         <div>
                           <p className="text-[11px] uppercase tracking-[0.3em] font-black text-brand-gray-500">
                             Booking Reference
@@ -1773,7 +1773,7 @@ export default function App() {
                       </div>
 
                       {/* 2. What happens next */}
-                      <div className="w-full bg-brand-gray-50 border-2 border-brand-black/15 rounded-xl p-6 sm:p-7 text-left space-y-4">
+                      <div className="w-full bg-brand-gray-50 border-2 border-brand-black/15 rounded-lg p-6 sm:p-7 text-left space-y-4">
                         <div className="flex items-center gap-2 border-b border-brand-black/10 pb-3">
                           <Clock size={16} className="text-brand-gray-600" aria-hidden="true" />
                           <h3 className="text-xs font-black uppercase tracking-[0.25em] text-brand-gray-700">
@@ -1863,7 +1863,7 @@ export default function App() {
                       </div>
 
                       {/* 4. Details Card */}
-                      <div className="bg-brand-gray-50 w-full p-6 sm:p-8 text-left space-y-6 border-2 border-brand-black rounded-xl">
+                      <div className="bg-brand-gray-50 w-full p-6 sm:p-7 text-left space-y-6 border-2 border-brand-black/15 rounded-lg">
                         <div className="border-b border-brand-black/10 pb-4 flex flex-row items-center justify-between gap-3">
                           <div>
                             <span className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500 block">
@@ -1874,7 +1874,7 @@ export default function App() {
                             </p>
                           </div>
                           <div className="shrink-0 text-right">
-                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-brand-black text-white text-xs font-mono font-bold tracking-wider border-2 border-brand-black transition-all duration-300 hover:bg-brand-white hover:text-brand-black cursor-default select-none shadow-sm hover:shadow-md">
+                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-brand-black text-white text-xs font-mono font-bold tracking-wider border-2 border-brand-black rounded-lg transition-all duration-300 hover:bg-brand-white hover:text-brand-black cursor-default select-none shadow-sm hover:shadow-md">
                               {confirmationTimeRange}
                             </span>
                           </div>
@@ -1898,7 +1898,7 @@ export default function App() {
                                 return (
                                   <div
                                     key={service._id || idx}
-                                    className="p-4 bg-brand-white border border-brand-black/10 rounded-lg space-y-2"
+                                    className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2"
                                   >
                                     <div className="flex justify-between items-start gap-3">
                                       <span className="font-black text-sm uppercase text-brand-black leading-snug">
@@ -1922,7 +1922,7 @@ export default function App() {
                                 );
                               })
                             ) : (
-                              <div className="p-4 bg-brand-white border border-brand-black/10 rounded-lg space-y-2">
+                              <div className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2">
                                 <div className="flex justify-between items-start gap-3">
                                   <span className="font-black text-sm uppercase text-brand-black leading-snug">
                                     {typeof createdBooking?.serviceId === 'object' && createdBooking?.serviceId ? createdBooking.serviceId.name : 'Appointment'}
@@ -2022,7 +2022,7 @@ export default function App() {
 
                       {/* Reschedule Overlay Panel */}
                       {reschedulingBooking && (
-                        <div className="border-2 border-brand-black bg-brand-white p-6 space-y-6 rounded-xl">
+                        <div className="border-2 border-brand-black bg-brand-white p-6 space-y-6 rounded-lg">
                           <div className="border-b border-brand-black/10 pb-3 flex justify-between items-center">
                             <h3 className="text-sm font-black uppercase tracking-[0.2em]">Reschedule Slot</h3>
                             <span className="text-xs font-serif italic">#{reschedulingBooking.reference}</span>
@@ -2151,7 +2151,7 @@ export default function App() {
                                   const attendant = typeof booking.attendantId === 'object' ? booking.attendantId : null;
 
                                   return (
-                                    <div key={booking._id} className="border-2 border-brand-black p-6 space-y-4 bg-brand-gray-50 rounded-xl">
+                                    <div key={booking._id} className="border-2 border-brand-black p-6 space-y-4 bg-brand-gray-50 rounded-lg">
                                       <div className="flex justify-between items-center border-b border-brand-black/10 pb-3">
                                         <span className="font-black text-xs uppercase italic">#{booking.reference || 'LMN-LEGACY'}</span>
                                         <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 border ${booking.status === 'confirmed'
@@ -2271,9 +2271,9 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
 
   return (
     <div className="flex items-center justify-between relative max-w-[340px] mx-auto px-2">
-      <div className="absolute top-[8px] left-4 right-4 h-[2px] bg-[#EEDBE1] -z-10">
+      <div className="absolute top-[8px] left-4 right-4 h-[2px] bg-[#F0D5DE] -z-10">
         <div
-          className="h-full bg-[#B86B7C] transition-all duration-700 ease-out"
+          className="h-full bg-[#C4466F] transition-all duration-700 ease-out"
           style={{ width: `${(Math.max(0, Math.min(activeIndex, steps.length - 1)) / (steps.length - 1)) * 100}%` }}
         />
       </div>
@@ -2282,7 +2282,7 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
         const isActive = idx === activeIndex;
         return (
           <div key={idx} className="flex flex-col items-center gap-2">
-            <div className={`w-[14px] h-[14px] rounded-full transition-all duration-500 ${isCompleted || isActive ? 'bg-[#B86B7C] scale-110 shadow-sm' : 'bg-[#EEDBE1]'}`}></div>
+            <div className={`w-[14px] h-[14px] rounded-full transition-all duration-500 ${isCompleted || isActive ? 'bg-[#C4466F] scale-110 shadow-sm' : 'bg-[#F0D5DE]'}`}></div>
             <span className={`text-[11px] tracking-normal transition-colors duration-500 ${isActive ? 'text-[#1A1215] font-bold' : 'text-[#523E46] font-medium'}`}>
               {step.label}
             </span>
@@ -2295,14 +2295,14 @@ function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
 
 function ServiceSelectionCardSkeleton() {
   return (
-    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[#EEDBE1] bg-white overflow-hidden animate-pulse">
+    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[#F0D5DE] bg-white overflow-hidden animate-pulse">
       <div className="flex-1 space-y-2.5">
-        <div className="h-4 w-2/3 bg-[#F5E1E6] rounded-full" />
-        <div className="h-3 w-1/3 bg-[#F5E1E6] rounded-full" />
+        <div className="h-4 w-2/3 bg-[#FCE2EA] rounded-full" />
+        <div className="h-3 w-1/3 bg-[#FCE2EA] rounded-full" />
       </div>
       <div className="flex flex-col items-end gap-3">
-        <div className="w-5 h-5 rounded-full bg-[#F5E1E6]" />
-        <div className="h-3.5 w-14 bg-[#F5E1E6] rounded-full" />
+        <div className="w-5 h-5 rounded-full bg-[#FCE2EA]" />
+        <div className="h-3.5 w-14 bg-[#FCE2EA] rounded-full" />
       </div>
     </div>
   );
@@ -2326,8 +2326,8 @@ function ServiceSelectionCard({
       className={`
         flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden backdrop-blur-md
         ${isSelected
-          ? 'bg-[#FFF5F7]/90 border-[#B86B7C] shadow-md ring-2 ring-[#B86B7C]/25'
-          : 'bg-white/80 border-[#EEDBE1] hover:bg-white hover:border-[#B86B7C] hover:shadow-xs'}
+          ? 'bg-[#FFF5F8]/90 border-[#C4466F] shadow-md ring-2 ring-[#C4466F]/25'
+          : 'bg-white/80 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F] hover:shadow-xs'}
       `}
       onClick={onSelect}
     >
@@ -2335,7 +2335,7 @@ function ServiceSelectionCard({
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-sans font-semibold text-[16px] text-[#1A1215] leading-tight transition-transform duration-300">{service.name}</h3>
           {selectionOrder && (
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white shadow-xs ${selectionOrder === 1 ? 'bg-[#B86B7C]' : 'bg-[#4A2D35]'}`}>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white shadow-xs ${selectionOrder === 1 ? 'bg-[#C4466F]' : 'bg-[#4A2D35]'}`}>
               {selectionOrder === 1 ? '1st Service' : '2nd Service'}
             </span>
           )}
@@ -2345,7 +2345,7 @@ function ServiceSelectionCard({
         </p>
       </div>
       <div className="flex flex-col items-end gap-3">
-        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-[#B86B7C] bg-[#B86B7C]' : 'border-[#DFBFC7] group-hover:border-[#B86B7C]'}`}>
+        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-[#C4466F] bg-[#C4466F]' : 'border-[#F0D5DE] group-hover:border-[#C4466F]'}`}>
           {isSelected && <CheckCircle2 size={12} strokeWidth={3} className="text-white" />}
         </div>
         <p className="font-bold text-sm text-[#1A1215] tracking-tight">{formatPrice(service.price, service.priceMax)}</p>
@@ -2380,7 +2380,7 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
     <div className="space-y-8 h-[350px] overflow-y-auto pr-2 scrollbar-hide">
       {months.map(([month, monthDates], i) => (
         <div key={i} className="space-y-4">
-          <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-[#3D2D34] border-b border-[#EEDBE1] pb-2">{month}</h3>
+          <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-[#3D2D34] border-b border-[#F0D5DE] pb-2">{month}</h3>
           <div className="grid grid-cols-4 gap-3">
             {monthDates.map((d, j) => {
               const dateStr = formatDateInTimezone(d);
@@ -2392,11 +2392,11 @@ function DateScroller({ selectedDate, onDateSelect }: { selectedDate: string, on
                   key={j}
                   onClick={() => onDateSelect(dateStr)}
                   className={`flex flex-col items-center justify-center p-4 transition-all duration-300 border rounded-xl ${isSelected
-                    ? 'bg-[#1A1215] text-[#FDF8F9] scale-105 border-[#1A1215] shadow-xl ring-2 ring-[#B86B7C]/40 z-10'
-                    : 'bg-white border-[#EEDBE1] hover:border-[#B86B7C] text-[#1A1215]'
+                    ? 'bg-[#1A1215] text-[#FDF8F9] scale-105 border-[#1A1215] shadow-xl ring-2 ring-[#C4466F]/40 z-10'
+                    : 'bg-white border-[#F0D5DE] hover:border-[#C4466F] text-[#1A1215]'
                     }`}
                 >
-                  <span className={`text-[11px] uppercase font-bold tracking-normal leading-none mb-1 ${isSelected ? 'text-[#F5E1E6]' : 'text-[#523E46]'}`}>{dayName}</span>
+                  <span className={`text-[11px] uppercase font-bold tracking-normal leading-none mb-1 ${isSelected ? 'text-[#FCE2EA]' : 'text-[#523E46]'}`}>{dayName}</span>
                   <span className="text-xl font-black italic font-serif leading-none">{dayNum}</span>
                 </button>
               );
