@@ -104,8 +104,9 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       api.setApiTenantSlug(t.slug);
 
       // Update CSS variables for branding colors
-      const rawPrimary = t.branding?.primaryColor;
-      const primary = (rawPrimary && rawPrimary.toLowerCase() !== '#b08968') ? rawPrimary : '#B86B7C';
+      const rawPrimary = t.branding?.primaryColor?.toLowerCase();
+      const isLegacyDefault = !rawPrimary || rawPrimary === '#b08968' || rawPrimary === '#9a5532' || rawPrimary === '#8c4a32' || rawPrimary === '#b86b7c';
+      const primary = isLegacyDefault ? '#C4466F' : (t.branding?.primaryColor || '#C4466F');
       document.documentElement.style.setProperty('--brand-color', primary);
       document.documentElement.style.setProperty('--color-primary', primary);
       document.documentElement.style.setProperty('--color-brand-sage', primary);

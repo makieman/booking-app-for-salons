@@ -6,33 +6,33 @@
   --font-sans: "Plus Jakarta Sans", "Inter", sans-serif;
 
   /* ------------------------------------------------------------------
-     Design Language: Subtle Glassmorphism
+     Design Language: Subtle Glassmorphism with Saturated Rose Pink
      WCAG AA/AAA verified:
      - Body Text: #231F1D on #FAF8F5 (16.2:1) & glass (16.5:1)
      - Secondary Details: #6E655F on #FAF8F5 (5.1:1 >= 4.5:1)
-     - Terracotta CTA: #8C4A32 with #FFFFFF text (5.3:1 >= 4.5:1)
-     - Ambient Glows: #D4A359 at 15% opacity
+     - Rose Pink CTA: #C4466F with #FFFFFF text (4.8:1 >= 4.5:1)
+     - Ambient Glows: Rose-gold blend (#C4466F & #D4A359 at 10-12% opacity)
      ------------------------------------------------------------------ */
 
   /* Brand & Actions */
-  --color-primary: #8C4A32;        /* Terracotta CTA */
-  --color-primary-hover: #783E2A;  /* Deep Terracotta Hover */
-  --color-primary-tint: rgba(140, 74, 50, 0.08);
-  --color-primary-ink: #8C4A32;
+  --color-primary: #C4466F;        /* Vibrant Rose Pink CTA */
+  --color-primary-hover: #A83257;  /* Deep Rose Hover */
+  --color-primary-tint: rgba(196, 70, 111, 0.08);
+  --color-primary-ink: #A83257;
   --color-on-primary: #FFFFFF;
-  --color-accent: #D4A359;         /* Warm Gold Ambient Glow */
-  --color-accent-hover: #C59345;
+  --color-accent: #E8829F;         /* Radiant Rose Ambient Glow */
+  --color-accent-hover: #D66D8C;
 
   /* Surfaces and Canvas */
   --color-bg-salon: #FAF8F5;       /* Warm Ivory Canvas */
   --color-surface-card: rgba(255, 255, 255, 0.72);
-  --color-surface-subtle: rgba(250, 248, 245, 0.85);
+  --color-surface-subtle: rgba(253, 242, 245, 0.85);
   --color-surface-glass: rgba(255, 255, 255, 0.72);
   --color-surface-espresso: rgba(44, 34, 30, 0.88);
 
   /* Borders & Glass Highlights */
-  --color-border-glass: rgba(232, 226, 217, 0.65);
-  --color-border-subtle: rgba(232, 226, 217, 0.65);
+  --color-border-glass: rgba(240, 213, 222, 0.65);
+  --color-border-subtle: rgba(240, 213, 222, 0.65);
   --color-border-strong: rgba(110, 101, 95, 0.4);
 
   /* High-Contrast Typography */
@@ -45,10 +45,10 @@
   /* Legacy brand scale */
   --color-brand-black: #231F1D;
   --color-brand-white: #FAF8F5;
-  --color-brand-gray-50: rgba(250, 248, 245, 0.85);
-  --color-brand-gray-100: rgba(232, 226, 217, 0.65);
-  --color-brand-gray-200: #E0D7CC;
-  --color-brand-gray-300: #C2B6A7;
+  --color-brand-gray-50: rgba(253, 242, 245, 0.85);
+  --color-brand-gray-100: rgba(240, 213, 222, 0.65);
+  --color-brand-gray-200: #EAD3DA;
+  --color-brand-gray-300: #C4466F;
   --color-brand-gray-400: #8C827B;
   --color-brand-gray-500: #6E655F;
   --color-brand-gray-600: #4B433E;
@@ -57,13 +57,13 @@
   --color-brand-gray-900: #1B1715;
 
   --color-brand-cream: #FAF8F5;
-  --color-brand-sage: #8C4A32;
+  --color-brand-sage: #C4466F;
   --color-brand-charcoal: #231F1D;
   --color-brand-surface: #FAF8F5;
   --color-brand-muted: #6E655F;
-  --color-brand-border: rgba(232, 226, 217, 0.65);
+  --color-brand-border: rgba(240, 213, 222, 0.65);
 
-  --shadow-luxury: 0 20px 40px -15px rgba(44, 34, 30, 0.08);
+  --shadow-luxury: 0 20px 40px -15px rgba(196, 70, 111, 0.10);
   --shadow-glass: 0 8px 32px 0 rgba(44, 34, 30, 0.05);
 
   --radius-btn: 0.625rem;
@@ -120,7 +120,7 @@
 
 .glass-panel-interactive:hover {
   background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(212, 163, 89, 0.45);
+  border-color: rgba(196, 70, 111, 0.45);
   box-shadow: 0 12px 36px 0 rgba(44, 34, 30, 0.07);
   transform: translateY(-1px);
 }
@@ -133,7 +133,7 @@
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.4);
 }
 
-/* Ambient glows (#D4A359 at 15% opacity) */
+/* Ambient glows (Rose-gold blend: #C4466F & #D4A359) */
 .ambient-glow-mesh {
   position: fixed;
   inset: 0;
@@ -149,7 +149,7 @@
   width: 520px;
   height: 520px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(212, 163, 89, 0.15) 0%, rgba(212, 163, 89, 0) 70%);
+  background: radial-gradient(circle, rgba(196, 70, 111, 0.12) 0%, rgba(196, 70, 111, 0) 70%);
   filter: blur(45px);
 }
 
@@ -160,7 +160,7 @@
   width: 600px;
   height: 600px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(212, 163, 89, 0.12) 0%, rgba(212, 163, 89, 0) 70%);
+  background: radial-gradient(circle, rgba(212, 163, 89, 0.10) 0%, rgba(212, 163, 89, 0) 70%);
   filter: blur(55px);
 }
 
@@ -171,12 +171,12 @@
   width: 480px;
   height: 480px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(212, 163, 89, 0.10) 0%, rgba(212, 163, 89, 0) 70%);
+  background: radial-gradient(circle, rgba(232, 130, 159, 0.10) 0%, rgba(232, 130, 159, 0) 70%);
   filter: blur(50px);
 }
 
 .luxury-card {
-  @apply bg-white/70 backdrop-blur-md border border-[rgba(232,226,217,0.65)] hover:border-[#D4A359]/50 transition-all duration-500 shadow-sm hover:shadow-luxury;
+  @apply bg-white/70 backdrop-blur-md border border-[rgba(240,213,222,0.65)] hover:border-[#C4466F]/50 transition-all duration-500 shadow-sm hover:shadow-luxury;
 }
 
 @keyframes swing {
