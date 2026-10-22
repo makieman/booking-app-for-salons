@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   User,
+  CircleUserRound,
   Calendar,
   Clock,
   Phone,
@@ -365,7 +366,7 @@ export function CustomerAccountModal({
         <div className="flex items-center justify-between px-6 py-5 border-b border-brand-gray-200 bg-brand-white">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-full bg-brand-black text-white flex items-center justify-center font-bold text-xs tracking-wider shrink-0">
-              {initials ? initials : <User size={18} />}
+              {initials ? initials : <CircleUserRound size={20} />}
             </div>
             <div>
               <h2

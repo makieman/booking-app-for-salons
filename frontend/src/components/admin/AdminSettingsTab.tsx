@@ -21,8 +21,16 @@ export function AdminSettingsTab({
 }: AdminSettingsTabProps) {
   const adminPush = useAdminPushNotifications();
 
+  const getActiveBrandColor = (c?: string) => {
+    const hex = c?.toLowerCase();
+    if (!hex || hex === '#b08968' || hex === '#9a5532' || hex === '#8c4a32' || hex === '#b86b7c') {
+      return '#C4466F';
+    }
+    return c;
+  };
+
   const [name, setName] = useState(tenant?.name || '');
-  const [primaryColor, setPrimaryColor] = useState(tenant?.branding?.primaryColor || '#B08968');
+  const [primaryColor, setPrimaryColor] = useState(getActiveBrandColor(tenant?.branding?.primaryColor));
   const [emailFromName, setEmailFromName] = useState(tenant?.branding?.emailFromName || '');
   const [emailReplyTo, setEmailReplyTo] = useState(tenant?.branding?.emailReplyTo || '');
   const [whatsappSenderNumber, setWhatsappSenderNumber] = useState(tenant?.branding?.whatsappSenderNumber || '');
@@ -45,7 +53,7 @@ export function AdminSettingsTab({
   useEffect(() => {
     if (tenant) {
       setName(tenant.name);
-      setPrimaryColor(tenant.branding?.primaryColor || '#B08968');
+      setPrimaryColor(getActiveBrandColor(tenant.branding?.primaryColor));
       setEmailFromName(tenant.branding?.emailFromName || '');
       setEmailReplyTo(tenant.branding?.emailReplyTo || '');
       setWhatsappSenderNumber(tenant.branding?.whatsappSenderNumber || '');
