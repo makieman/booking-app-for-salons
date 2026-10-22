@@ -331,14 +331,14 @@ export function DateTimeSelectionScreen({
               aria-label="Any professional (first available)"
               onClick={() => handleAttendantChange(null)}
               className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border backdrop-blur-md transition-all duration-200 shrink-0 min-h-[44px] ${selectedAttendant === null
-                  ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#8C4A32]/40'
-                  : 'bg-white/70 border-[rgba(232,226,217,0.65)] hover:border-[#D4A359] hover:bg-white/90 text-[#231F1D]'
+                  ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#C4466F]/40'
+                  : 'bg-white/70 border-[rgba(240,213,222,0.65)] hover:border-[#C4466F] hover:bg-white/90 text-[#231F1D]'
                 }`}
             >
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs border ${selectedAttendant === null
                     ? 'border-white/30 bg-white/10 text-white'
-                    : 'border-[rgba(232,226,217,0.8)] bg-brand-gray-50 text-[#231F1D]'
+                    : 'border-[rgba(240,213,222,0.8)] bg-brand-gray-50 text-[#231F1D]'
                   }`}
               >
                 <Users size={14} />
@@ -364,14 +364,14 @@ export function DateTimeSelectionScreen({
                   aria-label={`Staff member ${att.name}`}
                   onClick={() => handleAttendantChange(att)}
                   className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border backdrop-blur-md transition-all duration-200 shrink-0 min-h-[44px] ${isSelected
-                      ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#8C4A32]/40'
-                      : 'bg-white/70 border-[rgba(232,226,217,0.65)] hover:border-[#D4A359] hover:bg-white/90 text-[#231F1D]'
+                      ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#C4466F]/40'
+                      : 'bg-white/70 border-[rgba(240,213,222,0.65)] hover:border-[#C4466F] hover:bg-white/90 text-[#231F1D]'
                     }`}
                 >
                   <div
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border ${isSelected
                         ? 'border-white/30 bg-white/10 text-white'
-                        : 'border-[rgba(232,226,217,0.8)] bg-brand-gray-50 text-[#231F1D]'
+                        : 'border-[rgba(240,213,222,0.8)] bg-brand-gray-50 text-[#231F1D]'
                       }`}
                   >
                     {initials}
@@ -403,8 +403,8 @@ export function DateTimeSelectionScreen({
                 aria-label={`Staff page ${idx + 1}`}
                 onClick={() => scrollToStaffSegment(idx)}
                 className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${isActive
-                    ? 'w-4 bg-[#8C4A32] shadow-xs'
-                    : 'w-1.5 bg-[#E0D7CC] hover:bg-[#C2B6A7]'
+                    ? 'w-4 bg-[#C4466F] shadow-xs'
+                    : 'w-1.5 bg-[#EAD3DA] hover:bg-[#C4466F]/60'
                   }`}
               />
             );
@@ -494,8 +494,8 @@ export function DateTimeSelectionScreen({
                 className={`relative aspect-square min-h-[44px] min-w-[44px] rounded-xl flex flex-col items-center justify-center transition-all duration-200 border ${isDisabled
                     ? 'opacity-25 cursor-not-allowed text-[#6E655F]/60 bg-transparent border-transparent'
                     : isSelected
-                      ? 'bg-[rgba(44,34,30,0.88)] text-white shadow-md font-bold ring-2 ring-[#8C4A32]/40 scale-[1.03] z-10 border-white/20'
-                      : 'hover:bg-white/90 hover:border-[#D4A359] text-[#231F1D] font-semibold bg-white/60 border-[rgba(232,226,217,0.65)]'
+                      ? 'bg-[rgba(44,34,30,0.88)] text-white shadow-md font-bold ring-2 ring-[#C4466F]/40 scale-[1.03] z-10 border-white/20'
+                      : 'hover:bg-white/90 hover:border-[#C4466F] text-[#231F1D] font-semibold bg-white/60 border-[rgba(240,213,222,0.65)]'
                   }`}
               >
                 <span className="text-sm leading-none font-medium">{dayNum}</span>
@@ -517,7 +517,7 @@ export function DateTimeSelectionScreen({
         </div>
 
         {/* Legend */}
-        <div className="pt-2 border-t border-[rgba(232,226,217,0.65)] flex items-center justify-between flex-wrap gap-2 text-[11px] text-[#6E655F] font-medium">
+        <div className="pt-2 border-t border-[rgba(240,213,222,0.65)] flex items-center justify-between flex-wrap gap-2 text-[11px] text-[#6E655F] font-medium">
           <span>Available slots:</span>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5">
@@ -543,7 +543,7 @@ export function DateTimeSelectionScreen({
         </h2>
 
         {/* Morning / Afternoon / Evening filter container matching calendar width with centered items */}
-        <div className="w-full bg-white/60 backdrop-blur-md border border-[rgba(232,226,217,0.65)] p-1.5 rounded-2xl flex items-center justify-center">
+        <div className="w-full bg-white/60 backdrop-blur-md border border-[rgba(240,213,222,0.65)] p-1.5 rounded-2xl flex items-center justify-center">
           <div className="flex items-center justify-center gap-1.5 sm:gap-2 max-w-full overflow-x-auto scrollbar-hide">
             {(['all', 'morning', 'afternoon', 'evening'] as const).map(period => {
               const isActive = periodFilter === period;
@@ -575,7 +575,7 @@ export function DateTimeSelectionScreen({
         {isLoadingSlots ? (
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 pt-2 animate-pulse">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-12 bg-white/60 rounded-xl border border-[rgba(232,226,217,0.65)]" />
+              <div key={i} className="h-12 bg-white/60 rounded-xl border border-[rgba(240,213,222,0.65)]" />
             ))}
           </div>
         ) : filteredTimeSlots.length > 0 ? (
@@ -592,8 +592,8 @@ export function DateTimeSelectionScreen({
                   aria-label={`Select time slot at ${timeDisplay}`}
                   onClick={() => onSelectTime(time)}
                   className={`min-h-[46px] px-3 py-2.5 rounded-xl border backdrop-blur-md text-xs font-black tracking-wider transition-all duration-200 flex items-center justify-center ${isSelected
-                      ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#8C4A32]/40 scale-[1.02]'
-                      : 'bg-white/75 border-[rgba(232,226,217,0.65)] hover:border-[#D4A359] text-[#231F1D]'
+                      ? 'bg-[rgba(44,34,30,0.88)] text-white border-white/20 shadow-md ring-2 ring-[#C4466F]/40 scale-[1.02]'
+                      : 'bg-white/75 border-[rgba(240,213,222,0.65)] hover:border-[#C4466F] text-[#231F1D]'
                     }`}
                 >
                   {timeDisplay}
@@ -602,7 +602,7 @@ export function DateTimeSelectionScreen({
             })}
           </div>
         ) : (
-          <div className="bg-white/75 backdrop-blur-md rounded-2xl border border-[rgba(232,226,217,0.65)] p-6 text-center space-y-2">
+          <div className="bg-white/75 backdrop-blur-md rounded-2xl border border-[rgba(240,213,222,0.65)] p-6 text-center space-y-2">
             <Clock size={28} className="mx-auto text-[#6E655F] stroke-1" />
             <p className="text-sm font-serif italic text-[#231F1D]">
               No available slots for {formattedSelectedDate}
@@ -616,7 +616,7 @@ export function DateTimeSelectionScreen({
 
         {/* Schedule Preview for Multi-service bookings */}
         {selectedTime && multiSlotOptions.length > 0 && (
-          <div className="bg-white/75 backdrop-blur-md border border-[rgba(232,226,217,0.65)] rounded-2xl p-4 space-y-2.5 mt-3">
+          <div className="bg-white/75 backdrop-blur-md border border-[rgba(240,213,222,0.65)] rounded-2xl p-4 space-y-2.5 mt-3">
             <div className="text-xs font-bold uppercase tracking-wider text-[#6E655F]">
               <span>Appointment Schedule Preview</span>
             </div>
@@ -630,7 +630,7 @@ export function DateTimeSelectionScreen({
                       return (
                         <div
                           key={idx}
-                          className="flex items-center justify-between text-xs py-1 border-b border-[rgba(232,226,217,0.5)] last:border-b-0"
+                          className="flex items-center justify-between text-xs py-1 border-b border-[rgba(240,213,222,0.5)] last:border-b-0"
                         >
                           <span className="font-semibold text-[#231F1D]">
                             {idx + 1}. {svc?.name} ({formatTime12(seg.startTime)} – {formatTime12(seg.endTime)})
@@ -652,7 +652,7 @@ export function DateTimeSelectionScreen({
         )}
       </section>
 
-      {/* Sticky Bottom Bar: Dark Espresso Glass with Terracotta Continue button */}
+      {/* Sticky Bottom Bar: Dark Espresso Glass with Rose Pink Continue button */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-[rgba(44,34,30,0.88)] backdrop-blur-[16px] border-t border-white/12 shadow-2xl">
         <div className="max-w-md mx-auto px-4 py-3 sm:py-3.5 flex items-center justify-between gap-4 text-white">
           <div className="space-y-0.5">
@@ -668,7 +668,7 @@ export function DateTimeSelectionScreen({
             type="button"
             disabled={!selectedTime}
             onClick={onContinue}
-            className="min-h-[46px] px-7 bg-[#8C4A32] text-white font-bold text-xs uppercase tracking-[0.2em] rounded-xl transition-all disabled:opacity-30 hover:bg-[#783E2A] hover:tracking-[0.25em] active:scale-[0.98] shadow-lg shrink-0 cursor-pointer disabled:cursor-not-allowed"
+            className="min-h-[46px] px-7 bg-[#C4466F] text-white font-bold text-xs uppercase tracking-[0.2em] rounded-xl transition-all disabled:opacity-30 hover:bg-[#A83257] hover:tracking-[0.25em] active:scale-[0.98] shadow-lg shrink-0 cursor-pointer disabled:cursor-not-allowed"
           >
             Continue
           </button>
