@@ -9,12 +9,14 @@
  * and similar utility follows the salon automatically.
  */
 
-/** Default brand colour of the built-in "Terracotta & Espresso" palette (see index.css). */
-export const DEFAULT_PRIMARY = '#8C4A32';
+/** Default brand colour of the built-in rose palette (see index.css). */
+export const DEFAULT_PRIMARY = '#C4466F';
 
 /** Previous defaults. Tenants that never customised their colour have this saved. */
 const LEGACY_DEFAULT_PRIMARY = '#B08968';
 const LEGACY_DEFAULT_PRIMARY_V2 = '#9A5532';
+const LEGACY_DEFAULT_PRIMARY_V3 = '#8C4A32';
+const LEGACY_DEFAULT_PRIMARY_V4 = '#B86B7C';
 
 // Fixed palette colours the derived tokens are checked against.
 const INK = '#231F1D'; // main text colour, used as the label on accent buttons
@@ -70,7 +72,14 @@ export interface BrandTokens {
 export function usesDefaultBrand(hex?: string | null): boolean {
   if (!hex) return true;
   const normalised = hex.trim().toUpperCase();
-  return normalised === LEGACY_DEFAULT_PRIMARY || normalised === LEGACY_DEFAULT_PRIMARY_V2 || normalised === DEFAULT_PRIMARY || parse(normalised) === null;
+  return (
+    normalised === LEGACY_DEFAULT_PRIMARY ||
+    normalised === LEGACY_DEFAULT_PRIMARY_V2 ||
+    normalised === LEGACY_DEFAULT_PRIMARY_V3 ||
+    normalised === LEGACY_DEFAULT_PRIMARY_V4 ||
+    normalised === DEFAULT_PRIMARY ||
+    parse(normalised) === null
+  );
 }
 
 /**

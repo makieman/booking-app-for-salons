@@ -55,7 +55,7 @@ async function seedDefaultTenant(): Promise<void> {
         timezone: 'Africa/Nairobi',
         workingHours: { start: '09:00', end: '18:00' },
         branding: {
-          primaryColor: '#B86B7C',
+          primaryColor: '#C4466F',
         },
         locale: 'en',
         supportPhone: '0721530120',
