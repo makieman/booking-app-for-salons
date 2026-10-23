@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles, UserCheck } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -1670,243 +1670,324 @@ export default function App() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="flex flex-col items-center justify-center py-8 sm:py-12 text-center space-y-8 sm:space-y-10 max-w-xl mx-auto"
                     >
-                      {/* 1. Heading, Status Badge & Subtitle */}
-                      <div className="space-y-3">
+                      {/* 1. Status Seal, Heading, Badge & Concierge Subtitle */}
+                      <div className="space-y-4">
                         {createdBooking?.status === 'confirmed' ? (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="relative">
+                              <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-glass flex items-center justify-center">
+                                <CheckCircle2 size={32} strokeWidth={2.2} />
+                              </div>
+                              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#C4466F] text-white flex items-center justify-center shadow-xs">
+                                <Sparkles size={12} />
+                              </span>
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-emerald-50 text-emerald-900 border border-emerald-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
-                              <span>Confirmed</span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" aria-hidden="true" />
+                              <span>Reserved & Confirmed</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-emerald-950"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
                               Appointment Confirmed
                             </h2>
-                            <div className="w-16 h-1 bg-emerald-700 mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                              Your appointment has been approved! We look forward to seeing you at the salon.
+
+                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
+                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C4466F]/40" />
+                              <Sparkles size={12} className="text-[#C4466F]" />
+                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-[#C4466F]/40" />
+                            </div>
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                              Your appointment has been approved! We look forward to welcoming you to Flo Sisterlocks.
                             </p>
-                          </>
+                          </div>
                         ) : createdBooking?.status === 'cancelled' ? (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-700 border border-rose-200/90 shadow-glass flex items-center justify-center">
+                              <AlertCircle size={32} strokeWidth={2.2} />
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-red-100 text-red-900 border border-red-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-rose-50 text-rose-900 border border-rose-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-600" aria-hidden="true" />
                               <span>Cancelled</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-red-950"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
                               Appointment Cancelled
                             </h2>
-                            <div className="w-16 h-1 bg-red-600 mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+
+                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
+                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-rose-400/40" />
+                              <AlertCircle size={12} className="text-rose-500" />
+                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-rose-400/40" />
+                            </div>
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
                               This appointment has been cancelled or declined by the salon.
                             </p>
-                          </>
+                          </div>
                         ) : createdBooking?.status === 'completed' ? (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-glass flex items-center justify-center">
+                              <Sparkles size={32} strokeWidth={2.2} />
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-blue-100 text-blue-900 border border-blue-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-emerald-50 text-emerald-900 border border-emerald-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-blue-500" aria-hidden="true" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
                               <span>Completed</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-blue-950"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
                               Appointment Completed
                             </h2>
-                            <div className="w-16 h-1 bg-blue-600 mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                              Thank you for visiting! We look forward to seeing you again.
+
+                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
+                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C4466F]/40" />
+                              <Sparkles size={12} className="text-[#C4466F]" />
+                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-[#C4466F]/40" />
+                            </div>
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                              Thank you for visiting Flo Sisterlocks! We look forward to seeing you again.
                             </p>
-                          </>
+                          </div>
                         ) : (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-700 border border-amber-200/90 shadow-glass flex items-center justify-center">
+                              <Clock size={32} strokeWidth={2.2} className="animate-pulse" />
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-amber-50 text-amber-900 border border-amber-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
-                              <span>Pending approval</span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" aria-hidden="true" />
+                              <span>Pending Salon Approval</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
-                              Request received
+                              Request Received
                             </h2>
-                            <div className="w-16 h-1 bg-brand-black mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-500 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                              The salon will review your request shortly.
+
+                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
+                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C4466F]/40" />
+                              <Sparkles size={12} className="text-[#C4466F]" />
+                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-[#C4466F]/40" />
+                            </div>
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                              The salon team will review and confirm your appointment slot shortly.
                             </p>
-                          </>
+                          </div>
                         )}
                       </div>
 
-                      {/* 3. Prominent Reference */}
-                      <div className="w-full bg-brand-white border-2 border-brand-black rounded-lg p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-sm">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.3em] font-black text-brand-gray-500">
-                            Booking Reference
-                          </p>
-                          <p className="text-2xl sm:text-3xl font-mono font-black tracking-wider text-brand-black mt-0.5">
-                            #{createdBooking?.reference || 'PENDING'}
-                          </p>
+                      {/* 2. Official Salon Pass / Reference Card */}
+                      <div className="w-full relative overflow-hidden bg-white/90 backdrop-blur-md border border-[rgba(240,213,222,0.85)] rounded-2xl p-6 sm:p-7 text-left shadow-luxury transition-all duration-300">
+                        {/* Decorative subtle luxury accent bar on top */}
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C4466F] via-[#D4A359] to-[#C4466F] opacity-80" />
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-md bg-[#C4466F]/10 text-[#C4466F] text-[9px] font-extrabold uppercase tracking-widest border border-[#C4466F]/20 flex items-center gap-1">
+                                <Sparkles size={10} />
+                                <span>Salon Pass</span>
+                              </span>
+                              <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-[#6E655F]">
+                                Booking Reference
+                              </span>
+                            </div>
+                            <p className="text-2xl sm:text-3xl font-mono font-black tracking-wider text-[#231F1D]">
+                              #{createdBooking?.reference || 'PENDING'}
+                            </p>
+                            <p className="text-xs text-[#6E655F]">
+                              Present this pass code upon arrival or use it to view booking status.
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleCopyReference}
+                            className={`inline-flex items-center justify-center gap-2 self-start sm:self-auto px-5 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 shadow-2xs min-h-[44px] cursor-pointer ${
+                              copiedReference
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-[#FAF8F5] text-[#231F1D] border-[rgba(240,213,222,0.9)] hover:bg-[#231F1D] hover:text-white hover:border-[#231F1D]'
+                            }`}
+                            aria-label={copiedReference ? 'Reference copied to clipboard' : 'Copy reference to clipboard'}
+                          >
+                            {copiedReference ? (
+                              <>
+                                <Check size={15} className="stroke-[2.5]" aria-hidden="true" />
+                                <span>Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={15} aria-hidden="true" />
+                                <span>Copy Pass</span>
+                              </>
+                            )}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleCopyReference}
-                          className="inline-flex items-center justify-center gap-2 self-start sm:self-auto px-4 py-2.5 rounded-lg border-2 border-brand-black bg-brand-white hover:bg-brand-black hover:text-white transition-all text-xs font-black uppercase tracking-widest active:scale-95 shadow-sm"
-                          aria-label={copiedReference ? 'Reference copied to clipboard' : 'Copy reference to clipboard'}
-                        >
-                          {copiedReference ? (
-                            <>
-                              <Check size={14} className="text-emerald-600 sm:group-hover:text-white" aria-hidden="true" />
-                              <span>Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={14} aria-hidden="true" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
                       </div>
 
-                      {/* 2. What happens next */}
-                      <div className="w-full bg-brand-gray-50 border-2 border-brand-black/15 rounded-lg p-6 sm:p-7 text-left space-y-4">
-                        <div className="flex items-center gap-2 border-b border-brand-black/10 pb-3">
-                          <Clock size={16} className="text-brand-gray-600" aria-hidden="true" />
-                          <h3 className="text-xs font-black uppercase tracking-[0.25em] text-brand-gray-700">
-                            {createdBooking?.status === 'confirmed' ? 'Appointment Information' : 'What happens next'}
-                          </h3>
+                      {/* 3. Appointment Information & Next Steps */}
+                      <div className="w-full bg-white/70 backdrop-blur-sm border border-[rgba(240,213,222,0.85)] rounded-2xl p-6 sm:p-7 text-left space-y-4 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-[rgba(240,213,222,0.6)] pb-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-[#C4466F]/10 text-[#C4466F] flex items-center justify-center">
+                              <Calendar size={14} />
+                            </div>
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#231F1D]">
+                              {createdBooking?.status === 'confirmed' ? 'Appointment Information' : 'What Happens Next'}
+                            </h3>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-[#C4466F] bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-100/80">
+                            Concierge Guide
+                          </span>
                         </div>
 
-                        <ol className="space-y-3.5 text-xs sm:text-sm text-brand-gray-600">
-                          {createdBooking?.status === 'confirmed' ? (
-                            <>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-[11px] flex items-center justify-center">
-                                  ✓
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  <span className="font-bold text-brand-black">Your appointment is confirmed.</span> Your stylist and slot have been scheduled.
-                                </div>
-                              </li>
-                              {createdBooking?.attendantId && typeof createdBooking.attendantId === 'object' && (
-                                <li className="flex items-start gap-3">
-                                  <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                    ★
-                                  </span>
-                                  <div className="pt-0.5 leading-relaxed">
-                                    <span className="font-bold text-brand-black">Assigned Stylist:</span>{' '}
-                                    <span className="font-semibold text-emerald-800">
-                                      {(createdBooking.attendantId as any).name}
-                                    </span>
-                                  </div>
-                                </li>
-                              )}
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  ⏱
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  Please arrive <span className="font-bold text-brand-black">5 minutes early</span> to ensure a smooth session.
-                                </div>
-                              </li>
-                            </>
-                          ) : createdBooking?.status === 'cancelled' ? (
-                            <li className="flex items-start gap-3">
-                              <span className="shrink-0 w-6 h-6 rounded-full bg-red-600 text-white font-bold text-[11px] flex items-center justify-center">
-                                ✕
-                              </span>
-                              <div className="pt-0.5 leading-relaxed">
-                                This booking was cancelled. If you would like to reschedule, please select a new date and time.
+                        {createdBooking?.status === 'confirmed' ? (
+                          <div className="grid gap-3 pt-1">
+                            {/* Confirmed Slot */}
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)] transition-all">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/90 flex items-center justify-center shadow-2xs">
+                                <CheckCircle2 size={16} strokeWidth={2.2} />
                               </div>
-                            </li>
-                          ) : (
-                            <>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  1
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  <span className="font-bold text-brand-black">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Your appointment is officially confirmed.</span>
+                                Your designated slot has been locked in our schedule.
+                              </div>
+                            </div>
+
+                            {/* Assigned Stylist */}
+                            {createdBooking?.attendantId && typeof createdBooking.attendantId === 'object' && (
+                              <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)] transition-all">
+                                <div className="shrink-0 w-8 h-8 rounded-xl bg-[#C4466F]/10 text-[#C4466F] border border-[#C4466F]/20 flex items-center justify-center shadow-2xs">
+                                  <UserCheck size={16} strokeWidth={2.2} />
                                 </div>
-                              </li>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  2
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  We'll email you a confirmation{clientInfo.email || createdBooking?.email ? (
-                                    <>
-                                      {' '}at{' '}
-                                      <strong className="text-brand-black underline decoration-brand-black/30 break-all">
-                                        {createdBooking?.email || clientInfo.email}
-                                      </strong>
-                                    </>
-                                  ) : null}{' '}
-                                  once approved (please check your spam folder).
+                                <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                  <span className="font-bold text-[#231F1D] block">Assigned Specialist Stylist</span>
+                                  <span className="inline-flex items-center gap-1.5 font-bold text-[#C4466F] bg-white px-2.5 py-1 rounded-lg border border-rose-100/80 mt-1 shadow-2xs">
+                                    <Sparkles size={12} />
+                                    {(createdBooking.attendantId as any).name}
+                                  </span>
                                 </div>
-                              </li>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  3
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  If notifications are enabled, you'll also get a notification when it's approved.
-                                </div>
-                              </li>
-                            </>
-                          )}
-                        </ol>
+                              </div>
+                            )}
+
+                            {/* Early Arrival */}
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)] transition-all">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/90 flex items-center justify-center shadow-2xs">
+                                <Clock size={16} strokeWidth={2.2} />
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Arrival Guidance</span>
+                                Please arrive <strong className="text-[#231F1D]">5 minutes early</strong> to relax and ensure a smooth start to your session.
+                              </div>
+                            </div>
+                          </div>
+                        ) : createdBooking?.status === 'cancelled' ? (
+                          <div className="p-4 rounded-xl bg-rose-50/80 border border-rose-200/70 text-xs sm:text-sm text-rose-900 leading-relaxed flex items-start gap-3">
+                            <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block">This booking was cancelled.</span>
+                              If you would like to reschedule or choose an alternative slot, please browse our available appointments below.
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid gap-3 pt-1">
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#231F1D] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                                1
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Salon Team Review</span>
+                                Staff will check stylist availability and confirm your designated slot.
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#C4466F] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                                2
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Email & WhatsApp Notification</span>
+                                We'll send your confirmation pass{clientInfo.email || createdBooking?.email ? (
+                                  <>
+                                    {' '}to{' '}
+                                    <strong className="text-[#231F1D] underline decoration-[rgba(196,70,111,0.4)] break-all font-semibold">
+                                      {createdBooking?.email || clientInfo.email}
+                                    </strong>
+                                  </>
+                                ) : null}{' '}
+                                once approved (please check your spam folder).
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#D4A359] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                                3
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Instant Push Alerts</span>
+                                If notifications are enabled, you'll also get an instant alert the moment your appointment is approved.
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* 4. Details Card */}
-                      <div className="bg-brand-gray-50 w-full p-6 sm:p-7 text-left space-y-6 border-2 border-brand-black/15 rounded-lg">
-                        <div className="border-b border-brand-black/10 pb-4 flex flex-row items-center justify-between gap-3">
+                      <div className="bg-white/80 backdrop-blur-md w-full p-6 sm:p-7 text-left space-y-6 border border-[rgba(240,213,222,0.85)] rounded-2xl shadow-luxury">
+                        <div className="border-b border-[rgba(240,213,222,0.6)] pb-4 flex flex-row items-center justify-between gap-3">
                           <div>
-                            <span className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500 block">
+                            <span className="text-[11px] uppercase tracking-[0.25em] font-black text-[#6E655F] block">
                               Scheduled Date & Time
                             </span>
-                            <p className="font-serif font-black text-lg sm:text-xl text-brand-black mt-1">
+                            <p className="font-serif font-black text-lg sm:text-xl text-[#231F1D] mt-1">
                               {confirmationFriendlyDate}
                             </p>
                           </div>
                           <div className="shrink-0 text-right">
-                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-brand-black text-white text-xs font-mono font-bold tracking-wider border-2 border-brand-black rounded-lg transition-all duration-300 hover:bg-brand-white hover:text-brand-black cursor-default select-none shadow-sm hover:shadow-md">
+                            <span className="inline-flex items-center justify-center whitespace-nowrap px-4 py-2 bg-[#231F1D] text-white text-xs font-mono font-bold tracking-wider rounded-xl transition-all duration-300 hover:bg-[#C4466F] cursor-default select-none shadow-xs">
                               {confirmationTimeRange}
                             </span>
                           </div>
                         </div>
 
                         <div className="space-y-4">
-                          <p className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500">
+                          <p className="text-[11px] uppercase tracking-[0.25em] font-black text-[#6E655F]">
                             Requested Services ({selectedServices.length > 0 ? selectedServices.length : 1})
                           </p>
                           <div className="space-y-3">
@@ -1923,23 +2004,23 @@ export default function App() {
                                 return (
                                   <div
                                     key={service._id || idx}
-                                    className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2"
+                                    className="p-4 bg-[#FAF8F5]/90 border border-[rgba(240,213,222,0.7)] rounded-xl space-y-2 shadow-2xs"
                                   >
                                     <div className="flex justify-between items-start gap-3">
-                                      <span className="font-black text-sm uppercase text-brand-black leading-snug">
+                                      <span className="font-black text-sm uppercase text-[#231F1D] leading-snug">
                                         {service.name}
                                       </span>
-                                      <span className="font-bold text-xs text-brand-black shrink-0">
+                                      <span className="font-bold text-xs text-[#231F1D] shrink-0">
                                         {formatPrice(service.price, service.priceMax)}
                                       </span>
                                     </div>
-                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6E655F]">
                                       <span className="inline-flex items-center gap-1.5">
-                                        <User size={13} className="text-brand-gray-400" />
-                                        <span>Artist: <strong className="text-brand-black font-semibold">{artistName}</strong></span>
+                                        <User size={13} className="text-[#C4466F]" />
+                                        <span>Artist: <strong className="text-[#231F1D] font-semibold">{artistName}</strong></span>
                                       </span>
                                       <span className="inline-flex items-center gap-1.5">
-                                        <Clock size={13} className="text-brand-gray-400" />
+                                        <Clock size={13} className="text-[#C4466F]" />
                                         <span>{serviceTime}</span>
                                       </span>
                                     </div>
@@ -1947,23 +2028,23 @@ export default function App() {
                                 );
                               })
                             ) : (
-                              <div className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2">
+                              <div className="p-4 bg-[#FAF8F5]/90 border border-[rgba(240,213,222,0.7)] rounded-xl space-y-2 shadow-2xs">
                                 <div className="flex justify-between items-start gap-3">
-                                  <span className="font-black text-sm uppercase text-brand-black leading-snug">
+                                  <span className="font-black text-sm uppercase text-[#231F1D] leading-snug">
                                     {typeof createdBooking?.serviceId === 'object' && createdBooking?.serviceId ? createdBooking.serviceId.name : 'Appointment'}
                                   </span>
                                   {createdBooking?.price !== undefined && (
-                                    <span className="font-bold text-xs text-brand-black shrink-0">
+                                    <span className="font-bold text-xs text-[#231F1D] shrink-0">
                                       KES {createdBooking.price.toLocaleString()}
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6E655F]">
                                   <span className="inline-flex items-center gap-1.5">
-                                    <User size={13} className="text-brand-gray-400" />
+                                    <User size={13} className="text-[#C4466F]" />
                                     <span>
                                       Artist:{' '}
-                                      <strong className="text-brand-black font-semibold">
+                                      <strong className="text-[#231F1D] font-semibold">
                                         {typeof createdBooking?.attendantId === 'object' && createdBooking?.attendantId
                                           ? createdBooking.attendantId.name
                                           : 'Any Available'}
@@ -1971,7 +2052,7 @@ export default function App() {
                                     </span>
                                   </span>
                                   <span className="inline-flex items-center gap-1.5">
-                                    <Clock size={13} className="text-brand-gray-400" />
+                                    <Clock size={13} className="text-[#C4466F]" />
                                     <span>{confirmationTimeRange}</span>
                                   </span>
                                 </div>
@@ -1980,11 +2061,11 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="border-t border-brand-black/15 pt-5 flex justify-between items-center">
-                          <span className="text-xs uppercase tracking-[0.25em] font-black text-brand-gray-600">
+                        <div className="border-t border-[rgba(240,213,222,0.6)] pt-5 flex justify-between items-center">
+                          <span className="text-xs uppercase tracking-[0.25em] font-black text-[#6E655F]">
                             Total Cost
                           </span>
-                          <span className="font-black text-base sm:text-lg text-brand-black">
+                          <span className="font-black text-base sm:text-lg text-[#231F1D]">
                             KES {(totalServicePrice || createdBooking?.price || 0).toLocaleString()}
                           </span>
                         </div>
@@ -1996,7 +2077,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => handleCheckBookingStatus(createdBooking?.reference)}
-                          className="w-full bg-brand-black text-brand-white py-5 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-brand-gray-800 hover:tracking-[0.3em] active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
+                          className="w-full bg-[#231F1D] text-white py-4.5 rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#362F2B] active:scale-[0.98] shadow-md flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
                         >
                           <Search size={15} />
                           <span>Check booking status</span>
@@ -2008,7 +2089,7 @@ export default function App() {
                             href={whatsAppUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full bg-[#25D366] text-white py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-[#20ba59] active:scale-[0.98] shadow-sm flex items-center justify-center gap-2"
+                            className="w-full bg-[#25D366] text-white py-4 rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#20ba59] active:scale-[0.98] shadow-2xs flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
                           >
                             <MessageCircle size={16} />
                             <span>Message us on WhatsApp</span>
@@ -2019,7 +2100,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={resetFlow}
-                          className="w-full bg-transparent border-2 border-brand-black/30 text-brand-black py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:border-brand-black hover:bg-brand-black hover:text-white active:scale-[0.98]"
+                          className="w-full bg-white/80 border border-[rgba(240,213,222,0.9)] text-[#231F1D] py-4 rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#231F1D] hover:text-white active:scale-[0.98] cursor-pointer min-h-[48px]"
                         >
                           Book another appointment
                         </button>
