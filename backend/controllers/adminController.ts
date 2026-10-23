@@ -1,13 +1,19 @@
 import { Request, Response } from 'express';
+import { DateTime } from 'luxon';
 import Booking from '../models/Booking';
 import Service from '../models/Service';
+import Attendant, { type IAttendant } from '../models/Attendant';
 import {
   sendBookingConfirmedToCustomer,
   sendBookingCancelledToCustomer,
+  sendBookingRescheduledToCustomer,
 } from '../services/emailService';
 import { sendPushToPhone, sendPushToAttendant, sendPushToAdmins } from '../services/pushService';
-import { sendWhatsAppBookingConfirmed, sendWhatsAppBookingCancelled } from '../services/whatsappService';
-import type { IAttendant } from '../models/Attendant';
+import {
+  sendWhatsAppBookingConfirmed,
+  sendWhatsAppBookingCancelled,
+  sendWhatsAppRescheduled,
+} from '../services/whatsappService';
 import { generateUniqueBookingReference } from './bookingController';
 
 /**
@@ -238,10 +244,6 @@ export const createAdminBooking = async (req: Request, res: Response) => {
   }
 };
 
-import { DateTime } from 'luxon';
-import Attendant from '../models/Attendant';
-import { sendWhatsAppRescheduled } from '../services/whatsappService';
-
 /**
  * PATCH /api/admin/bookings/:id
  * Confirms, reschedules, cancels, completes, or marks no-show for a booking.
@@ -414,7 +416,7 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
 
     if (isRescheduling) {
       void sendWhatsAppRescheduled(primaryUpdatedBooking, syntheticService, (primaryUpdatedBooking.attendantId as any)?.name);
-      void sendBookingConfirmedToCustomer(req.tenant!, primaryUpdatedBooking, syntheticService, (primaryUpdatedBooking.attendantId as any)?.name);
+      void sendBookingRescheduledToCustomer(req.tenant!, primaryUpdatedBooking, syntheticService, (primaryUpdatedBooking.attendantId as any)?.name);
       void sendPushToPhone(primaryUpdatedBooking.phone, {
         title: '📅 Appointment Rescheduled',
         body: `Your booking for ${combinedName} is now on ${primaryUpdatedBooking.date} at ${primaryUpdatedBooking.startTime}.`,
