@@ -1,6 +1,16 @@
 import { Router } from 'express';
-import { getVapidKey, subscribe, unsubscribe, subscribeAdmin, unsubscribeAdmin, updatePreferences, subscribeAttendant, unsubscribeAttendant } from '../controllers/pushController';
-import { requireAttendantAuth } from '../middleware/authMiddleware';
+import {
+  getVapidKey,
+  subscribe,
+  unsubscribe,
+  subscribeAdmin,
+  unsubscribeAdmin,
+  updatePreferences,
+  subscribeAttendant,
+  unsubscribeAttendant,
+  testPush,
+} from '../controllers/pushController';
+import { requireAttendantAuth, requireStaffOrOwnerAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -27,5 +37,8 @@ router.post('/subscribe-attendant', requireAttendantAuth, subscribeAttendant);
 
 // DELETE /api/push/unsubscribe-attendant — removes an attendant push subscription
 router.delete('/unsubscribe-attendant', requireAttendantAuth, unsubscribeAttendant);
+
+// POST   /api/push/test — authenticated test push endpoint
+router.post('/test', requireStaffOrOwnerAuth, testPush);
 
 export default router;

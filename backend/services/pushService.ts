@@ -2,6 +2,7 @@ import webpush from 'web-push';
 import PushSubscription from '../models/PushSubscription';
 import NotificationModel from '../models/Notification';
 import mongoose from 'mongoose';
+import { normalizeKenyanPhone } from '../utils/phoneNormalizer';
 
 // ── VAPID lazy initialisation
 let _vapidInitialised = false;
@@ -18,34 +19,83 @@ function ensureVapid(): void {
   _vapidInitialised = true;
 }
 
-interface PushPayload {
+export interface PushPayload {
   title: string;
   body:  string;
   url?:  string;
   sound?: 'default' | 'chime' | 'bell' | 'ding' | 'silent';
 }
 
+export interface PushResult {
+  endpoint: string;
+  status: 'delivered' | 'failed';
+  statusCode?: number;
+  error?: string;
+}
+
+/**
+ * Sends a single test push to a specific subscription object and returns the result.
+ */
+export async function sendDirectTestPush(
+  sub: { endpoint: string; keys: { p256dh: string; auth: string }; soundPreference?: any },
+  payload: PushPayload,
+): Promise<PushResult> {
+  ensureVapid();
+  let host = 'unknown';
+  try {
+    host = new URL(sub.endpoint).host;
+  } catch {}
+
+  try {
+    const subscriptionPayload = { ...payload, sound: sub.soundPreference || 'default' };
+    await webpush.sendNotification(
+      { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } },
+      JSON.stringify(subscriptionPayload),
+      { TTL: 86400, urgency: 'high' },
+    );
+    return { endpoint: sub.endpoint, status: 'delivered', statusCode: 201 };
+  } catch (err: any) {
+    const status: number = err?.statusCode ?? err?.status ?? 0;
+    if (status === 410 || status === 404) {
+      console.log(`[pushService] Removing stale subscription (${status}) host=${host}`);
+      await PushSubscription.deleteMany({ endpoint: sub.endpoint }).catch(console.error);
+    } else {
+      console.error(`[pushService] Failed test push notification: status=${status} host=${host}:`, err?.message || err);
+    }
+    return { endpoint: sub.endpoint, status: 'failed', statusCode: status, error: err?.message || 'Send failed' };
+  }
+}
+
 async function sendToSubscriptions(
   subscriptions: Awaited<ReturnType<typeof PushSubscription.find>>,
   payload: PushPayload,
-): Promise<void> {
+): Promise<PushResult[]> {
   const staleEndpoints: string[] = [];
+  const results: PushResult[] = [];
 
   await Promise.all(
     subscriptions.map(async (sub) => {
+      let host = 'unknown';
+      try {
+        host = new URL(sub.endpoint).host;
+      } catch {}
+
       try {
         const subscriptionPayload = { ...payload, sound: sub.soundPreference || 'default' };
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } },
           JSON.stringify(subscriptionPayload),
+          { TTL: 86400, urgency: 'high' },
         );
+        results.push({ endpoint: sub.endpoint, status: 'delivered', statusCode: 201 });
       } catch (err: any) {
         const status: number = err?.statusCode ?? err?.status ?? 0;
+        results.push({ endpoint: sub.endpoint, status: 'failed', statusCode: status, error: err?.message || 'Send failed' });
         if (status === 410 || status === 404) {
           staleEndpoints.push(sub.endpoint);
-          console.log(`[pushService] Removing stale subscription (${status})`);
+          console.log(`[pushService] Removing stale subscription (${status}) host=${host}`);
         } else {
-          console.error('[pushService] Failed to send push notification:', err);
+          console.error(`[pushService] Failed to send push notification: status=${status} host=${host}:`, err?.message || err);
         }
       }
     }),
@@ -58,6 +108,8 @@ async function sendToSubscriptions(
       console.error('[pushService] Failed to delete stale subscriptions:', err);
     }
   }
+
+  return results;
 }
 
 // ── Public helpers ────────────────────────────────────────────────────────────
@@ -74,11 +126,13 @@ export async function sendPushToPhone(
   if (!phone) { console.warn('[pushService] Skipping — no phone'); return; }
   try { ensureVapid(); } catch (err) { console.error('[pushService] VAPID init failed:', err); return; }
 
+  const normalizedPhone = normalizeKenyanPhone(phone) || phone;
+
   let subscriptions;
   try {
     subscriptions = await PushSubscription.find({
       tenantId: new mongoose.Types.ObjectId(tenantId),
-      customerPhone: phone,
+      customerPhone: { $in: [normalizedPhone, phone] },
       role: 'customer',
     });
   } catch (err) { console.error('[pushService] Failed to query subscriptions:', err); return; }
