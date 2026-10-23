@@ -33,7 +33,7 @@ const ADMIN_EMAILS: string[] = (process.env.ADMIN_EMAIL ?? '')
   .map(e => e.trim())
   .filter(Boolean);
 
-// ── Helper Utilities ──────────────────────────────────────────────────────────
+// Helper Utilities
 
 function formatBookingDate(dateStr: string, timezone: string = 'Africa/Nairobi'): string {
   try {
@@ -67,6 +67,10 @@ function generateWhatsAppUrl(phone?: string, text?: string): string {
 
 function getBookingViewUrl(tenant: ITenant, booking: IBooking): string {
   return `${FRONTEND_BASE_URL}/${tenant.slug}?ref=${booking.reference}`;
+}
+
+function getRescheduleUrl(tenant: ITenant, booking: IBooking): string {
+  return `${FRONTEND_BASE_URL}/${tenant.slug}?ref=${booking.reference}&action=reschedule`;
 }
 
 function getSalonUrl(tenant: ITenant): string {
@@ -221,6 +225,7 @@ export async function sendBookingRequestReceived(
     `Hi ${tenant.name}, I have a question regarding my booking #${booking.reference}`
   );
   const bookingViewUrl = getBookingViewUrl(tenant, booking);
+  const rescheduleUrl = getRescheduleUrl(tenant, booking);
   const salonUrl = getSalonUrl(tenant);
 
   const html = renderTemplate('booking_request_received', {
@@ -234,6 +239,7 @@ export async function sendBookingRequestReceived(
     brandColor,
     whatsAppUrl,
     bookingViewUrl,
+    rescheduleUrl,
     salonUrl,
     previewText: `Your booking request for ${service.name} at ${tenant.name} has been received.`,
   });
@@ -271,6 +277,7 @@ export async function sendBookingConfirmedToCustomer(
     `Hi ${tenant.name}, regarding my confirmed appointment #${booking.reference}`
   );
   const bookingViewUrl = getBookingViewUrl(tenant, booking);
+  const rescheduleUrl = getRescheduleUrl(tenant, booking);
   const salonUrl = getSalonUrl(tenant);
 
   const html = renderTemplate('booking_confirmed', {
@@ -285,6 +292,7 @@ export async function sendBookingConfirmedToCustomer(
     brandColor,
     whatsAppUrl,
     bookingViewUrl,
+    rescheduleUrl,
     salonUrl,
     previewText: `✓ Your appointment for ${service.name} at ${tenant.name} is confirmed!`,
   });
@@ -322,6 +330,7 @@ export async function sendBookingRescheduledToCustomer(
     `Hi ${tenant.name}, regarding my rescheduled appointment #${booking.reference}`
   );
   const bookingViewUrl = getBookingViewUrl(tenant, booking);
+  const rescheduleUrl = getRescheduleUrl(tenant, booking);
   const salonUrl = getSalonUrl(tenant);
 
   const html = renderTemplate('booking_rescheduled', {
@@ -336,6 +345,7 @@ export async function sendBookingRescheduledToCustomer(
     brandColor,
     whatsAppUrl,
     bookingViewUrl,
+    rescheduleUrl,
     salonUrl,
     previewText: `📅 Your appointment at ${tenant.name} has been rescheduled to ${formattedDate} at ${booking.startTime}.`,
   });

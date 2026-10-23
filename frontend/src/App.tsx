@@ -1009,6 +1009,16 @@ export default function App() {
         status: 'pending' as const
       } : b));
 
+      if (createdBooking && createdBooking._id === reschedulingBooking._id) {
+        setCreatedBooking({
+          ...createdBooking,
+          date: rescheduleDate,
+          startTime: rescheduleTime,
+          endTime: updated.endTime,
+          status: 'pending' as const
+        });
+      }
+
       alert('Appointment successfully rescheduled! It has been set to pending for review.');
       setReschedulingBooking(null);
     } catch (err: any) {
@@ -1017,6 +1027,21 @@ export default function App() {
       setRescheduleSubmitting(false);
     }
   };
+
+  // Auto-launch reschedule modal if URL has ?action=reschedule or ?reschedule=true
+  useEffect(() => {
+    if (!createdBooking) return;
+    const params = new URLSearchParams(window.location.search);
+    const wantsReschedule = params.get('action') === 'reschedule' || params.get('reschedule') === 'true';
+    if (
+      wantsReschedule &&
+      !reschedulingBooking &&
+      createdBooking.status !== 'cancelled' &&
+      createdBooking.status !== 'completed'
+    ) {
+      void handleStartReschedule(createdBooking);
+    }
+  }, [createdBooking]);
 
   if (renderError) {
     return (
