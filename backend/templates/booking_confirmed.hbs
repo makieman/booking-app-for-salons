@@ -1,76 +1,114 @@
-<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;letter-spacing:-0.5px;color:#1F1F1F;">
-  Appointment Confirmed ✓
-</h2>
-<div style="width:48px;height:3px;background:{{#if tenant.branding.primaryColor}}{{tenant.branding.primaryColor}}{{else}}#1F1F1F{{/if}};margin-bottom:20px;"></div>
-<p style="margin:0 0 8px;font-size:14px;color:#6b6b6b;line-height:1.6;">
-  Hi <strong style="color:#1F1F1F;">{{booking.customerName}}</strong>,
-</p>
-<p style="margin:0 0 20px;font-size:14px;color:#6b6b6b;line-height:1.6;">
-  Great news — your appointment has been <strong style="color:#1F1F1F;">confirmed</strong>!
-  We look forward to seeing you.
+<!-- Status -->
+<p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#16A34A;">
+  ● &nbsp;Appointment Confirmed
 </p>
 
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-  style="background:#f5f5f5;border:1px solid #e5e5e5;margin-top:24px;">
+<!-- Title -->
+<h1 style="margin:0 0 8px;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-0.03em;color:#0F172A;">
+  You're all booked, {{booking.customerName}}
+</h1>
+
+<p style="margin:0 0 28px;font-size:15px;line-height:1.6;color:#475569;">
+  Your appointment with <strong style="color:#0F172A;">{{tenant.name}}</strong> is officially confirmed.
+</p>
+
+<!-- Primary Action: Add to Google Calendar -->
+{{#if googleCalendarUrl}}
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 32px;">
   <tr>
-    <td style="padding:24px 28px;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-        {{#if attendantName}}
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Artist</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{attendantName}}</span>
-          </td>
-        </tr>
-        {{/if}}
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Service</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{service.name}}</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Date</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{formattedDate}}</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Time</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{booking.startTime}} – {{booking.endTime}}</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Price</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{formattedPrice}}</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Reference</span>
-          </td>
-          <td align="right" style="padding:8px 0;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{booking.reference}}</span>
-          </td>
-        </tr>
-      </table>
+    <td align="center" style="background-color:#0F172A;border-radius:8px;padding:12px 22px;">
+      <a href="{{googleCalendarUrl}}" target="_blank" style="color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:0.01em;display:inline-block;">
+        📅 &nbsp;Add to Google Calendar
+      </a>
     </td>
   </tr>
 </table>
+{{/if}}
 
-<p style="margin:24px 0 0;font-size:12px;color:#6b6b6b;line-height:1.6;">
-  Please arrive 5–10 minutes before your appointment time. 
-  Need to reschedule? Call us at <strong>{{tenant.supportPhone}}</strong>.
+<!-- Key Details List (Minimal hairline dividers, NO outer border box) -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:28px;">
+
+  <!-- Date -->
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#64748B;width:35%;vertical-align:top;">
+      Date
+    </td>
+    <td align="right" style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:14px;font-weight:600;color:#0F172A;vertical-align:top;">
+      {{formattedDate}}
+    </td>
+  </tr>
+
+  <!-- Time -->
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#64748B;vertical-align:top;">
+      Time
+    </td>
+    <td align="right" style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:14px;font-weight:600;color:#0F172A;vertical-align:top;">
+      {{booking.startTime}} – {{booking.endTime}}
+      {{#if durationLabel}}<span style="font-size:12px;font-weight:400;color:#64748B;">({{durationLabel}})</span>{{/if}}
+    </td>
+  </tr>
+
+  <!-- Service -->
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#64748B;vertical-align:top;">
+      Service
+    </td>
+    <td align="right" style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:14px;font-weight:600;color:#0F172A;vertical-align:top;">
+      {{service.name}}
+    </td>
+  </tr>
+
+  <!-- Stylist (if assigned) -->
+  {{#if attendantName}}
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#64748B;vertical-align:top;">
+      Stylist
+    </td>
+    <td align="right" style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:14px;font-weight:600;color:#0F172A;vertical-align:top;">
+      {{attendantName}}
+    </td>
+  </tr>
+  {{/if}}
+
+  <!-- Reference Code -->
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#64748B;vertical-align:top;">
+      Booking Reference
+    </td>
+    <td align="right" style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:13px;font-family:monospace;font-weight:700;color:#0F172A;vertical-align:top;">
+      #{{booking.reference}}
+    </td>
+  </tr>
+
+  <!-- Total Price -->
+  <tr>
+    <td style="padding:14px 0 8px;font-size:14px;font-weight:600;color:#0F172A;vertical-align:top;">
+      Total
+    </td>
+    <td align="right" style="padding:14px 0 8px;font-size:16px;font-weight:700;color:#0F172A;vertical-align:top;">
+      {{formattedPrice}}
+    </td>
+  </tr>
+
+</table>
+
+<!-- Clean text notes & contact links (No colored box) -->
+<p style="margin:0 0 10px;font-size:13px;color:#64748B;line-height:1.6;">
+  Please arrive 5–10 minutes before your appointment time.
+</p>
+
+<p style="margin:0;font-size:13px;color:#64748B;line-height:1.6;">
+  Need to make changes or running late?
+  {{#if whatsAppUrl}}
+    <a href="{{whatsAppUrl}}" target="_blank" style="color:#0F172A;font-weight:600;text-decoration:underline;">Chat on WhatsApp</a> or
+  {{/if}}
+  {{#if tenant.supportPhone}}
+    call <a href="tel:{{tenant.supportPhone}}" style="color:#0F172A;font-weight:600;text-decoration:underline;">{{tenant.supportPhone}}</a>.
+  {{/if}}
+  {{#if bookingViewUrl}}
+    <span style="display:block;margin-top:6px;">
+      <a href="{{bookingViewUrl}}" target="_blank" style="color:#64748B;text-decoration:none;">View booking online &rarr;</a>
+    </span>
+  {{/if}}
 </p>
