@@ -3,7 +3,7 @@ import PushSubscription from '../models/PushSubscription';
 import NotificationModel from '../models/Notification';
 import mongoose from 'mongoose';
 
-// ── VAPID lazy initialisation ─────────────────────────────────────────────────
+// ── VAPID lazy initialisation
 let _vapidInitialised = false;
 
 function ensureVapid(): void {
