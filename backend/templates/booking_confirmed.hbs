@@ -12,18 +12,25 @@
   Your appointment with <strong style="color:#0F172A;">{{tenant.name}}</strong> is officially confirmed.
 </p>
 
-<!-- Primary Action: Add to Google Calendar -->
-{{#if googleCalendarUrl}}
+<!-- Actions: Add to Google Calendar & Reschedule -->
 <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 32px;">
   <tr>
+    {{#if googleCalendarUrl}}
     <td align="center" style="background-color:#0F172A;border-radius:8px;padding:12px 22px;">
       <a href="{{googleCalendarUrl}}" target="_blank" style="color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:0.01em;display:inline-block;">
         📅 &nbsp;Add to Google Calendar
       </a>
     </td>
+    {{/if}}
+    {{#if rescheduleUrl}}
+    <td style="padding-left:12px;vertical-align:middle;">
+      <a href="{{rescheduleUrl}}" target="_blank" style="color:#0F172A;font-size:13px;font-weight:600;text-decoration:none;display:inline-block;padding:11px 16px;background-color:#F1F5F9;border-radius:8px;">
+        Reschedule slot &rarr;
+      </a>
+    </td>
+    {{/if}}
   </tr>
 </table>
-{{/if}}
 
 <!-- Key Details List (Minimal hairline dividers, NO outer border box) -->
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:28px;">
@@ -93,22 +100,31 @@
 
 </table>
 
-<!-- Clean text notes & contact links (No colored box) -->
-<p style="margin:0 0 10px;font-size:13px;color:#64748B;line-height:1.6;">
-  Please arrive 5–10 minutes before your appointment time.
-</p>
+<!-- Reschedule & Changes Section -->
+<div style="margin:28px 0 0;padding-top:20px;border-top:1px solid #F1F5F9;">
+  <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#0F172A;">
+    Need to change your appointment?
+  </p>
+  <p style="margin:0 0 16px;font-size:13px;color:#475569;line-height:1.6;">
+    You can easily <a href="{{rescheduleUrl}}" target="_blank" style="color:#0F172A;font-weight:600;text-decoration:underline;">reschedule your date or time online &rarr;</a>
+  </p>
 
-<p style="margin:0;font-size:13px;color:#64748B;line-height:1.6;">
-  Need to make changes or running late?
-  {{#if whatsAppUrl}}
-    <a href="{{whatsAppUrl}}" target="_blank" style="color:#0F172A;font-weight:600;text-decoration:underline;">Chat on WhatsApp</a> or
-  {{/if}}
-  {{#if tenant.supportPhone}}
-    call <a href="tel:{{tenant.supportPhone}}" style="color:#0F172A;font-weight:600;text-decoration:underline;">{{tenant.supportPhone}}</a>.
-  {{/if}}
-  {{#if bookingViewUrl}}
-    <span style="display:block;margin-top:6px;">
-      <a href="{{bookingViewUrl}}" target="_blank" style="color:#64748B;text-decoration:none;">View booking online &rarr;</a>
-    </span>
-  {{/if}}
-</p>
+  <p style="margin:0 0 6px;font-size:12px;color:#64748B;line-height:1.6;">
+    Please arrive 5–10 minutes before your appointment time.
+  </p>
+
+  <p style="margin:0;font-size:12px;color:#64748B;line-height:1.6;">
+    Running late or have questions?
+    {{#if whatsAppUrl}}
+      <a href="{{whatsAppUrl}}" target="_blank" style="color:#0F172A;font-weight:500;text-decoration:underline;">Chat on WhatsApp</a>{{#if tenant.supportPhone}} or{{/if}}
+    {{/if}}
+    {{#if tenant.supportPhone}}
+      call <a href="tel:{{tenant.supportPhone}}" style="color:#0F172A;font-weight:500;text-decoration:underline;">{{tenant.supportPhone}}</a>.
+    {{/if}}
+    {{#if bookingViewUrl}}
+      <span style="display:block;margin-top:6px;">
+        <a href="{{bookingViewUrl}}" target="_blank" style="color:#64748B;text-decoration:none;">View booking status online &rarr;</a>
+      </span>
+    {{/if}}
+  </p>
+</div>

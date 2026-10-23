@@ -65,6 +65,7 @@ for (const t of templates) {
     whatsAppUrl: 'https://wa.me/254712345678',
     customerWhatsAppUrl: 'https://wa.me/254712345678',
     bookingViewUrl: 'https://booking-app.com/flo-sisterlocks?ref=FL-9912',
+    rescheduleUrl: 'https://booking-app.com/flo-sisterlocks?ref=FL-9912&action=reschedule',
     salonUrl: 'https://booking-app.com/flo-sisterlocks',
     adminUrl: 'https://booking-app.com/flo-sisterlocks/admin',
     resetUrl: 'https://booking-app.com/reset?token=xyz',
