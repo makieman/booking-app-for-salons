@@ -184,6 +184,9 @@ export function AdminLayout({
                       <span>Test</span>
                     </button>
                   </div>
+                  <p className="text-[10px] text-brand-gray-400 leading-tight">
+                    Custom sounds play only while the app is open; when closed the phone's notification sound is used.
+                  </p>
                 </div>
               )}
             </div>

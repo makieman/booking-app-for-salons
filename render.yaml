@@ -17,7 +17,7 @@ services:
       - key: ADMIN_EMAIL
         sync: false
       - key: FROM_EMAIL
-        value: onboarding@resend.dev
+        sync: false
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY

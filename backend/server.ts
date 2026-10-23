@@ -28,6 +28,8 @@ import tenantRoutes from './routes/tenantRoutes';
 import whatsappRoutes from './routes/whatsappRoutes';
 import { startReminderScheduler } from './services/reminderService';
 import { resolveTenant } from './middleware/resolveTenant';
+import { migratePushSubscriptionIndexes } from './scripts/migratePushSubscriptionIndex';
+import { verifyEmailConfig } from './services/emailService';
 
 import Tenant from './models/Tenant';
 import Attendant from './models/Attendant';
@@ -146,6 +148,14 @@ async function startServer(): Promise<void> {
   // ── Database ─────────────────────────────────────────────
   await connectDB();
   await seedDefaultTenant();
+
+  // ── Safe Migrations & Production Verifications ────────────
+  try {
+    await migratePushSubscriptionIndexes();
+  } catch (err) {
+    console.warn('[server] Warning: PushSubscription index migration failed:', err);
+  }
+  verifyEmailConfig();
 
   // ── Reminder Scheduler (starts after DB is ready) ────────
   startReminderScheduler();

@@ -24,17 +24,8 @@ function getConfig() {
   };
 }
 
-// ── Phone Normalizer ─────────────────────────────────────────────────────────
-
-export function normalizeKenyanPhone(raw: string): string | null {
-  const cleaned = raw.replace(/[\s-]/g, '');
-  if (/^\+254\d{9}$/.test(cleaned)) return cleaned;
-  if (/^254\d{9}$/.test(cleaned))   return `+${cleaned}`;
-  if (/^07\d{8}$/.test(cleaned))    return `+254${cleaned.slice(1)}`;
-  if (/^01\d{8}$/.test(cleaned))    return `+254${cleaned.slice(1)}`;
-  console.warn(`[whatsappService] Could not normalize phone: "${raw}"`);
-  return null;
-}
+import { normalizeKenyanPhone } from '../utils/phoneNormalizer';
+export { normalizeKenyanPhone };
 
 // ── Core HTTP Sender ─────────────────────────────────────────────────────────
 
