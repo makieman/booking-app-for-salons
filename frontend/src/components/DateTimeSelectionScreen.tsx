@@ -413,7 +413,7 @@ export function DateTimeSelectionScreen({
       </section>
 
       {/* Month Calendar Grid */}
-      <section aria-labelledby="calendar-heading" className="bg-white/75 backdrop-blur-md rounded-2xl border border-[rgba(232,226,217,0.65)] p-4 sm:p-5 shadow-soft space-y-4">
+      <section aria-labelledby="calendar-heading" className="bg-white/75 backdrop-blur-md rounded-2xl border border-[rgba(232,226,217,0.65)] p-3 sm:p-5 shadow-soft space-y-4">
         {/* Month Header & Controls */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -443,20 +443,20 @@ export function DateTimeSelectionScreen({
           </div>
         </div>
 
-        {/* Days of Week Header */}
-        <div className="grid grid-cols-7 text-center">
+        {/* Days of Week Header with gap and border */}
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2 text-center mb-1 pb-1.5 border-b border-[rgba(232,226,217,0.45)]">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-            <span key={d} className="text-[11px] font-bold uppercase tracking-wider text-[#6E655F] py-1">
+            <span key={d} className="text-[11px] font-bold uppercase tracking-wider text-[#6E655F]">
               {d}
             </span>
           ))}
         </div>
 
         {/* Calendar Days */}
-        <div className="grid grid-cols-7 gap-1 sm:gap-1.5" role="grid" aria-label="Month days">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2" role="grid" aria-label="Month days">
           {calendarDays.map(item => {
             if (item.isBlank) {
-              return <div key={item.key} className="aspect-square min-h-[44px]" aria-hidden="true" />;
+              return <div key={item.key} className="w-full aspect-square" aria-hidden="true" />;
             }
 
             const { dateStr, dayNum } = item;
@@ -491,25 +491,25 @@ export function DateTimeSelectionScreen({
                 aria-label={ariaLabel}
                 aria-selected={isSelected}
                 aria-disabled={isDisabled}
-                className={`relative aspect-square min-h-[44px] min-w-[44px] rounded-xl flex flex-col items-center justify-center transition-all duration-200 border ${isDisabled
+                className={`relative w-full aspect-square rounded-xl flex flex-col items-center justify-center transition-all duration-150 border ${isDisabled
                     ? 'opacity-25 cursor-not-allowed text-[#6E655F]/60 bg-transparent border-transparent'
                     : isSelected
-                      ? 'bg-[rgba(44,34,30,0.88)] text-white shadow-md font-bold ring-2 ring-[#C4466F]/40 scale-[1.03] z-10 border-white/20'
+                      ? 'bg-[rgba(44,34,30,0.88)] text-white shadow-md font-bold ring-2 ring-[#C4466F]/50 z-10 border-white/20'
                       : 'hover:bg-white/90 hover:border-[#C4466F] text-[#231F1D] font-semibold bg-white/60 border-[rgba(240,213,222,0.65)]'
                   }`}
               >
-                <span className="text-sm leading-none font-medium">{dayNum}</span>
+                <span className="text-xs sm:text-sm leading-none font-medium">{dayNum}</span>
 
                 {/* Capacity indicator bar under available days */}
                 {!isDisabled && indicatorBg && (
                   <span
-                    className={`mt-1 h-[3px] w-3.5 rounded-full ${indicatorBg} ${isSelected ? 'ring-1 ring-white/50' : ''
+                    className={`mt-1 h-[3px] w-3 rounded-full ${indicatorBg} ${isSelected ? 'ring-1 ring-white/50' : ''
                       }`}
                     aria-hidden="true"
                   />
                 )}
                 {!isDisabled && !indicatorBg && !isLoadingMonthCounts && (
-                  <span className="mt-1 h-[3px] w-3.5" aria-hidden="true" />
+                  <span className="mt-1 h-[3px] w-3" aria-hidden="true" />
                 )}
               </button>
             );
