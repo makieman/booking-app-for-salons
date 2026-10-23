@@ -1,80 +1,87 @@
-<h2 style="margin:0 0 8px;font-size:22px;font-weight:700;letter-spacing:-0.5px;color:#1F1F1F;">
-  Booking Update
-</h2>
-<div style="width:48px;height:3px;background:{{#if tenant.branding.primaryColor}}{{tenant.branding.primaryColor}}{{else}}#1F1F1F{{/if}};margin-bottom:20px;"></div>
-<p style="margin:0 0 8px;font-size:14px;color:#6b6b6b;line-height:1.6;">
-  Hi <strong style="color:#1F1F1F;">{{booking.customerName}}</strong>,
+<!-- Status -->
+<p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#DC2626;">
+  ● &nbsp;Booking Cancelled
 </p>
-<p style="margin:0 0 20px;font-size:14px;color:#6b6b6b;line-height:1.6;">
-  Unfortunately your booking has been <strong style="color:#1F1F1F;">cancelled</strong>.
-  We apologise for any inconvenience. Please book a new slot or get in touch with us directly.
+
+<!-- Title -->
+<h1 style="margin:0 0 8px;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-0.03em;color:#0F172A;">
+  Your booking has been cancelled
+</h1>
+
+<p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">
+  Hi {{booking.customerName}}, your booking for <strong style="color:#0F172A;">{{service.name}}</strong> with <strong style="color:#0F172A;">{{tenant.name}}</strong> has been cancelled.
 </p>
+
 {{#if reason}}
-<div style="margin:0 0 20px;padding:12px 16px;background:#fef2f2;border-left:4px solid #ef4444;font-size:13px;color:#991b1b;line-height:1.5;">
+<p style="margin:0 0 24px;font-size:14px;color:#991B1B;line-height:1.6;">
   <strong>Reason:</strong> {{reason}}
-</div>
+</p>
 {{/if}}
 
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-  style="background:#f5f5f5;border:1px solid #e5e5e5;margin-top:24px;">
+<!-- Action: Book New Slot -->
+{{#if salonUrl}}
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 32px;">
   <tr>
-    <td style="padding:24px 28px;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-        {{#if attendantName}}
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Artist</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{attendantName}}</span>
-          </td>
-        </tr>
-        {{/if}}
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Service</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{service.name}}</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Date</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{formattedDate}}</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Time</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{booking.startTime}} – {{booking.endTime}}</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Price</span>
-          </td>
-          <td align="right" style="padding:8px 0;border-bottom:1px solid #e5e5e5;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{formattedPrice}}</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 0;">
-            <span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:#6b6b6b;">Reference</span>
-          </td>
-          <td align="right" style="padding:8px 0;">
-            <span style="font-size:13px;font-weight:900;color:#1F1F1F;">{{booking.reference}}</span>
-          </td>
-        </tr>
-      </table>
+    <td align="center" style="background-color:#0F172A;border-radius:8px;padding:12px 22px;">
+      <a href="{{salonUrl}}" target="_blank" style="color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:0.01em;display:inline-block;">
+        Book a New Appointment &rarr;
+      </a>
     </td>
   </tr>
 </table>
+{{/if}}
 
-<p style="margin:24px 0 0;font-size:12px;color:#6b6b6b;line-height:1.6;">
-  To rebook, visit our website or call/WhatsApp <strong>{{tenant.supportPhone}}</strong>.
+<!-- Key Details List (Minimal hairline dividers, NO outer border box) -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:28px;">
+
+  <!-- Cancelled Date -->
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#94A3B8;width:35%;vertical-align:top;">
+      Original Date
+    </td>
+    <td align="right" style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:14px;color:#94A3B8;text-decoration:line-through;vertical-align:top;">
+      {{formattedDate}}
+    </td>
+  </tr>
+
+  <!-- Cancelled Time -->
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#94A3B8;vertical-align:top;">
+      Original Time
+    </td>
+    <td align="right" style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:14px;color:#94A3B8;text-decoration:line-through;vertical-align:top;">
+      {{booking.startTime}} – {{booking.endTime}}
+    </td>
+  </tr>
+
+  <!-- Service -->
+  <tr>
+    <td style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#64748B;vertical-align:top;">
+      Service
+    </td>
+    <td align="right" style="padding:12px 0;border-bottom:1px solid #F1F5F9;font-size:14px;font-weight:600;color:#0F172A;vertical-align:top;">
+      {{service.name}}
+    </td>
+  </tr>
+
+  <!-- Reference Code -->
+  <tr>
+    <td style="padding:12px 0;font-size:13px;color:#64748B;vertical-align:top;">
+      Booking Reference
+    </td>
+    <td align="right" style="padding:12px 0;font-size:13px;font-family:monospace;font-weight:600;color:#64748B;vertical-align:top;">
+      #{{booking.reference}}
+    </td>
+  </tr>
+
+</table>
+
+<p style="margin:0;font-size:13px;color:#64748B;line-height:1.6;">
+  If you have questions or wish to rebook directly,
+  {{#if whatsAppUrl}}
+    <a href="{{whatsAppUrl}}" target="_blank" style="color:#0F172A;font-weight:600;text-decoration:underline;">chat with us on WhatsApp</a> or
+  {{/if}}
+  {{#if tenant.supportPhone}}
+    call <a href="tel:{{tenant.supportPhone}}" style="color:#0F172A;font-weight:600;text-decoration:underline;">{{tenant.supportPhone}}</a>.
+  {{/if}}
 </p>
