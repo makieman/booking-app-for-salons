@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Trash2, CheckCheck, Volume2, RefreshCw } from 'lucide-react';
+import { Bell, Trash2, CheckCheck, Volume2, RefreshCw, X, ChevronRight } from 'lucide-react';
 import { useInAppNotifications } from '../hooks/useInAppNotifications';
 
 interface NotificationCenterProps {
   onNavigate?: (url: string) => void;
+  onOpenDedicated?: () => void;
   token?: string;
   ownerPin?: string;
 }
 
-export function NotificationCenter({ onNavigate, token, ownerPin }: NotificationCenterProps) {
+export function NotificationCenter({ onNavigate, onOpenDedicated, token, ownerPin }: NotificationCenterProps) {
   const {
     notifications,
     unreadCount,
@@ -79,45 +80,67 @@ export function NotificationCenter({ onNavigate, token, ownerPin }: Notification
         )}
       </button>
 
-      {/* Notifications Dropdown */}
+      {/* Notifications Dropdown (Centered modal on mobile, anchored luxury dropdown on sm+) */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-brand-white border border-brand-gray-100 rounded-[12px] shadow-luxury z-50 flex flex-col overflow-hidden max-h-[480px]">
-          {/* Header */}
-          <div className="p-4 border-b border-brand-gray-100 flex items-center justify-between">
-            <div>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-black/40 backdrop-blur-xs sm:bg-transparent sm:backdrop-blur-none sm:p-0 sm:static sm:block sm:inset-auto sm:z-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsOpen(false);
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm sm:max-w-none sm:w-96 bg-brand-white border border-brand-gray-100 rounded-[16px] sm:rounded-[12px] shadow-luxury flex flex-col overflow-hidden max-h-[82vh] sm:max-h-[480px] sm:absolute sm:right-0 sm:mt-3 animate-in fade-in zoom-in-95 duration-150"
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-brand-gray-100 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-serif italic font-black text-lg text-brand-black leading-none">
+                    Notifications
+                  </h3>
+                  {isLoading && (
+                    <RefreshCw size={12} className="animate-spin text-brand-gray-400" />
+                  )}
+                </div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-brand-gray-400 mt-1">
+                  {unreadCount} UNREAD
+                </p>
+              </div>
+
               <div className="flex items-center gap-2">
-                <h3 className="font-serif italic font-black text-lg text-brand-black leading-none">
-                  Notifications
-                </h3>
-                {isLoading && (
-                  <RefreshCw size={12} className="animate-spin text-brand-gray-400" />
+                {notifications.length > 0 && (
+                  <div className="flex items-center gap-2.5 sm:gap-3 mr-1">
+                    <button
+                      onClick={markAllAsRead}
+                      title="Mark all as read"
+                      className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-brand-gray-400 hover:text-brand-black transition-colors"
+                    >
+                      <CheckCheck size={12} />
+                      <span>Read All</span>
+                    </button>
+                    <button
+                      onClick={clearAll}
+                      title="Clear all notifications"
+                      className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors"
+                    >
+                      <Trash2 size={12} />
+                      <span>Clear</span>
+                    </button>
+                  </div>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="sm:hidden p-1.5 -mr-1 rounded-full text-brand-gray-400 hover:text-brand-black hover:bg-brand-gray-100 transition-colors"
+                  aria-label="Close notifications"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <p className="text-[10px] font-black uppercase tracking-wider text-brand-gray-400 mt-1">
-                {unreadCount} UNREAD
-              </p>
             </div>
-            {notifications.length > 0 && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={markAllAsRead}
-                  title="Mark all as read"
-                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-brand-gray-400 hover:text-brand-black transition-colors"
-                >
-                  <CheckCheck size={12} />
-                  <span>Read All</span>
-                </button>
-                <button
-                  onClick={clearAll}
-                  title="Clear all notifications"
-                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors"
-                >
-                  <Trash2 size={12} />
-                  <span>Clear</span>
-                </button>
-              </div>
-            )}
-          </div>
 
           {/* List */}
           <div className="flex-1 overflow-y-auto divide-y divide-brand-gray-100/50 scrollbar-hide max-h-[350px]">
@@ -217,8 +240,29 @@ export function NotificationCenter({ onNavigate, token, ownerPin }: Notification
               })
             )}
           </div>
+
+          {/* Footer Link to Dedicated Page */}
+          {onOpenDedicated && (
+            <div className="p-3 bg-brand-gray-50/80 border-t border-brand-gray-100 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-brand-gray-500">
+                All alerts & activity
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onOpenDedicated();
+                }}
+                className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-brand-black hover:opacity-75 transition-opacity"
+              >
+                <span>View Full Hub</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 }
