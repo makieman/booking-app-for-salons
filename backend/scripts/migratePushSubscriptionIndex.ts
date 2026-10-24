@@ -14,6 +14,11 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
  * 3. Creates the new compound unique index `{ endpoint: 1, role: 1, attendantId: 1 }`
  */
 export async function migratePushSubscriptionIndexes(): Promise<{ droppedOld: boolean; createdNew: boolean }> {
+  if (mongoose.connection.readyState !== 1) {
+    console.warn('Skipping push subscription index migration: No active MongoDB connection.');
+    return { droppedOld: false, createdNew: false };
+  }
+
   const collection = mongoose.connection.collection('pushsubscriptions');
   let droppedOld = false;
   let createdNew = false;
@@ -55,8 +60,8 @@ export async function migratePushSubscriptionIndexes(): Promise<{ droppedOld: bo
 
     return { droppedOld, createdNew };
   } catch (err: any) {
-    console.error('[Migration] Failed to migrate push subscription indexes:', err);
-    throw err;
+    console.warn('[Migration] Warning: Push subscription index migration skipped/deferred:', err?.message || err);
+    return { droppedOld, createdNew };
   }
 }
 

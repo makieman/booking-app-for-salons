@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles, UserCheck } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -173,10 +173,23 @@ export default function App() {
   }, []);
 
   // Data from API
-  const [services, setServices] = useState<Service[]>([]);
+  // Initialize with cached services or top 3 default services so they appear on top instantly
+  const [services, setServices] = useState<Service[]>(() => {
+    try {
+      const cached = localStorage.getItem('cachedServices');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return FALLBACK_SERVICES.slice(0, 3);
+  });
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSyncingServices, setIsSyncingServices] = useState(true);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -284,8 +297,11 @@ export default function App() {
     const refToRestore = bookingRef || (!createdBooking && activeStep === 'service' ? localStorage.getItem('lastBookingReference') : null);
     if (!refToRestore) return;
 
+    const phoneToRestore = api.findStoredPhone(refToRestore, clientInfo.phone);
+    if (!phoneToRestore) return;
+
     if (!createdBooking || createdBooking.reference !== refToRestore) {
-      api.lookupBookings({ reference: refToRestore })
+      api.lookupBookings({ reference: refToRestore, phone: phoneToRestore })
         .then(results => {
           if (results && results.length > 0) {
             const found = results[0];
@@ -293,11 +309,11 @@ export default function App() {
             if (found.date) setSelectedDate(found.date);
             if (found.startTime) setSelectedTime(found.startTime);
             if (found.customerName || found.phone || found.email) {
-              setClientInfo({
-                name: found.customerName || '',
-                phone: found.phone || '',
-                email: found.email || '',
-              });
+              setClientInfo(prev => ({
+                name: found.customerName || prev.name,
+                phone: phoneToRestore || found.phone || prev.phone,
+                email: found.email || prev.email,
+              }));
             }
             if (typeof found.serviceId === 'object' && found.serviceId) {
               setSelectedServices([found.serviceId as Service]);
@@ -314,16 +330,19 @@ export default function App() {
           console.warn('[App] Failed to auto-restore booking reference:', err);
         });
     }
-  }, [bookingRef, tenantLoading]);
+  }, [bookingRef, tenantLoading, clientInfo.phone]);
 
   // Live polling for booking status updates when on confirmation screen
   useEffect(() => {
     if (activeStep !== 'confirmation' || !createdBooking?.reference) return;
 
+    const bookingPhone = api.findStoredPhone(createdBooking.reference, clientInfo.phone);
+    if (!bookingPhone) return;
+
     let isCancelled = false;
     const checkBookingStatus = async () => {
       try {
-        const results = await api.lookupBookings({ reference: createdBooking.reference });
+        const results = await api.lookupBookings({ reference: createdBooking.reference, phone: bookingPhone });
         if (!isCancelled && results && results.length > 0) {
           const latest = results[0];
           const statusChanged = latest.status !== createdBooking.status;
@@ -365,24 +384,23 @@ export default function App() {
     };
   }, [activeStep, createdBooking?.reference, createdBooking?.status, createdBooking?.attendantId]);
 
-  // Lookup Booking State
-  const [lookupQuery, setLookupQuery] = useState('');
-  const [lookupType, setLookupType] = useState<'reference' | 'phone'>('reference');
+  // Lookup Booking State (requires both reference and phone)
+  const [lookupReference, setLookupReference] = useState('');
+  const [lookupPhone, setLookupPhone] = useState(() => clientInfo.phone || localStorage.getItem('lastBookingPhone') || '');
   const [lookupResults, setLookupResults] = useState<Booking[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeStep === 'lookup' && !lookupQuery) {
+    if (activeStep === 'lookup' && !lookupReference) {
       try {
-        const saved = localStorage.getItem('lastBookingReference');
-        if (saved) {
-          setLookupQuery(saved);
-          setLookupType('reference');
-        }
+        const savedRef = localStorage.getItem('lastBookingReference');
+        if (savedRef) setLookupReference(savedRef);
+        const savedPhone = localStorage.getItem('lastBookingPhone') || clientInfo.phone;
+        if (savedPhone) setLookupPhone(savedPhone);
       } catch { }
     }
-  }, [activeStep, lookupQuery]);
+  }, [activeStep, lookupReference, clientInfo.phone]);
 
   // Customer Cancellation
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
@@ -525,11 +543,21 @@ export default function App() {
       };
     }
 
+    // Keep backend warm on app open and periodically while browsing
+    api.pingBackendKeepWarm();
+    const keepWarmTimer = setInterval(() => {
+      api.pingBackendKeepWarm();
+    }, 10 * 60 * 1000);
+
     const fetchInitialData = async () => {
       try {
-        setIsLoading(true);
+        if (services.length <= 3) {
+          setIsSyncingServices(true);
+        }
         const fetchedServices = await api.getServices();
-        setServices(fetchedServices);
+        if (Array.isArray(fetchedServices) && fetchedServices.length > 0) {
+          setServices(fetchedServices);
+        }
 
         if (isAdmin) {
           const fetchedBookings = await api.getBookings();
@@ -537,16 +565,20 @@ export default function App() {
         }
         setApiError(null);
       } catch (err) {
-        console.error('Failed to fetch data, falling back to mock data', err);
-        setServices(FALLBACK_SERVICES);
-        setApiError('Unable to connect to server. Showing offline data.');
+        console.warn('Sync notice: using cached/offline data', err);
+        setServices(prev => (prev.length > 0 ? prev : FALLBACK_SERVICES));
+        if (services.length === 0) {
+          setApiError('Unable to connect to server. Showing offline data.');
+        }
       } finally {
         setIsLoading(false);
+        setIsSyncingServices(false);
       }
     };
     fetchInitialData();
 
     return () => {
+      clearInterval(keepWarmTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -652,13 +684,7 @@ export default function App() {
       setBookings(prev => [...prev, newBooking]);
       try {
         if (newBooking?.reference) {
-          localStorage.setItem('lastBookingReference', newBooking.reference);
-          const refsRaw = localStorage.getItem('customerBookingRefs');
-          const refsList: string[] = refsRaw ? JSON.parse(refsRaw) : [];
-          if (!refsList.includes(newBooking.reference)) {
-            refsList.unshift(newBooking.reference);
-            localStorage.setItem('customerBookingRefs', JSON.stringify(refsList.slice(0, 50)));
-          }
+          api.saveStoredBookingRef(newBooking.reference, clientInfo.phone);
         }
         localStorage.setItem('customerProfile', JSON.stringify(clientInfo));
       } catch { }
@@ -711,7 +737,8 @@ export default function App() {
     setShowNotificationPrompt(false);
     setCreatedBooking(null);
     setCopiedReference(false);
-    setLookupQuery('');
+    setLookupReference('');
+    setLookupPhone(clientInfo.phone || '');
     setLookupResults([]);
     setLookupError(null);
     setReschedulingBooking(null);
@@ -728,7 +755,21 @@ export default function App() {
     } catch { }
   };
 
-  // ── Confirmation Screen Helpers & Action Handlers ─────────────────────────
+  const handleLogoClick = () => {
+    resetFlow();
+    setShowCustomerAccountModal(false);
+    setShowPinModal(false);
+    if (viewMode !== 'customer') {
+      setUserMode('customer');
+      navigate('customer', tenantSlug || undefined);
+    } else {
+      try {
+        window.history.pushState({ step: 'service' }, '', window.location.pathname);
+      } catch { }
+    }
+  };
+
+  // ── Confirmation Screen Helpers & Action Handlers
   const handleCopyReference = async () => {
     const ref = createdBooking?.reference;
     if (!ref) return;
@@ -753,8 +794,7 @@ export default function App() {
 
   const handleCheckBookingStatus = (ref?: string) => {
     const referenceToSearch = ref || createdBooking?.reference || '';
-    setLookupType('reference');
-    setLookupQuery(referenceToSearch);
+    setLookupReference(referenceToSearch);
     setLookupError(null);
     setLookupResults([]);
     setActiveStep('lookup');
@@ -762,20 +802,24 @@ export default function App() {
       try {
         localStorage.setItem('lastBookingReference', referenceToSearch);
       } catch { }
-      setLookupLoading(true);
-      api.lookupBookings({ reference: referenceToSearch })
-        .then(results => {
-          setLookupResults(results);
-          if (results.length === 0) {
-            setLookupError('No bookings found matching your search.');
-          }
-        })
-        .catch((err: any) => {
-          setLookupError(err?.message || 'Failed to search bookings.');
-        })
-        .finally(() => {
-          setLookupLoading(false);
-        });
+      const phone = api.findStoredPhone(referenceToSearch, clientInfo.phone);
+      if (phone) {
+        setLookupPhone(phone);
+        setLookupLoading(true);
+        api.lookupBookings({ reference: referenceToSearch, phone })
+          .then(results => {
+            setLookupResults(results);
+            if (results.length === 0) {
+              setLookupError('No bookings found matching your search.');
+            }
+          })
+          .catch((err: any) => {
+            setLookupError(err?.message || 'Failed to search bookings.');
+          })
+          .finally(() => {
+            setLookupLoading(false);
+          });
+      }
     }
   };
 
@@ -785,7 +829,13 @@ export default function App() {
       url.searchParams.set('ref', reference);
       window.history.pushState({}, '', url.toString());
     } catch { }
-    api.lookupBookings({ reference }).then(results => {
+    const phone = api.findStoredPhone(reference, clientInfo.phone);
+    if (!phone) {
+      setLookupReference(reference);
+      setActiveStep('lookup');
+      return;
+    }
+    api.lookupBookings({ reference, phone }).then(results => {
       if (results && results.length > 0) {
         const b = results[0];
         setCreatedBooking(b);
@@ -794,7 +844,7 @@ export default function App() {
         if (b.customerName || b.phone || b.email) {
           setClientInfo({
             name: b.customerName || clientInfo.name,
-            phone: b.phone || clientInfo.phone,
+            phone: phone || b.phone || clientInfo.phone,
             email: b.email || clientInfo.email,
           });
         }
@@ -887,18 +937,22 @@ export default function App() {
       const bookingMatch = url.match(/\/bookings\/([A-Za-z0-9-]+)/);
       if (bookingMatch && bookingMatch[1]) {
         const queryVal = bookingMatch[1];
-        setLookupQuery(queryVal);
+        setLookupReference(queryVal);
         setActiveStep('lookup');
-        setLookupLoading(true);
         setLookupError(null);
-        api.lookupBookings(queryVal.includes('-') ? { reference: queryVal } : { phone: queryVal })
-          .then(data => {
-            setLookupResults(data || []);
-          })
-          .catch(err => {
-            setLookupError(err?.message || 'Booking lookup failed');
-          })
-          .finally(() => setLookupLoading(false));
+        const phone = api.findStoredPhone(queryVal, clientInfo.phone);
+        if (phone) {
+          setLookupPhone(phone);
+          setLookupLoading(true);
+          api.lookupBookings({ reference: queryVal, phone })
+            .then(data => {
+              setLookupResults(data || []);
+            })
+            .catch(err => {
+              setLookupError(err?.message || 'Booking lookup failed');
+            })
+            .finally(() => setLookupLoading(false));
+        }
       } else {
         resetFlow();
       }
@@ -910,24 +964,28 @@ export default function App() {
     if (activeStep === 'contact') setActiveStep('date');
   };
 
-  // ── Lookup Handlers ────────────────────────────────────────────────────────
+  //Lookup Handlers (requires reference + phone)
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lookupQuery.trim()) return;
+    if (!lookupReference.trim() || !lookupPhone.trim()) {
+      setLookupError('Please enter both booking reference and phone number.');
+      return;
+    }
 
     setLookupLoading(true);
     setLookupError(null);
     setLookupResults([]);
 
     try {
-      const results = await api.lookupBookings(
-        lookupType === 'reference'
-          ? { reference: lookupQuery }
-          : { phone: lookupQuery }
-      );
+      const results = await api.lookupBookings({
+        reference: lookupReference.trim(),
+        phone: lookupPhone.trim(),
+      });
       setLookupResults(results);
       if (results.length === 0) {
-        setLookupError('No bookings found matching your search.');
+        setLookupError('No bookings found matching your reference and phone number.');
+      } else {
+        api.saveStoredBookingRef(lookupReference.trim(), lookupPhone.trim());
       }
     } catch (err: any) {
       setLookupError(err.message || 'Failed to search bookings.');
@@ -940,9 +998,17 @@ export default function App() {
     const confirmCancel = window.confirm('Are you sure you want to cancel this booking? This action cannot be undone.');
     if (!confirmCancel) return;
 
+    const b = lookupResults.find(item => item._id === id);
+    let phone = lookupPhone.trim() || api.findStoredPhone(b?.reference || '', clientInfo.phone);
+    if (!phone) {
+      const entered = window.prompt('Please enter the phone number used for this booking to confirm cancellation:');
+      if (!entered) return;
+      phone = entered.trim();
+    }
+
     setCancelLoading(true);
     try {
-      await api.cancelBookingCustomer(id);
+      await api.cancelBookingCustomer(id, phone);
       setLookupResults(prev => prev.map(b => b._id === id ? { ...b, status: 'cancelled' as const } : b));
       alert('Your appointment has been successfully cancelled.');
     } catch (err: any) {
@@ -993,11 +1059,19 @@ export default function App() {
   const handleConfirmReschedule = async () => {
     if (!reschedulingBooking || !rescheduleTime) return;
 
+    let phone = lookupPhone.trim() || api.findStoredPhone(reschedulingBooking.reference, clientInfo.phone);
+    if (!phone) {
+      const entered = window.prompt('Please enter the phone number used for this booking to confirm reschedule:');
+      if (!entered) return;
+      phone = entered.trim();
+    }
+
     setRescheduleSubmitting(true);
     try {
       const updated = await api.rescheduleBookingCustomer(reschedulingBooking._id, {
         date: rescheduleDate,
-        startTime: rescheduleTime
+        startTime: rescheduleTime,
+        phone,
       });
 
       // Update in lookup results list
@@ -1260,7 +1334,7 @@ export default function App() {
         </AnimatePresence>
 
         <header className={`px-4 sm:px-8 py-6 sm:py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100 ${viewMode === 'admin' && ownerToken ? 'lg:hidden' : ''}`}>
-          <div className="flex items-center gap-5 cursor-pointer group" onClick={resetFlow}>
+          <div className="flex items-center gap-5 cursor-pointer group" onClick={handleLogoClick} title="Go to Services Page">
             <div className="h-16 w-16 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
               <img
                 src={tenant?.branding?.logoUrl || "/logo-bg.jpg"}
@@ -1287,13 +1361,12 @@ export default function App() {
             {userMode === 'customer' && activeStep !== 'lookup' && (
               <button
                 onClick={() => {
-                  if (!lookupQuery) {
+                  if (!lookupReference) {
                     try {
-                      const saved = localStorage.getItem('lastBookingReference');
-                      if (saved) {
-                        setLookupQuery(saved);
-                        setLookupType('reference');
-                      }
+                      const savedRef = localStorage.getItem('lastBookingReference');
+                      if (savedRef) setLookupReference(savedRef);
+                      const savedPhone = localStorage.getItem('lastBookingPhone') || clientInfo.phone;
+                      if (savedPhone) setLookupPhone(savedPhone);
                     } catch { }
                   }
                   setActiveStep('lookup');
@@ -1465,20 +1538,35 @@ export default function App() {
                             <ServiceSelectionCardSkeleton key={i} />
                           ))
                         ) : filteredServices.length > 0 ? (
-                          filteredServices.map(service => {
-                            const selectedIndex = selectedServices.findIndex(s => s._id === service._id);
-                            const isSelected = selectedIndex !== -1;
-                            const selectionOrder = isSelected ? selectedIndex + 1 : null;
-                            return (
-                              <ServiceSelectionCard
-                                key={service._id}
-                                service={service}
-                                isSelected={isSelected}
-                                selectionOrder={selectionOrder}
-                                onSelect={() => handleToggleService(service)}
-                              />
-                            );
-                          })
+                          <>
+                            {filteredServices.map(service => {
+                              const selectedIndex = selectedServices.findIndex(s => s._id === service._id);
+                              const isSelected = selectedIndex !== -1;
+                              const selectionOrder = isSelected ? selectedIndex + 1 : null;
+                              return (
+                                <ServiceSelectionCard
+                                  key={service._id}
+                                  service={service}
+                                  isSelected={isSelected}
+                                  selectionOrder={selectionOrder}
+                                  onSelect={() => handleToggleService(service)}
+                                />
+                              );
+                            })}
+
+                            {/* Skeleton cards underneath cached top services while client internet is fetching fresh services */}
+                            {isSyncingServices && !searchQuery && (
+                              <div className="space-y-3 pt-2">
+                                <div className="flex items-center gap-2 px-1 text-[11px] font-semibold text-[#8C6D77] animate-pulse">
+                                  <Loader2 size={12} className="animate-spin text-[#C4466F]" />
+                                  <span>Loading additional services...</span>
+                                </div>
+                                {Array.from({ length: 2 }).map((_, i) => (
+                                  <ServiceSelectionCardSkeleton key={`sync-skel-${i}`} />
+                                ))}
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="py-12 text-center border border-dashed border-[#F0D5DE] rounded-2xl bg-white">
                             <p className="text-[#523E46] text-sm font-medium">No services found matching your criteria.</p>
@@ -1670,243 +1758,324 @@ export default function App() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="flex flex-col items-center justify-center py-8 sm:py-12 text-center space-y-8 sm:space-y-10 max-w-xl mx-auto"
                     >
-                      {/* 1. Heading, Status Badge & Subtitle */}
-                      <div className="space-y-3">
+                      {/* 1. Status Seal, Heading, Badge & Concierge Subtitle */}
+                      <div className="space-y-4">
                         {createdBooking?.status === 'confirmed' ? (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="relative">
+                              <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-glass flex items-center justify-center">
+                                <CheckCircle2 size={32} strokeWidth={2.2} />
+                              </div>
+                              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#C4466F] text-white flex items-center justify-center shadow-xs">
+                                <Sparkles size={12} />
+                              </span>
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-emerald-50 text-emerald-900 border border-emerald-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
-                              <span>Confirmed</span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" aria-hidden="true" />
+                              <span>Reserved & Confirmed</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-emerald-950"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
                               Appointment Confirmed
                             </h2>
-                            <div className="w-16 h-1 bg-emerald-700 mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                              Your appointment has been approved! We look forward to seeing you at the salon.
+
+                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
+                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C4466F]/40" />
+                              <Sparkles size={12} className="text-[#C4466F]" />
+                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-[#C4466F]/40" />
+                            </div>
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                              Your appointment has been approved! We look forward to welcoming you to Flo Sisterlocks.
                             </p>
-                          </>
+                          </div>
                         ) : createdBooking?.status === 'cancelled' ? (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-700 border border-rose-200/90 shadow-glass flex items-center justify-center">
+                              <AlertCircle size={32} strokeWidth={2.2} />
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-red-100 text-red-900 border border-red-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-rose-50 text-rose-900 border border-rose-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-600" aria-hidden="true" />
                               <span>Cancelled</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-red-950"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
                               Appointment Cancelled
                             </h2>
-                            <div className="w-16 h-1 bg-red-600 mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+
+                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
+                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-rose-400/40" />
+                              <AlertCircle size={12} className="text-rose-500" />
+                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-rose-400/40" />
+                            </div>
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
                               This appointment has been cancelled or declined by the salon.
                             </p>
-                          </>
+                          </div>
                         ) : createdBooking?.status === 'completed' ? (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-glass flex items-center justify-center">
+                              <Sparkles size={32} strokeWidth={2.2} />
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-blue-100 text-blue-900 border border-blue-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-emerald-50 text-emerald-900 border border-emerald-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-blue-500" aria-hidden="true" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
                               <span>Completed</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-blue-950"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
                               Appointment Completed
                             </h2>
-                            <div className="w-16 h-1 bg-blue-600 mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                              Thank you for visiting! We look forward to seeing you again.
+
+                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
+                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C4466F]/40" />
+                              <Sparkles size={12} className="text-[#C4466F]" />
+                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-[#C4466F]/40" />
+                            </div>
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                              Thank you for visiting Flo Sisterlocks! We look forward to seeing you again.
                             </p>
-                          </>
+                          </div>
                         ) : (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-700 border border-amber-200/90 shadow-glass flex items-center justify-center">
+                              <Clock size={32} strokeWidth={2.2} className="animate-pulse" />
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-amber-50 text-amber-900 border border-amber-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
-                              <span>Pending approval</span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" aria-hidden="true" />
+                              <span>Pending Salon Approval</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
-                              Request received
+                              Request Received
                             </h2>
-                            <div className="w-16 h-1 bg-brand-black mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-500 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                              The salon will review your request shortly.
+
+                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
+                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C4466F]/40" />
+                              <Sparkles size={12} className="text-[#C4466F]" />
+                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-[#C4466F]/40" />
+                            </div>
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                              The salon team will review and confirm your appointment slot shortly.
                             </p>
-                          </>
+                          </div>
                         )}
                       </div>
 
-                      {/* 3. Prominent Reference */}
-                      <div className="w-full bg-brand-white border-2 border-brand-black rounded-lg p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-sm">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.3em] font-black text-brand-gray-500">
-                            Booking Reference
-                          </p>
-                          <p className="text-2xl sm:text-3xl font-mono font-black tracking-wider text-brand-black mt-0.5">
-                            #{createdBooking?.reference || 'PENDING'}
-                          </p>
+                      {/* 2. Official Salon Pass / Reference Card */}
+                      <div className="w-full relative overflow-hidden bg-white/90 backdrop-blur-md border border-[rgba(240,213,222,0.85)] rounded-2xl p-6 sm:p-7 text-left shadow-luxury transition-all duration-300">
+                        {/* Decorative subtle luxury accent bar on top */}
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C4466F] via-[#D4A359] to-[#C4466F] opacity-80" />
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-md bg-[#C4466F]/10 text-[#C4466F] text-[9px] font-extrabold uppercase tracking-widest border border-[#C4466F]/20 flex items-center gap-1">
+                                <Sparkles size={10} />
+                                <span>Salon Pass</span>
+                              </span>
+                              <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-[#6E655F]">
+                                Booking Reference
+                              </span>
+                            </div>
+                            <p className="text-2xl sm:text-3xl font-mono font-black tracking-wider text-[#231F1D]">
+                              #{createdBooking?.reference || 'PENDING'}
+                            </p>
+                            <p className="text-xs text-[#6E655F]">
+                              Present this pass code upon arrival or use it to view booking status.
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleCopyReference}
+                            className={`inline-flex items-center justify-center gap-2 self-start sm:self-auto px-5 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 shadow-2xs min-h-[44px] cursor-pointer ${
+                              copiedReference
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-[#FAF8F5] text-[#231F1D] border-[rgba(240,213,222,0.9)] hover:bg-[#231F1D] hover:text-white hover:border-[#231F1D]'
+                            }`}
+                            aria-label={copiedReference ? 'Reference copied to clipboard' : 'Copy reference to clipboard'}
+                          >
+                            {copiedReference ? (
+                              <>
+                                <Check size={15} className="stroke-[2.5]" aria-hidden="true" />
+                                <span>Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={15} aria-hidden="true" />
+                                <span>Copy Pass</span>
+                              </>
+                            )}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleCopyReference}
-                          className="inline-flex items-center justify-center gap-2 self-start sm:self-auto px-4 py-2.5 rounded-lg border-2 border-brand-black bg-brand-white hover:bg-brand-black hover:text-white transition-all text-xs font-black uppercase tracking-widest active:scale-95 shadow-sm"
-                          aria-label={copiedReference ? 'Reference copied to clipboard' : 'Copy reference to clipboard'}
-                        >
-                          {copiedReference ? (
-                            <>
-                              <Check size={14} className="text-emerald-600 sm:group-hover:text-white" aria-hidden="true" />
-                              <span>Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={14} aria-hidden="true" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
                       </div>
 
-                      {/* 2. What happens next */}
-                      <div className="w-full bg-brand-gray-50 border-2 border-brand-black/15 rounded-lg p-6 sm:p-7 text-left space-y-4">
-                        <div className="flex items-center gap-2 border-b border-brand-black/10 pb-3">
-                          <Clock size={16} className="text-brand-gray-600" aria-hidden="true" />
-                          <h3 className="text-xs font-black uppercase tracking-[0.25em] text-brand-gray-700">
-                            {createdBooking?.status === 'confirmed' ? 'Appointment Information' : 'What happens next'}
-                          </h3>
+                      {/* 3. Appointment Information & Next Steps */}
+                      <div className="w-full bg-white/70 backdrop-blur-sm border border-[rgba(240,213,222,0.85)] rounded-2xl p-6 sm:p-7 text-left space-y-4 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-[rgba(240,213,222,0.6)] pb-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-[#C4466F]/10 text-[#C4466F] flex items-center justify-center">
+                              <Calendar size={14} />
+                            </div>
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#231F1D]">
+                              {createdBooking?.status === 'confirmed' ? 'Appointment Information' : 'What Happens Next'}
+                            </h3>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-[#C4466F] bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-100/80">
+                            Concierge Guide
+                          </span>
                         </div>
 
-                        <ol className="space-y-3.5 text-xs sm:text-sm text-brand-gray-600">
-                          {createdBooking?.status === 'confirmed' ? (
-                            <>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-[11px] flex items-center justify-center">
-                                  ✓
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  <span className="font-bold text-brand-black">Your appointment is confirmed.</span> Your stylist and slot have been scheduled.
-                                </div>
-                              </li>
-                              {createdBooking?.attendantId && typeof createdBooking.attendantId === 'object' && (
-                                <li className="flex items-start gap-3">
-                                  <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                    ★
-                                  </span>
-                                  <div className="pt-0.5 leading-relaxed">
-                                    <span className="font-bold text-brand-black">Assigned Stylist:</span>{' '}
-                                    <span className="font-semibold text-emerald-800">
-                                      {(createdBooking.attendantId as any).name}
-                                    </span>
-                                  </div>
-                                </li>
-                              )}
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  ⏱
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  Please arrive <span className="font-bold text-brand-black">5 minutes early</span> to ensure a smooth session.
-                                </div>
-                              </li>
-                            </>
-                          ) : createdBooking?.status === 'cancelled' ? (
-                            <li className="flex items-start gap-3">
-                              <span className="shrink-0 w-6 h-6 rounded-full bg-red-600 text-white font-bold text-[11px] flex items-center justify-center">
-                                ✕
-                              </span>
-                              <div className="pt-0.5 leading-relaxed">
-                                This booking was cancelled. If you would like to reschedule, please select a new date and time.
+                        {createdBooking?.status === 'confirmed' ? (
+                          <div className="grid gap-3 pt-1">
+                            {/* Confirmed Slot */}
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)] transition-all">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/90 flex items-center justify-center shadow-2xs">
+                                <CheckCircle2 size={16} strokeWidth={2.2} />
                               </div>
-                            </li>
-                          ) : (
-                            <>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  1
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  <span className="font-bold text-brand-black">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Your appointment is officially confirmed.</span>
+                                Your designated slot has been locked in our schedule.
+                              </div>
+                            </div>
+
+                            {/* Assigned Stylist */}
+                            {createdBooking?.attendantId && typeof createdBooking.attendantId === 'object' && (
+                              <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)] transition-all">
+                                <div className="shrink-0 w-8 h-8 rounded-xl bg-[#C4466F]/10 text-[#C4466F] border border-[#C4466F]/20 flex items-center justify-center shadow-2xs">
+                                  <UserCheck size={16} strokeWidth={2.2} />
                                 </div>
-                              </li>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  2
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  We'll email you a confirmation{clientInfo.email || createdBooking?.email ? (
-                                    <>
-                                      {' '}at{' '}
-                                      <strong className="text-brand-black underline decoration-brand-black/30 break-all">
-                                        {createdBooking?.email || clientInfo.email}
-                                      </strong>
-                                    </>
-                                  ) : null}{' '}
-                                  once approved (please check your spam folder).
+                                <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                  <span className="font-bold text-[#231F1D] block">Assigned Specialist Stylist</span>
+                                  <span className="inline-flex items-center gap-1.5 font-bold text-[#C4466F] bg-white px-2.5 py-1 rounded-lg border border-rose-100/80 mt-1 shadow-2xs">
+                                    <Sparkles size={12} />
+                                    {(createdBooking.attendantId as any).name}
+                                  </span>
                                 </div>
-                              </li>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  3
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  If notifications are enabled, you'll also get a notification when it's approved.
-                                </div>
-                              </li>
-                            </>
-                          )}
-                        </ol>
+                              </div>
+                            )}
+
+                            {/* Early Arrival */}
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)] transition-all">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/90 flex items-center justify-center shadow-2xs">
+                                <Clock size={16} strokeWidth={2.2} />
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Arrival Guidance</span>
+                                Please arrive <strong className="text-[#231F1D]">5 minutes early</strong> to relax and ensure a smooth start to your session.
+                              </div>
+                            </div>
+                          </div>
+                        ) : createdBooking?.status === 'cancelled' ? (
+                          <div className="p-4 rounded-xl bg-rose-50/80 border border-rose-200/70 text-xs sm:text-sm text-rose-900 leading-relaxed flex items-start gap-3">
+                            <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block">This booking was cancelled.</span>
+                              If you would like to reschedule or choose an alternative slot, please browse our available appointments below.
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid gap-3 pt-1">
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#231F1D] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                                1
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Salon Team Review</span>
+                                Staff will check stylist availability and confirm your designated slot.
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#C4466F] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                                2
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Email & WhatsApp Notification</span>
+                                We'll send your confirmation pass{clientInfo.email || createdBooking?.email ? (
+                                  <>
+                                    {' '}to{' '}
+                                    <strong className="text-[#231F1D] underline decoration-[rgba(196,70,111,0.4)] break-all font-semibold">
+                                      {createdBooking?.email || clientInfo.email}
+                                    </strong>
+                                  </>
+                                ) : null}{' '}
+                                once approved (please check your spam folder).
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#D4A359] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                                3
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Instant Push Alerts</span>
+                                If notifications are enabled, you'll also get an instant alert the moment your appointment is approved.
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* 4. Details Card */}
-                      <div className="bg-brand-gray-50 w-full p-6 sm:p-7 text-left space-y-6 border-2 border-brand-black/15 rounded-lg">
-                        <div className="border-b border-brand-black/10 pb-4 flex flex-row items-center justify-between gap-3">
+                      <div className="bg-white/80 backdrop-blur-md w-full p-6 sm:p-7 text-left space-y-6 border border-[rgba(240,213,222,0.85)] rounded-2xl shadow-luxury">
+                        <div className="border-b border-[rgba(240,213,222,0.6)] pb-4 flex flex-row items-center justify-between gap-3">
                           <div>
-                            <span className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500 block">
+                            <span className="text-[11px] uppercase tracking-[0.25em] font-black text-[#6E655F] block">
                               Scheduled Date & Time
                             </span>
-                            <p className="font-serif font-black text-lg sm:text-xl text-brand-black mt-1">
+                            <p className="font-serif font-black text-lg sm:text-xl text-[#231F1D] mt-1">
                               {confirmationFriendlyDate}
                             </p>
                           </div>
                           <div className="shrink-0 text-right">
-                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-brand-black text-white text-xs font-mono font-bold tracking-wider border-2 border-brand-black rounded-lg transition-all duration-300 hover:bg-brand-white hover:text-brand-black cursor-default select-none shadow-sm hover:shadow-md">
+                            <span className="inline-flex items-center justify-center whitespace-nowrap px-4 py-2 bg-[#231F1D] text-white text-xs font-mono font-bold tracking-wider rounded-xl transition-all duration-300 hover:bg-[#C4466F] cursor-default select-none shadow-xs">
                               {confirmationTimeRange}
                             </span>
                           </div>
                         </div>
 
                         <div className="space-y-4">
-                          <p className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500">
+                          <p className="text-[11px] uppercase tracking-[0.25em] font-black text-[#6E655F]">
                             Requested Services ({selectedServices.length > 0 ? selectedServices.length : 1})
                           </p>
                           <div className="space-y-3">
@@ -1923,23 +2092,23 @@ export default function App() {
                                 return (
                                   <div
                                     key={service._id || idx}
-                                    className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2"
+                                    className="p-4 bg-[#FAF8F5]/90 border border-[rgba(240,213,222,0.7)] rounded-xl space-y-2 shadow-2xs"
                                   >
                                     <div className="flex justify-between items-start gap-3">
-                                      <span className="font-black text-sm uppercase text-brand-black leading-snug">
+                                      <span className="font-black text-sm uppercase text-[#231F1D] leading-snug">
                                         {service.name}
                                       </span>
-                                      <span className="font-bold text-xs text-brand-black shrink-0">
+                                      <span className="font-bold text-xs text-[#231F1D] shrink-0">
                                         {formatPrice(service.price, service.priceMax)}
                                       </span>
                                     </div>
-                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6E655F]">
                                       <span className="inline-flex items-center gap-1.5">
-                                        <User size={13} className="text-brand-gray-400" />
-                                        <span>Artist: <strong className="text-brand-black font-semibold">{artistName}</strong></span>
+                                        <User size={13} className="text-[#C4466F]" />
+                                        <span>Artist: <strong className="text-[#231F1D] font-semibold">{artistName}</strong></span>
                                       </span>
                                       <span className="inline-flex items-center gap-1.5">
-                                        <Clock size={13} className="text-brand-gray-400" />
+                                        <Clock size={13} className="text-[#C4466F]" />
                                         <span>{serviceTime}</span>
                                       </span>
                                     </div>
@@ -1947,23 +2116,23 @@ export default function App() {
                                 );
                               })
                             ) : (
-                              <div className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2">
+                              <div className="p-4 bg-[#FAF8F5]/90 border border-[rgba(240,213,222,0.7)] rounded-xl space-y-2 shadow-2xs">
                                 <div className="flex justify-between items-start gap-3">
-                                  <span className="font-black text-sm uppercase text-brand-black leading-snug">
+                                  <span className="font-black text-sm uppercase text-[#231F1D] leading-snug">
                                     {typeof createdBooking?.serviceId === 'object' && createdBooking?.serviceId ? createdBooking.serviceId.name : 'Appointment'}
                                   </span>
                                   {createdBooking?.price !== undefined && (
-                                    <span className="font-bold text-xs text-brand-black shrink-0">
+                                    <span className="font-bold text-xs text-[#231F1D] shrink-0">
                                       KES {createdBooking.price.toLocaleString()}
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6E655F]">
                                   <span className="inline-flex items-center gap-1.5">
-                                    <User size={13} className="text-brand-gray-400" />
+                                    <User size={13} className="text-[#C4466F]" />
                                     <span>
                                       Artist:{' '}
-                                      <strong className="text-brand-black font-semibold">
+                                      <strong className="text-[#231F1D] font-semibold">
                                         {typeof createdBooking?.attendantId === 'object' && createdBooking?.attendantId
                                           ? createdBooking.attendantId.name
                                           : 'Any Available'}
@@ -1971,7 +2140,7 @@ export default function App() {
                                     </span>
                                   </span>
                                   <span className="inline-flex items-center gap-1.5">
-                                    <Clock size={13} className="text-brand-gray-400" />
+                                    <Clock size={13} className="text-[#C4466F]" />
                                     <span>{confirmationTimeRange}</span>
                                   </span>
                                 </div>
@@ -1980,11 +2149,11 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="border-t border-brand-black/15 pt-5 flex justify-between items-center">
-                          <span className="text-xs uppercase tracking-[0.25em] font-black text-brand-gray-600">
+                        <div className="border-t border-[rgba(240,213,222,0.6)] pt-5 flex justify-between items-center">
+                          <span className="text-xs uppercase tracking-[0.25em] font-black text-[#6E655F]">
                             Total Cost
                           </span>
-                          <span className="font-black text-base sm:text-lg text-brand-black">
+                          <span className="font-black text-base sm:text-lg text-[#231F1D]">
                             KES {(totalServicePrice || createdBooking?.price || 0).toLocaleString()}
                           </span>
                         </div>
@@ -1996,7 +2165,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => handleCheckBookingStatus(createdBooking?.reference)}
-                          className="w-full bg-brand-black text-brand-white py-5 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-brand-gray-800 hover:tracking-[0.3em] active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
+                          className="w-full bg-[#231F1D] text-white py-4.5 rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#362F2B] active:scale-[0.98] shadow-md flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
                         >
                           <Search size={15} />
                           <span>Check booking status</span>
@@ -2008,7 +2177,7 @@ export default function App() {
                             href={whatsAppUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full bg-[#25D366] text-white py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-[#20ba59] active:scale-[0.98] shadow-sm flex items-center justify-center gap-2"
+                            className="w-full bg-[#25D366] text-white py-4 rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#20ba59] active:scale-[0.98] shadow-2xs flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
                           >
                             <MessageCircle size={16} />
                             <span>Message us on WhatsApp</span>
@@ -2019,7 +2188,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={resetFlow}
-                          className="w-full bg-transparent border-2 border-brand-black/30 text-brand-black py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:border-brand-black hover:bg-brand-black hover:text-white active:scale-[0.98]"
+                          className="w-full bg-white/80 border border-[rgba(240,213,222,0.9)] text-[#231F1D] py-4 rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#231F1D] hover:text-white active:scale-[0.98] cursor-pointer min-h-[48px]"
                         >
                           Book another appointment
                         </button>
@@ -2115,46 +2284,41 @@ export default function App() {
 
                       {!reschedulingBooking && (
                         <>
-                          {/* Search Forms */}
-                          <form onSubmit={handleLookup} className="space-y-6">
-                            <div className="flex border-2 border-brand-black rounded-[10px] overflow-hidden">
-                              <button
-                                type="button"
-                                onClick={() => { setLookupType('reference'); setLookupResults([]); setLookupError(null); }}
-                                className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest border-r-2 border-brand-black transition-all ${lookupType === 'reference' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
-                                  }`}
-                              >
-                                Search Reference
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { setLookupType('phone'); setLookupResults([]); setLookupError(null); }}
-                                className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${lookupType === 'phone' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
-                                  }`}
-                              >
-                                Search Phone
-                              </button>
-                            </div>
-
-                            <div className="space-y-4">
+                          {/* Search Form (requires reference + phone) */}
+                          <form onSubmit={handleLookup} className="space-y-4">
+                            <div>
                               <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">
-                                {lookupType === 'reference' ? 'Service Reference Number' : 'Customer Phone Number'}
+                                Booking Reference Number
                               </label>
                               <input
                                 type="text"
-                                value={lookupQuery}
-                                onChange={e => setLookupQuery(e.target.value)}
-                                placeholder={lookupType === 'reference' ? 'e.g. LMN-XXXXX' : 'e.g. 07XXXXXXXX'}
-                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none placeholder:text-brand-gray-300 animate-none"
+                                value={lookupReference}
+                                onChange={e => setLookupReference(e.target.value)}
+                                placeholder="e.g. LMN-ABC123"
+                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none placeholder:text-brand-gray-300 animate-none rounded-[10px]"
                               />
-                              <button
-                                type="submit"
-                                disabled={lookupLoading || !lookupQuery.trim()}
-                                className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
-                              >
-                                {lookupLoading ? 'Searching...' : 'Find Booking'}
-                              </button>
                             </div>
+
+                            <div>
+                              <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">
+                                Phone Number (used during booking)
+                              </label>
+                              <input
+                                type="tel"
+                                value={lookupPhone}
+                                onChange={e => setLookupPhone(e.target.value)}
+                                placeholder="e.g. 0712 345 678"
+                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none placeholder:text-brand-gray-300 animate-none rounded-[10px]"
+                              />
+                            </div>
+
+                            <button
+                              type="submit"
+                              disabled={lookupLoading || !lookupReference.trim() || !lookupPhone.trim()}
+                              className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
+                            >
+                              {lookupLoading ? 'Searching...' : 'Find Booking'}
+                            </button>
                           </form>
 
                           {/* Lookup Errors */}
