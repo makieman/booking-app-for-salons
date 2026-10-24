@@ -91,13 +91,70 @@ function authHeaders(token?: string): HeadersInit {
 
 
 /**
- * Fetches all available services from the backend.
- * Endpoint: GET /api/services
+ * Pings backend /health to wake it up from cold-start or keep connection warm.
  */
-export async function getServices() {
-  const res = await fetch(`${API_BASE}/services`);
-  if (!res.ok) throw new Error('Failed to fetch services');
-  return res.json();
+export function pingBackendKeepWarm(): void {
+  try {
+    const healthUrl = API_BASE.startsWith('http')
+      ? `${API_BASE.replace(/\/api\/?$/, '')}/health`
+      : '/health';
+    fetch(healthUrl, { method: 'GET', keepalive: true }).catch(() => {});
+  } catch {}
+}
+
+/**
+ * Fetches all available services from the backend with delta-sync and ETag caching.
+ * Endpoint: GET /api/services
+ * - Sends If-None-Match to only transfer data if modified (304 Not Modified).
+ * - Gracefully falls back to local data on weak/offline connections.
+ */
+export async function getServices(options?: { fresh?: boolean }): Promise<any[]> {
+  const url = options?.fresh ? `${API_BASE}/services?_fresh=1` : `${API_BASE}/services`;
+  const savedEtag = localStorage.getItem('services_etag');
+
+  const headers: Record<string, string> = {};
+  if (savedEtag && !options?.fresh) {
+    headers['If-None-Match'] = savedEtag;
+  }
+
+  try {
+    const res = await fetch(url, {
+      headers,
+      cache: options?.fresh ? 'no-cache' : 'default',
+    });
+
+    // 304 Not Modified: server confirmed local version is current
+    if (res.status === 304) {
+      const cached = localStorage.getItem('cachedServices');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    }
+
+    if (!res.ok) throw new Error('Failed to fetch services');
+
+    const newEtag = res.headers.get('ETag');
+    if (newEtag) {
+      localStorage.setItem('services_etag', newEtag);
+    }
+
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      try {
+        localStorage.setItem('cachedServices', JSON.stringify(data));
+      } catch {}
+    }
+    return data;
+  } catch (err) {
+    // If request failed (weak internet or offline), fall back to cached data
+    const cached = localStorage.getItem('cachedServices');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 /**

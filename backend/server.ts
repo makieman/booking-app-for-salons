@@ -135,7 +135,23 @@ async function startServer(): Promise<void> {
   });
 
   // ── Middleware ────────────────────────────────────────────
-  app.use(cors());          // Allow cross-origin requests from the frontend
+  app.use(cors({
+    exposedHeaders: ['ETag']
+  }));          // Allow cross-origin requests from the frontend and expose ETag for delta-sync
+
+  // ── Render Free Tier Keep-Warm Ping ───────────────────────
+  // Prevents the backend from entering a 50s cold start by self-pinging /health every 14 minutes.
+  const externalUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL;
+  if (externalUrl) {
+    const RENDER_PING_INTERVAL_MS = 14 * 60 * 1000;
+    setInterval(async () => {
+      try {
+        await fetch(`${externalUrl}/health`);
+      } catch {
+        // Silently catch to avoid polluting logs
+      }
+    }, RENDER_PING_INTERVAL_MS);
+  }
   // Parse JSON and keep req.rawBody buffer for HMAC signature verification (e.g. Meta WhatsApp)
   app.use(
     express.json({

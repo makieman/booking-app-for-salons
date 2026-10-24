@@ -14,7 +14,7 @@ import {
   ChevronRight,
   ExternalLink
 } from 'lucide-react';
-import { useInAppNotifications, InAppNotification } from '../hooks/useInAppNotifications';
+import { useInAppNotifications } from '../hooks/useInAppNotifications';
 
 interface NotificationCenterProps {
   onNavigate?: (url: string) => void;
