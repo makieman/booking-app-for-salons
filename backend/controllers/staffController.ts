@@ -134,7 +134,7 @@ export const updateAttendant = async (req: Request, res: Response) => {
     const attendant = await Attendant.findOneAndUpdate(
       { _id: id, tenantId: req.tenant!._id },
       update,
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select(SAFE_FIELDS).populate('serviceIds', 'name');
 
     if (!attendant) return res.status(404).json({ error: 'Attendant not found' });
@@ -161,7 +161,7 @@ export const deleteAttendant = async (req: Request, res: Response) => {
       const updated = await Attendant.findOneAndUpdate(
         { _id: id, tenantId },
         { isActive: false },
-        { new: true }
+        { returnDocument: 'after' }
       );
       if (!updated) return res.status(404).json({ error: 'Attendant not found' });
       return res.json({

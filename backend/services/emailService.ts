@@ -149,11 +149,19 @@ function renderTemplate(templateName: string, context: any): string {
   const templateSource = fs.readFileSync(templatePath, 'utf8');
   const layoutSource = fs.readFileSync(layoutPath, 'utf8');
 
+  // Convert context to a plain JSON object to prevent Mongoose document prototype access issues
+  const plainContext = JSON.parse(JSON.stringify(context || {}));
+
   const template = Handlebars.compile(templateSource);
   const layout = Handlebars.compile(layoutSource);
 
-  const bodyHtml = template(context);
-  return layout({ ...context, body: bodyHtml });
+  const runtimeOptions = {
+    allowProtoPropertiesByDefault: true,
+    allowProtoMethodsByDefault: true,
+  };
+
+  const bodyHtml = template(plainContext, runtimeOptions);
+  return layout({ ...plainContext, body: bodyHtml }, runtimeOptions);
 }
 
 export function verifyEmailConfig(): void {

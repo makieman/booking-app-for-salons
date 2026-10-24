@@ -13,7 +13,7 @@ describe('PushSubscription Identity & Compound Unique Index Tests', () => {
   before(async () => {
     // If not connected, connect to local or env MongoDB
     if (mongoose.connection.readyState === 0) {
-      const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/flo-sisterlocks';
+      const uri = process.env.TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017/flo-sisterlocks-test';
       await mongoose.connect(uri);
     }
     // Clean up test documents and run index migration
@@ -71,7 +71,7 @@ describe('PushSubscription Identity & Compound Unique Index Tests', () => {
         attendantId: null,
         tenantId: dummyTenantId,
       },
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', runValidators: true }
     );
 
     // Customer doc should have new phone

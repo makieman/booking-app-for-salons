@@ -37,7 +37,7 @@ export const subscribe = async (req: Request, res: Response): Promise<void> => {
         attendantId: null,
         tenantId: req.tenant!._id,
       },
-      { upsert: true, new: true, runValidators: true },
+      { upsert: true, returnDocument: 'after', runValidators: true },
     );
     res.status(201).json({ success: true, phone: normalizedPhone });
   } catch (error) {
@@ -86,7 +86,7 @@ export const subscribeAdmin = async (req: Request, res: Response): Promise<void>
     await PushSubscription.findOneAndUpdate(
       { endpoint, role: 'admin', attendantId: null },
       updateObj,
-      { upsert: true, new: true, runValidators: true },
+      { upsert: true, returnDocument: 'after', runValidators: true },
     );
     res.status(201).json({ success: true });
   } catch (error) {
@@ -127,7 +127,7 @@ export const updatePreferences = async (req: Request, res: Response): Promise<vo
     const sub = await PushSubscription.findOneAndUpdate(
       filter,
       { soundPreference },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
     if (!sub) { res.status(404).json({ error: 'Push subscription not found' }); return; }
     res.json({ success: true });
@@ -153,7 +153,7 @@ export const subscribeAttendant = async (req: Request, res: Response): Promise<v
     await PushSubscription.findOneAndUpdate(
       { endpoint, role: 'attendant', attendantId },
       { endpoint, keys, role: 'attendant', attendantId, tenantId: req.tenant!._id },
-      { upsert: true, new: true, runValidators: true },
+      { upsert: true, returnDocument: 'after', runValidators: true },
     );
     res.status(201).json({ success: true });
   } catch (error) {

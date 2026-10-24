@@ -115,7 +115,7 @@ export const updateService = async (req: Request, res: Response) => {
     const updated = await Service.findOneAndUpdate(
       { _id: id, tenantId: req.tenant!._id },
       updates,
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
     if (!updated) return res.status(404).json({ error: 'Service not found' });
 
