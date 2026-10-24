@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch server.ts",
     "start": "node --import tsx server.ts",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/**/*.test.ts",
     "link-whatsapp": "node scripts/link-whatsapp.mjs"
   },
   "dependencies": {

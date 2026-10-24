@@ -291,6 +291,7 @@ describe('slotService & enforcement tests', () => {
 
       (Booking.findOne as any) = async () => null; // for reference uniqueness
       (Booking.find as any) = async () => [];
+      (Booking.countDocuments as any) = async () => 0;
       (Booking.prototype.save as any) = async function(this: any) { return this; };
 
       // Case A: Salon Holiday
