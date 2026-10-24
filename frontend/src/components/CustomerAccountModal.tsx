@@ -61,7 +61,8 @@ export function CustomerAccountModal({
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
   // Lookup / link booking in account
-  const [manualLookupQuery, setManualLookupQuery] = useState('');
+  const [linkRef, setLinkRef] = useState('');
+  const [linkPhone, setLinkPhone] = useState(clientInfo.phone || '');
   const [linkingBooking, setLinkingBooking] = useState(false);
   const [linkMessage, setLinkMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -74,6 +75,7 @@ export function CustomerAccountModal({
       setProfileName(clientInfo.name || '');
       setProfilePhone(clientInfo.phone || '');
       setProfileEmail(clientInfo.email || '');
+      setLinkPhone(clientInfo.phone || '');
       setSaveSuccess(false);
       setLinkMessage(null);
     }
@@ -88,53 +90,26 @@ export function CustomerAccountModal({
       const fetchedBookings: Booking[] = [];
       const seenIds = new Set<string>();
 
-      // 1. Gather all stored references
-      const storedRefs: string[] = [];
-      try {
-        const refsRaw = localStorage.getItem('customerBookingRefs');
-        if (refsRaw) {
-          const parsed = JSON.parse(refsRaw);
-          if (Array.isArray(parsed)) storedRefs.push(...parsed);
-        }
-        const lastRef = localStorage.getItem('lastBookingReference');
-        if (lastRef && !storedRefs.includes(lastRef)) {
-          storedRefs.unshift(lastRef);
-        }
-      } catch (err) {
-        console.error('Error reading saved booking references:', err);
+      // 1. Gather all stored reference and phone pairs
+      const storedPairs = api.getStoredBookingRefs();
+      const defaultPhone = clientInfo.phone?.trim() || profilePhone.trim() || localStorage.getItem('lastBookingPhone')?.trim() || '';
+      const lastRef = localStorage.getItem('lastBookingReference');
+      if (lastRef && !storedPairs.some(p => p.reference === lastRef)) {
+        storedPairs.unshift({ reference: lastRef, phone: defaultPhone });
       }
 
-      // Query by references
-      for (const ref of storedRefs.slice(0, 10)) {
+      // Query by reference and phone pairs
+      for (const pair of storedPairs.slice(0, 10)) {
+        const phoneToQuery = pair.phone || defaultPhone;
+        if (!pair.reference || !phoneToQuery) continue;
         try {
-          const results = await api.lookupBookings({ reference: ref });
+          const results = await api.lookupBookings({ reference: pair.reference, phone: phoneToQuery });
           for (const b of results) {
             if (!seenIds.has(b._id)) {
               seenIds.add(b._id);
               fetchedBookings.push(b);
             }
           }
-        } catch {}
-      }
-
-      // 2. Also query by phone if available to catch any cross-device bookings
-      const phoneToSearch = clientInfo.phone?.trim() || profilePhone.trim();
-      if (phoneToSearch) {
-        try {
-          const phoneResults = await api.lookupBookings({ phone: phoneToSearch });
-          for (const b of phoneResults) {
-            if (!seenIds.has(b._id)) {
-              seenIds.add(b._id);
-              fetchedBookings.push(b);
-            }
-            // Auto-link new references to stored refs
-            if (b.reference && !storedRefs.includes(b.reference)) {
-              storedRefs.push(b.reference);
-            }
-          }
-          try {
-            localStorage.setItem('customerBookingRefs', JSON.stringify(storedRefs));
-          } catch {}
         } catch {}
       }
 
@@ -213,25 +188,29 @@ export function CustomerAccountModal({
     setTimeout(() => setCopiedRef(null), 2000);
   };
 
-  // Manual lookup & link to account
+  // Manual lookup & link to account (requires both reference and phone)
   const handleLinkBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    const query = manualLookupQuery.trim();
-    if (!query) return;
+    const ref = linkRef.trim();
+    const phone = linkPhone.trim() || clientInfo.phone?.trim() || profilePhone.trim();
+    if (!ref || !phone) {
+      setLinkMessage({
+        type: 'error',
+        text: 'Please provide both your booking reference and phone number.',
+      });
+      return;
+    }
 
     setLinkingBooking(true);
     setLinkMessage(null);
 
     try {
-      const isRef = query.toUpperCase().startsWith('LMN-') || query.length >= 7;
-      const results = isRef
-        ? await api.lookupBookings({ reference: query })
-        : await api.lookupBookings({ phone: query });
+      const results = await api.lookupBookings({ reference: ref, phone });
 
       if (!results || results.length === 0) {
         setLinkMessage({
           type: 'error',
-          text: `No appointments found matching "${query}". Please check the spelling or reference.`,
+          text: `No appointments found matching #${ref} and the provided phone number.`,
         });
       } else {
         // Append newly discovered bookings
@@ -249,35 +228,26 @@ export function CustomerAccountModal({
           return merged;
         });
 
-        // Store references in localStorage
-        try {
-          const raw = localStorage.getItem('customerBookingRefs');
-          const current: string[] = raw ? JSON.parse(raw) : [];
-          for (const b of results) {
-            if (b.reference && !current.includes(b.reference)) {
-              current.unshift(b.reference);
-            }
-          }
-          localStorage.setItem('customerBookingRefs', JSON.stringify(current));
-        } catch {}
+        // Store reference and phone pair in localStorage
+        api.saveStoredBookingRef(ref, phone);
 
         setLinkMessage({
           type: 'success',
-          text: `Found and linked ${results.length} appointment${results.length > 1 ? 's' : ''}!`,
+          text: `Found and linked appointment #${ref.toUpperCase()}!`,
         });
-        setManualLookupQuery('');
+        setLinkRef('');
       }
     } catch (err: any) {
       setLinkMessage({
         type: 'error',
-        text: err.message || 'Error looking up appointment.',
+        text: err.message || 'Error looking up appointment. Please verify your reference and phone.',
       });
     } finally {
       setLinkingBooking(false);
     }
   };
 
-  // Cancel booking handler
+  // Cancel booking handler (requires booking phone verification)
   const handleCancelBooking = async (bookingId: string, reference?: string) => {
     const confirmMessage = reference
       ? `Are you sure you want to cancel appointment #${reference}? This cannot be undone.`
@@ -285,9 +255,17 @@ export function CustomerAccountModal({
 
     if (!window.confirm(confirmMessage)) return;
 
+    const b = bookings.find(item => item._id === bookingId);
+    let phoneToSend = api.findStoredPhone(b?.reference || reference || '', clientInfo.phone || profilePhone);
+    if (!phoneToSend) {
+      const entered = window.prompt('Please enter the phone number used for this booking to confirm cancellation:');
+      if (!entered) return;
+      phoneToSend = entered.trim();
+    }
+
     setCancellingId(bookingId);
     try {
-      const updated = await api.cancelBookingCustomer(bookingId);
+      await api.cancelBookingCustomer(bookingId, phoneToSend);
       setBookings(prev =>
         prev.map(b => (b._id === bookingId ? { ...b, status: 'cancelled' } : b))
       );
@@ -443,18 +421,25 @@ export function CustomerAccountModal({
                   </button>
                 </div>
 
-                {/* Quick Link by Reference/Phone */}
-                <form onSubmit={handleLinkBooking} className="flex gap-2 w-full sm:w-auto">
+                {/* Quick Link by Reference + Phone */}
+                <form onSubmit={handleLinkBooking} className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                   <input
                     type="text"
-                    value={manualLookupQuery}
-                    onChange={e => setManualLookupQuery(e.target.value)}
-                    placeholder="Link booking (Ref or Phone)"
-                    className="flex-1 sm:w-56 px-3 py-2 text-xs border border-brand-gray-300 rounded-lg focus:outline-none focus:border-brand-black focus:ring-1 focus:ring-brand-black placeholder:text-brand-gray-400 font-medium"
+                    value={linkRef}
+                    onChange={e => setLinkRef(e.target.value)}
+                    placeholder="Ref (e.g. LMN-1234)"
+                    className="w-full sm:w-36 px-3 py-2 text-xs border border-brand-gray-300 rounded-lg focus:outline-none focus:border-brand-black focus:ring-1 focus:ring-brand-black placeholder:text-brand-gray-400 font-medium"
+                  />
+                  <input
+                    type="tel"
+                    value={linkPhone}
+                    onChange={e => setLinkPhone(e.target.value)}
+                    placeholder="Phone (e.g. 0712345678)"
+                    className="w-full sm:w-44 px-3 py-2 text-xs border border-brand-gray-300 rounded-lg focus:outline-none focus:border-brand-black focus:ring-1 focus:ring-brand-black placeholder:text-brand-gray-400 font-medium"
                   />
                   <button
                     type="submit"
-                    disabled={linkingBooking || !manualLookupQuery.trim()}
+                    disabled={linkingBooking || !linkRef.trim() || !linkPhone.trim()}
                     className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider bg-brand-black text-white rounded-lg hover:bg-brand-gray-800 disabled:opacity-40 transition-colors whitespace-nowrap"
                   >
                     {linkingBooking ? 'Linking...' : 'Link'}

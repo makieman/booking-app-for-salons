@@ -297,8 +297,11 @@ export default function App() {
     const refToRestore = bookingRef || (!createdBooking && activeStep === 'service' ? localStorage.getItem('lastBookingReference') : null);
     if (!refToRestore) return;
 
+    const phoneToRestore = api.findStoredPhone(refToRestore, clientInfo.phone);
+    if (!phoneToRestore) return;
+
     if (!createdBooking || createdBooking.reference !== refToRestore) {
-      api.lookupBookings({ reference: refToRestore })
+      api.lookupBookings({ reference: refToRestore, phone: phoneToRestore })
         .then(results => {
           if (results && results.length > 0) {
             const found = results[0];
@@ -306,11 +309,11 @@ export default function App() {
             if (found.date) setSelectedDate(found.date);
             if (found.startTime) setSelectedTime(found.startTime);
             if (found.customerName || found.phone || found.email) {
-              setClientInfo({
-                name: found.customerName || '',
-                phone: found.phone || '',
-                email: found.email || '',
-              });
+              setClientInfo(prev => ({
+                name: found.customerName || prev.name,
+                phone: phoneToRestore || found.phone || prev.phone,
+                email: found.email || prev.email,
+              }));
             }
             if (typeof found.serviceId === 'object' && found.serviceId) {
               setSelectedServices([found.serviceId as Service]);
@@ -327,16 +330,19 @@ export default function App() {
           console.warn('[App] Failed to auto-restore booking reference:', err);
         });
     }
-  }, [bookingRef, tenantLoading]);
+  }, [bookingRef, tenantLoading, clientInfo.phone]);
 
   // Live polling for booking status updates when on confirmation screen
   useEffect(() => {
     if (activeStep !== 'confirmation' || !createdBooking?.reference) return;
 
+    const bookingPhone = api.findStoredPhone(createdBooking.reference, clientInfo.phone);
+    if (!bookingPhone) return;
+
     let isCancelled = false;
     const checkBookingStatus = async () => {
       try {
-        const results = await api.lookupBookings({ reference: createdBooking.reference });
+        const results = await api.lookupBookings({ reference: createdBooking.reference, phone: bookingPhone });
         if (!isCancelled && results && results.length > 0) {
           const latest = results[0];
           const statusChanged = latest.status !== createdBooking.status;
@@ -378,24 +384,23 @@ export default function App() {
     };
   }, [activeStep, createdBooking?.reference, createdBooking?.status, createdBooking?.attendantId]);
 
-  // Lookup Booking State
-  const [lookupQuery, setLookupQuery] = useState('');
-  const [lookupType, setLookupType] = useState<'reference' | 'phone'>('reference');
+  // Lookup Booking State (requires both reference and phone)
+  const [lookupReference, setLookupReference] = useState('');
+  const [lookupPhone, setLookupPhone] = useState(() => clientInfo.phone || localStorage.getItem('lastBookingPhone') || '');
   const [lookupResults, setLookupResults] = useState<Booking[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeStep === 'lookup' && !lookupQuery) {
+    if (activeStep === 'lookup' && !lookupReference) {
       try {
-        const saved = localStorage.getItem('lastBookingReference');
-        if (saved) {
-          setLookupQuery(saved);
-          setLookupType('reference');
-        }
+        const savedRef = localStorage.getItem('lastBookingReference');
+        if (savedRef) setLookupReference(savedRef);
+        const savedPhone = localStorage.getItem('lastBookingPhone') || clientInfo.phone;
+        if (savedPhone) setLookupPhone(savedPhone);
       } catch { }
     }
-  }, [activeStep, lookupQuery]);
+  }, [activeStep, lookupReference, clientInfo.phone]);
 
   // Customer Cancellation
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
@@ -679,13 +684,7 @@ export default function App() {
       setBookings(prev => [...prev, newBooking]);
       try {
         if (newBooking?.reference) {
-          localStorage.setItem('lastBookingReference', newBooking.reference);
-          const refsRaw = localStorage.getItem('customerBookingRefs');
-          const refsList: string[] = refsRaw ? JSON.parse(refsRaw) : [];
-          if (!refsList.includes(newBooking.reference)) {
-            refsList.unshift(newBooking.reference);
-            localStorage.setItem('customerBookingRefs', JSON.stringify(refsList.slice(0, 50)));
-          }
+          api.saveStoredBookingRef(newBooking.reference, clientInfo.phone);
         }
         localStorage.setItem('customerProfile', JSON.stringify(clientInfo));
       } catch { }
@@ -738,7 +737,8 @@ export default function App() {
     setShowNotificationPrompt(false);
     setCreatedBooking(null);
     setCopiedReference(false);
-    setLookupQuery('');
+    setLookupReference('');
+    setLookupPhone(clientInfo.phone || '');
     setLookupResults([]);
     setLookupError(null);
     setReschedulingBooking(null);
@@ -794,8 +794,7 @@ export default function App() {
 
   const handleCheckBookingStatus = (ref?: string) => {
     const referenceToSearch = ref || createdBooking?.reference || '';
-    setLookupType('reference');
-    setLookupQuery(referenceToSearch);
+    setLookupReference(referenceToSearch);
     setLookupError(null);
     setLookupResults([]);
     setActiveStep('lookup');
@@ -803,20 +802,24 @@ export default function App() {
       try {
         localStorage.setItem('lastBookingReference', referenceToSearch);
       } catch { }
-      setLookupLoading(true);
-      api.lookupBookings({ reference: referenceToSearch })
-        .then(results => {
-          setLookupResults(results);
-          if (results.length === 0) {
-            setLookupError('No bookings found matching your search.');
-          }
-        })
-        .catch((err: any) => {
-          setLookupError(err?.message || 'Failed to search bookings.');
-        })
-        .finally(() => {
-          setLookupLoading(false);
-        });
+      const phone = api.findStoredPhone(referenceToSearch, clientInfo.phone);
+      if (phone) {
+        setLookupPhone(phone);
+        setLookupLoading(true);
+        api.lookupBookings({ reference: referenceToSearch, phone })
+          .then(results => {
+            setLookupResults(results);
+            if (results.length === 0) {
+              setLookupError('No bookings found matching your search.');
+            }
+          })
+          .catch((err: any) => {
+            setLookupError(err?.message || 'Failed to search bookings.');
+          })
+          .finally(() => {
+            setLookupLoading(false);
+          });
+      }
     }
   };
 
@@ -826,7 +829,13 @@ export default function App() {
       url.searchParams.set('ref', reference);
       window.history.pushState({}, '', url.toString());
     } catch { }
-    api.lookupBookings({ reference }).then(results => {
+    const phone = api.findStoredPhone(reference, clientInfo.phone);
+    if (!phone) {
+      setLookupReference(reference);
+      setActiveStep('lookup');
+      return;
+    }
+    api.lookupBookings({ reference, phone }).then(results => {
       if (results && results.length > 0) {
         const b = results[0];
         setCreatedBooking(b);
@@ -835,7 +844,7 @@ export default function App() {
         if (b.customerName || b.phone || b.email) {
           setClientInfo({
             name: b.customerName || clientInfo.name,
-            phone: b.phone || clientInfo.phone,
+            phone: phone || b.phone || clientInfo.phone,
             email: b.email || clientInfo.email,
           });
         }
@@ -928,18 +937,22 @@ export default function App() {
       const bookingMatch = url.match(/\/bookings\/([A-Za-z0-9-]+)/);
       if (bookingMatch && bookingMatch[1]) {
         const queryVal = bookingMatch[1];
-        setLookupQuery(queryVal);
+        setLookupReference(queryVal);
         setActiveStep('lookup');
-        setLookupLoading(true);
         setLookupError(null);
-        api.lookupBookings(queryVal.includes('-') ? { reference: queryVal } : { phone: queryVal })
-          .then(data => {
-            setLookupResults(data || []);
-          })
-          .catch(err => {
-            setLookupError(err?.message || 'Booking lookup failed');
-          })
-          .finally(() => setLookupLoading(false));
+        const phone = api.findStoredPhone(queryVal, clientInfo.phone);
+        if (phone) {
+          setLookupPhone(phone);
+          setLookupLoading(true);
+          api.lookupBookings({ reference: queryVal, phone })
+            .then(data => {
+              setLookupResults(data || []);
+            })
+            .catch(err => {
+              setLookupError(err?.message || 'Booking lookup failed');
+            })
+            .finally(() => setLookupLoading(false));
+        }
       } else {
         resetFlow();
       }
@@ -951,24 +964,28 @@ export default function App() {
     if (activeStep === 'contact') setActiveStep('date');
   };
 
-  //Lookup Handlers
+  //Lookup Handlers (requires reference + phone)
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lookupQuery.trim()) return;
+    if (!lookupReference.trim() || !lookupPhone.trim()) {
+      setLookupError('Please enter both booking reference and phone number.');
+      return;
+    }
 
     setLookupLoading(true);
     setLookupError(null);
     setLookupResults([]);
 
     try {
-      const results = await api.lookupBookings(
-        lookupType === 'reference'
-          ? { reference: lookupQuery }
-          : { phone: lookupQuery }
-      );
+      const results = await api.lookupBookings({
+        reference: lookupReference.trim(),
+        phone: lookupPhone.trim(),
+      });
       setLookupResults(results);
       if (results.length === 0) {
-        setLookupError('No bookings found matching your search.');
+        setLookupError('No bookings found matching your reference and phone number.');
+      } else {
+        api.saveStoredBookingRef(lookupReference.trim(), lookupPhone.trim());
       }
     } catch (err: any) {
       setLookupError(err.message || 'Failed to search bookings.');
@@ -981,9 +998,17 @@ export default function App() {
     const confirmCancel = window.confirm('Are you sure you want to cancel this booking? This action cannot be undone.');
     if (!confirmCancel) return;
 
+    const b = lookupResults.find(item => item._id === id);
+    let phone = lookupPhone.trim() || api.findStoredPhone(b?.reference || '', clientInfo.phone);
+    if (!phone) {
+      const entered = window.prompt('Please enter the phone number used for this booking to confirm cancellation:');
+      if (!entered) return;
+      phone = entered.trim();
+    }
+
     setCancelLoading(true);
     try {
-      await api.cancelBookingCustomer(id);
+      await api.cancelBookingCustomer(id, phone);
       setLookupResults(prev => prev.map(b => b._id === id ? { ...b, status: 'cancelled' as const } : b));
       alert('Your appointment has been successfully cancelled.');
     } catch (err: any) {
@@ -1034,11 +1059,19 @@ export default function App() {
   const handleConfirmReschedule = async () => {
     if (!reschedulingBooking || !rescheduleTime) return;
 
+    let phone = lookupPhone.trim() || api.findStoredPhone(reschedulingBooking.reference, clientInfo.phone);
+    if (!phone) {
+      const entered = window.prompt('Please enter the phone number used for this booking to confirm reschedule:');
+      if (!entered) return;
+      phone = entered.trim();
+    }
+
     setRescheduleSubmitting(true);
     try {
       const updated = await api.rescheduleBookingCustomer(reschedulingBooking._id, {
         date: rescheduleDate,
-        startTime: rescheduleTime
+        startTime: rescheduleTime,
+        phone,
       });
 
       // Update in lookup results list
@@ -1328,13 +1361,12 @@ export default function App() {
             {userMode === 'customer' && activeStep !== 'lookup' && (
               <button
                 onClick={() => {
-                  if (!lookupQuery) {
+                  if (!lookupReference) {
                     try {
-                      const saved = localStorage.getItem('lastBookingReference');
-                      if (saved) {
-                        setLookupQuery(saved);
-                        setLookupType('reference');
-                      }
+                      const savedRef = localStorage.getItem('lastBookingReference');
+                      if (savedRef) setLookupReference(savedRef);
+                      const savedPhone = localStorage.getItem('lastBookingPhone') || clientInfo.phone;
+                      if (savedPhone) setLookupPhone(savedPhone);
                     } catch { }
                   }
                   setActiveStep('lookup');
@@ -2252,46 +2284,41 @@ export default function App() {
 
                       {!reschedulingBooking && (
                         <>
-                          {/* Search Forms */}
-                          <form onSubmit={handleLookup} className="space-y-6">
-                            <div className="flex border-2 border-brand-black rounded-[10px] overflow-hidden">
-                              <button
-                                type="button"
-                                onClick={() => { setLookupType('reference'); setLookupResults([]); setLookupError(null); }}
-                                className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest border-r-2 border-brand-black transition-all ${lookupType === 'reference' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
-                                  }`}
-                              >
-                                Search Reference
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { setLookupType('phone'); setLookupResults([]); setLookupError(null); }}
-                                className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${lookupType === 'phone' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
-                                  }`}
-                              >
-                                Search Phone
-                              </button>
-                            </div>
-
-                            <div className="space-y-4">
+                          {/* Search Form (requires reference + phone) */}
+                          <form onSubmit={handleLookup} className="space-y-4">
+                            <div>
                               <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">
-                                {lookupType === 'reference' ? 'Service Reference Number' : 'Customer Phone Number'}
+                                Booking Reference Number
                               </label>
                               <input
                                 type="text"
-                                value={lookupQuery}
-                                onChange={e => setLookupQuery(e.target.value)}
-                                placeholder={lookupType === 'reference' ? 'e.g. LMN-XXXXX' : 'e.g. 07XXXXXXXX'}
-                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none placeholder:text-brand-gray-300 animate-none"
+                                value={lookupReference}
+                                onChange={e => setLookupReference(e.target.value)}
+                                placeholder="e.g. LMN-ABC123"
+                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none placeholder:text-brand-gray-300 animate-none rounded-[10px]"
                               />
-                              <button
-                                type="submit"
-                                disabled={lookupLoading || !lookupQuery.trim()}
-                                className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
-                              >
-                                {lookupLoading ? 'Searching...' : 'Find Booking'}
-                              </button>
                             </div>
+
+                            <div>
+                              <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">
+                                Phone Number (used during booking)
+                              </label>
+                              <input
+                                type="tel"
+                                value={lookupPhone}
+                                onChange={e => setLookupPhone(e.target.value)}
+                                placeholder="e.g. 0712 345 678"
+                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none placeholder:text-brand-gray-300 animate-none rounded-[10px]"
+                              />
+                            </div>
+
+                            <button
+                              type="submit"
+                              disabled={lookupLoading || !lookupReference.trim() || !lookupPhone.trim()}
+                              className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
+                            >
+                              {lookupLoading ? 'Searching...' : 'Find Booking'}
+                            </button>
                           </form>
 
                           {/* Lookup Errors */}
