@@ -173,10 +173,23 @@ export default function App() {
   }, []);
 
   // Data from API
-  const [services, setServices] = useState<Service[]>([]);
+  // Initialize with cached services or top 3 default services so they appear on top instantly
+  const [services, setServices] = useState<Service[]>(() => {
+    try {
+      const cached = localStorage.getItem('cachedServices');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return FALLBACK_SERVICES.slice(0, 3);
+  });
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSyncingServices, setIsSyncingServices] = useState(true);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -525,11 +538,21 @@ export default function App() {
       };
     }
 
+    // Keep backend warm on app open and periodically while browsing
+    api.pingBackendKeepWarm();
+    const keepWarmTimer = setInterval(() => {
+      api.pingBackendKeepWarm();
+    }, 10 * 60 * 1000);
+
     const fetchInitialData = async () => {
       try {
-        setIsLoading(true);
+        if (services.length <= 3) {
+          setIsSyncingServices(true);
+        }
         const fetchedServices = await api.getServices();
-        setServices(fetchedServices);
+        if (Array.isArray(fetchedServices) && fetchedServices.length > 0) {
+          setServices(fetchedServices);
+        }
 
         if (isAdmin) {
           const fetchedBookings = await api.getBookings();
@@ -537,16 +560,20 @@ export default function App() {
         }
         setApiError(null);
       } catch (err) {
-        console.error('Failed to fetch data, falling back to mock data', err);
-        setServices(FALLBACK_SERVICES);
-        setApiError('Unable to connect to server. Showing offline data.');
+        console.warn('Sync notice: using cached/offline data', err);
+        setServices(prev => (prev.length > 0 ? prev : FALLBACK_SERVICES));
+        if (services.length === 0) {
+          setApiError('Unable to connect to server. Showing offline data.');
+        }
       } finally {
         setIsLoading(false);
+        setIsSyncingServices(false);
       }
     };
     fetchInitialData();
 
     return () => {
+      clearInterval(keepWarmTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -1465,20 +1492,35 @@ export default function App() {
                             <ServiceSelectionCardSkeleton key={i} />
                           ))
                         ) : filteredServices.length > 0 ? (
-                          filteredServices.map(service => {
-                            const selectedIndex = selectedServices.findIndex(s => s._id === service._id);
-                            const isSelected = selectedIndex !== -1;
-                            const selectionOrder = isSelected ? selectedIndex + 1 : null;
-                            return (
-                              <ServiceSelectionCard
-                                key={service._id}
-                                service={service}
-                                isSelected={isSelected}
-                                selectionOrder={selectionOrder}
-                                onSelect={() => handleToggleService(service)}
-                              />
-                            );
-                          })
+                          <>
+                            {filteredServices.map(service => {
+                              const selectedIndex = selectedServices.findIndex(s => s._id === service._id);
+                              const isSelected = selectedIndex !== -1;
+                              const selectionOrder = isSelected ? selectedIndex + 1 : null;
+                              return (
+                                <ServiceSelectionCard
+                                  key={service._id}
+                                  service={service}
+                                  isSelected={isSelected}
+                                  selectionOrder={selectionOrder}
+                                  onSelect={() => handleToggleService(service)}
+                                />
+                              );
+                            })}
+
+                            {/* Skeleton cards underneath cached top services while client internet is fetching fresh services */}
+                            {isSyncingServices && !searchQuery && (
+                              <div className="space-y-3 pt-2">
+                                <div className="flex items-center gap-2 px-1 text-[11px] font-semibold text-[#8C6D77] animate-pulse">
+                                  <Loader2 size={12} className="animate-spin text-[#C4466F]" />
+                                  <span>Loading additional services...</span>
+                                </div>
+                                {Array.from({ length: 2 }).map((_, i) => (
+                                  <ServiceSelectionCardSkeleton key={`sync-skel-${i}`} />
+                                ))}
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="py-12 text-center border border-dashed border-[#F0D5DE] rounded-2xl bg-white">
                             <p className="text-[#523E46] text-sm font-medium">No services found matching your criteria.</p>
