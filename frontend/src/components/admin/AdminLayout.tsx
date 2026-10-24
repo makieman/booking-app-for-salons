@@ -73,8 +73,12 @@ export function AdminLayout({
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-60 bg-white border-r border-brand-gray-100 flex-col justify-between p-6 z-40 select-none shadow-sm">
         <div className="space-y-6">
           {/* Brand & Portal Header */}
-          <div className="flex items-center gap-3 pb-3 border-b border-brand-gray-100">
-            <div className="h-10 w-10 rounded-xl overflow-hidden border border-brand-gray-200 bg-brand-gray-50 flex items-center justify-center shrink-0">
+          <div
+            className="flex items-center gap-3 pb-3 border-b border-brand-gray-100 cursor-pointer group"
+            onClick={onBackToSalon}
+            title="Go to Services Page"
+          >
+            <div className="h-10 w-10 rounded-xl overflow-hidden border border-brand-gray-200 bg-brand-gray-50 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <img
                 src={tenant?.branding?.logoUrl || '/logo-bg.jpg'}
                 alt={tenant?.name || 'Salon Logo'}
@@ -215,8 +219,12 @@ export function AdminLayout({
       {/* ── Mobile Top Header & Responsive Tab Strip (<1024px) ── */}
       <div className="lg:hidden bg-white border-b border-brand-gray-100 sticky top-0 z-30 shadow-xs">
         <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-lg overflow-hidden border border-brand-gray-200 shrink-0">
+          <div
+            className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
+            onClick={onBackToSalon}
+            title="Go to Services Page"
+          >
+            <div className="h-8 w-8 rounded-lg overflow-hidden border border-brand-gray-200 shrink-0 group-hover:scale-105 transition-transform">
               <img
                 src={tenant?.branding?.logoUrl || '/logo-bg.jpg'}
                 alt={tenant?.name || 'Salon Logo'}

@@ -755,7 +755,21 @@ export default function App() {
     } catch { }
   };
 
-  // ── Confirmation Screen Helpers & Action Handlers ─────────────────────────
+  const handleLogoClick = () => {
+    resetFlow();
+    setShowCustomerAccountModal(false);
+    setShowPinModal(false);
+    if (viewMode !== 'customer') {
+      setUserMode('customer');
+      navigate('customer', tenantSlug || undefined);
+    } else {
+      try {
+        window.history.pushState({ step: 'service' }, '', window.location.pathname);
+      } catch { }
+    }
+  };
+
+  // ── Confirmation Screen Helpers & Action Handlers
   const handleCopyReference = async () => {
     const ref = createdBooking?.reference;
     if (!ref) return;
@@ -937,7 +951,7 @@ export default function App() {
     if (activeStep === 'contact') setActiveStep('date');
   };
 
-  // ── Lookup Handlers ────────────────────────────────────────────────────────
+  //Lookup Handlers
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!lookupQuery.trim()) return;
@@ -1287,7 +1301,7 @@ export default function App() {
         </AnimatePresence>
 
         <header className={`px-4 sm:px-8 py-6 sm:py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100 ${viewMode === 'admin' && ownerToken ? 'lg:hidden' : ''}`}>
-          <div className="flex items-center gap-5 cursor-pointer group" onClick={resetFlow}>
+          <div className="flex items-center gap-5 cursor-pointer group" onClick={handleLogoClick} title="Go to Services Page">
             <div className="h-16 w-16 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
               <img
                 src={tenant?.branding?.logoUrl || "/logo-bg.jpg"}

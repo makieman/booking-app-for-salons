@@ -150,7 +150,12 @@ export function AdminPortal({
       >
         {/* Header */}
         <div className="p-8 pb-6 border-b border-brand-black/10 text-center space-y-3 bg-brand-gray-50/50">
-          <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full border-2 border-brand-black/10 overflow-hidden bg-brand-white shadow-sm">
+          <div
+            className="h-16 w-16 mx-auto flex items-center justify-center rounded-full border-2 border-brand-black/10 overflow-hidden
+            bg-brand-white shadow-sm cursor-pointer hover:scale-105 transition-transform"
+            onClick={() => navigate('customer', tenantSlug || undefined)}
+            title="Go to Services Page"
+          >
             <img
               src={tenant?.branding?.logoUrl || '/logo-bg.jpg'}
               alt={tenant?.name || 'Salon Logo'}

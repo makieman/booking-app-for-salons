@@ -15,7 +15,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
  */
 export async function migratePushSubscriptionIndexes(): Promise<{ droppedOld: boolean; createdNew: boolean }> {
   if (mongoose.connection.readyState !== 1) {
-    console.warn('⚠️ Skipping push subscription index migration: No active MongoDB connection.');
+    console.warn('Skipping push subscription index migration: No active MongoDB connection.');
     return { droppedOld: false, createdNew: false };
   }
 
