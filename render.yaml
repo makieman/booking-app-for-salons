@@ -26,5 +26,3 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: OWNER_PIN
-        sync: false
