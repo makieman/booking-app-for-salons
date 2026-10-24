@@ -7,9 +7,9 @@ export interface IPushSubscription extends Document {
     auth: string;
   };
   role: 'customer' | 'admin' | 'attendant';
-  customerPhone?: string;
+  customerPhone?: string | null;
   /** For role='attendant': the attendant's MongoDB ObjectId as a string */
-  attendantId?: string;
+  attendantId?: string | null;
   employeeId?: string;
   soundPreference?: 'default' | 'chime' | 'bell' | 'ding' | 'silent';
   createdAt: Date;
