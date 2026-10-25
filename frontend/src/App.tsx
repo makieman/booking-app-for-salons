@@ -17,6 +17,7 @@ import { AdminPortal } from './components/AdminPortal';
 import { CustomerAccountModal } from './components/CustomerAccountModal';
 import { DateTimeSelectionScreen } from './components/DateTimeSelectionScreen';
 import { AdminView } from './components/admin/AdminView';
+import { BrandAppLoader } from './components/BrandAppLoader';
 import { getTodayDateString, formatDateInTimezone } from './utils/dateUtils';
 
 /** Formats a service price as a fixed price or a range.
@@ -1130,14 +1131,7 @@ export default function App() {
 
 
   if (tenantLoading) {
-    return (
-      <div className="min-h-screen bg-brand-white flex flex-col items-center justify-center font-sans">
-        <div className="space-y-4 text-center">
-          <div className="w-12 h-12 border-4 border-brand-black border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: 'var(--brand-color, #1F1F1F) transparent var(--brand-color, #1F1F1F) var(--brand-color, #1F1F1F)' }} />
-          <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-500">Loading salon details...</p>
-        </div>
-      </div>
-    );
+    return <BrandAppLoader />;
   }
 
   if (viewMode === 'select') {

@@ -34,8 +34,8 @@ export default defineConfig({
         short_name: 'Flobooking',
         description: 'Flo Sisterlocks — Certified Sisterlocks studio in Eldoret',
         start_url: '/',
-        theme_color: '#f5f5f5',
-        background_color: '#f5f5f5',
+        theme_color: '#FAF8F5',
+        background_color: '#FAF8F5',
         display: 'standalone',
         icons: [
           {
