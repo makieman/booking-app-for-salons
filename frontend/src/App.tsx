@@ -2020,7 +2020,7 @@ export default function App() {
                             </div>
 
                             <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
-                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#C4466F] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#231F1D] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
                                 2
                               </div>
                               <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
@@ -2038,7 +2038,7 @@ export default function App() {
                             </div>
 
                             <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
-                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#D4A359] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#231F1D] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
                                 3
                               </div>
                               <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
