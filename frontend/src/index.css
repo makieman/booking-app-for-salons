@@ -218,3 +218,83 @@ input:-webkit-autofill:active {
   -webkit-text-fill-color: #231F1D !important;
   transition: background-color 5000s ease-in-out 0s;
 }
+
+/* ------------------------------------------------------------------
+   Polished App Loading Animation
+   ------------------------------------------------------------------ */
+.loader-ambient-glow {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(196, 70, 111, 0.16) 0%, rgba(232, 130, 159, 0.05) 50%, rgba(250, 248, 245, 0) 70%);
+  animation: loaderGlowPulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.loader-ring-wrapper {
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+
+.loader-orbital-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(196, 70, 111, 0.12);
+  border-top-color: var(--brand-color, #C4466F);
+  border-right-color: #E8829F;
+  animation: loaderSpin 0.9s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+}
+
+.loader-inner-ring {
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-bottom-color: var(--brand-color, #C4466F);
+  border-left-color: rgba(196, 70, 111, 0.4);
+  animation: loaderSpinReverse 1.3s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+}
+
+.loader-center-spark {
+  position: absolute;
+  inset: 20px;
+  border-radius: 50%;
+  background: var(--brand-color, #C4466F);
+  box-shadow: 0 0 10px rgba(196, 70, 111, 0.6);
+  animation: loaderSparkPulse 1.8s ease-in-out infinite;
+}
+
+.loader-brand-line {
+  margin-top: 28px;
+  width: 32px;
+  height: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, rgba(196, 70, 111, 0.4), transparent);
+  animation: loaderLinePulse 1.8s ease-in-out infinite;
+}
+
+@keyframes loaderSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes loaderSpinReverse {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes loaderGlowPulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.5; }
+  50% { transform: scale(1.25); opacity: 0.95; }
+}
+
+@keyframes loaderSparkPulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
+@keyframes loaderLinePulse {
+  0%, 100% { opacity: 0.3; transform: scaleX(0.7); }
+  50% { opacity: 0.8; transform: scaleX(1.3); }
+}
