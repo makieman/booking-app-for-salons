@@ -7,7 +7,7 @@ import mongoose, { Schema, Document } from 'mongoose';
  * - tenantId:   The salon this attendant belongs to
  * - name:       Display name shown to customers (e.g. "Florence")
  * - username:   Login handle — unique within a tenant (not globally)
- * - pinHash:    bcrypt hash of their 4–6 digit PIN — never sent to the client
+ * - pinHash:    bcrypt hash of their 4–`6 digit PIN — never sent to the client
  * - isActive:   Soft-delete flag; deactivated attendants are hidden from the booking flow
  * - serviceIds: ObjectIds of services this attendant is qualified to perform
  */
