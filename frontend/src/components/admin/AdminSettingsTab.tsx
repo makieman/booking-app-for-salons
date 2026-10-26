@@ -41,6 +41,13 @@ export function AdminSettingsTab({
   const [supportPhone, setSupportPhone] = useState(tenant?.supportPhone || '');
   const [supportEmail, setSupportEmail] = useState(tenant?.supportEmail || '');
 
+  // SMS: loaded from the owner-only settings endpoint (the public tenant never carries these).
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [smsAvailable, setSmsAvailable] = useState(false);
+  const [smsLoaded, setSmsLoaded] = useState(false);
+  const [smsTestPhone, setSmsTestPhone] = useState('');
+  const [smsTesting, setSmsTesting] = useState(false);
+
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [faviconFile, setFaviconFile] = useState<File | null>(null);
 
@@ -48,6 +55,22 @@ export function AdminSettingsTab({
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getTenantSettings(ownerToken)
+      .then((s) => {
+        if (cancelled) return;
+        setSmsEnabled(!!s.smsEnabled);
+        setSmsAvailable(!!s.smsAvailable);
+        setSmsLoaded(true);
+      })
+      .catch((err) => console.error('Failed to load SMS settings:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerToken]);
 
   // Sync state if tenant updates
   useEffect(() => {
@@ -83,6 +106,8 @@ export function AdminSettingsTab({
         mpesaPaybillNumber: mpesaPaybillNumber.trim(),
         supportPhone: supportPhone.trim(),
         supportEmail: supportEmail.trim(),
+        // Only send the switch once we know its real value, so a failed load can't switch it off.
+        ...(smsLoaded ? { smsEnabled } : {}),
       });
       onTenantUpdated(updated);
       triggerToast('Salon settings updated successfully!', 'success');
@@ -92,6 +117,19 @@ export function AdminSettingsTab({
       triggerToast(err.message || 'Failed to update settings', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSendTestSms = async () => {
+    if (!smsTestPhone.trim()) return;
+    setSmsTesting(true);
+    try {
+      await api.sendTestSms(ownerToken, smsTestPhone.trim());
+      triggerToast('Test SMS sent. Check your phone.', 'success');
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to send test SMS', 'error');
+    } finally {
+      setSmsTesting(false);
     }
   };
 
@@ -335,6 +373,60 @@ export function AdminSettingsTab({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* SMS Notifications Card */}
+            <div className="p-6 bg-white border border-brand-gray-200 rounded-2xl shadow-xs space-y-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-brand-gray-500 border-b border-brand-gray-100 pb-2">
+                SMS Notifications
+              </p>
+
+              {!smsLoaded ? (
+                <p className="text-xs font-semibold text-brand-gray-500">Loading SMS settings…</p>
+              ) : !smsAvailable ? (
+                <p className="text-xs font-semibold text-brand-gray-500">
+                  SMS is not set up on the server yet. Once it is connected, you can switch it on here.
+                </p>
+              ) : (
+                <>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={smsEnabled}
+                      onChange={e => setSmsEnabled(e.target.checked)}
+                      className="mt-1 h-4 w-4 accent-brand-black"
+                    />
+                    <span className="text-sm font-semibold">
+                      Text customers about their bookings
+                      <span className="block text-xs font-medium text-brand-gray-500 mt-0.5">
+                        Sends a short SMS when a booking is received, confirmed, changed or cancelled, and a reminder the
+                        day before. Each message starts with your salon name. Remember to save settings after changing this.
+                      </span>
+                    </span>
+                  </label>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">Send a test SMS to</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="tel"
+                        placeholder="0712 345 678"
+                        value={smsTestPhone}
+                        onChange={e => setSmsTestPhone(e.target.value)}
+                        className="flex-1 border border-brand-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-brand-black focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendTestSms}
+                        disabled={smsTesting || !smsTestPhone.trim()}
+                        className="px-4 py-2 rounded-xl border border-brand-gray-200 text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+                      >
+                        {smsTesting ? 'Sending…' : 'Send test'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Media Uploads Card */}
