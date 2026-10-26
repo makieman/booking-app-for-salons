@@ -14,6 +14,11 @@ import {
   sendWhatsAppBookingCancelled,
   sendWhatsAppRescheduled,
 } from '../services/whatsappService';
+import {
+  sendBookingConfirmedSms,
+  sendBookingCancelledSms,
+  sendBookingRescheduledSms,
+} from '../services/smsService';
 import { generateUniqueBookingReference } from './bookingController';
 
 /**
@@ -213,6 +218,7 @@ export const createAdminBooking = async (req: Request, res: Response) => {
       if (status === 'confirmed') {
         void sendBookingConfirmedToCustomer(req.tenant!, booking, syntheticService, assignedAttendant?.name);
         void sendWhatsAppBookingConfirmed(booking, syntheticService, assignedAttendant?.name);
+        void sendBookingConfirmedSms(req.tenant!, booking, syntheticService, assignedAttendant?.name);
         void sendPushToPhone(
           booking.phone,
           {
@@ -416,6 +422,7 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
 
     if (isRescheduling) {
       void sendWhatsAppRescheduled(primaryUpdatedBooking, syntheticService, (primaryUpdatedBooking.attendantId as any)?.name);
+      void sendBookingRescheduledSms(req.tenant!, primaryUpdatedBooking, syntheticService, (primaryUpdatedBooking.attendantId as any)?.name);
       void sendBookingRescheduledToCustomer(req.tenant!, primaryUpdatedBooking, syntheticService, (primaryUpdatedBooking.attendantId as any)?.name);
       void sendPushToPhone(primaryUpdatedBooking.phone, {
         title: '📅 Appointment Rescheduled',
@@ -440,6 +447,7 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
     } else if (targetStatus === 'confirmed') {
       void sendBookingConfirmedToCustomer(req.tenant!, primaryUpdatedBooking, syntheticService, undefined);
       void sendWhatsAppBookingConfirmed(primaryUpdatedBooking, syntheticService, undefined);
+      void sendBookingConfirmedSms(req.tenant!, primaryUpdatedBooking, syntheticService);
       void sendPushToPhone(primaryUpdatedBooking.phone, {
         title: 'Appointment Confirmed!',
         body: `See you on ${primaryUpdatedBooking.date} at ${primaryUpdatedBooking.startTime} for ${combinedName}. Please arrive 5–10 mins early.`,
@@ -463,6 +471,7 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
     } else if (targetStatus === 'cancelled') {
       void sendBookingCancelledToCustomer(req.tenant!, primaryUpdatedBooking, syntheticService, undefined, finalReason || undefined);
       void sendWhatsAppBookingCancelled(primaryUpdatedBooking, syntheticService, finalReason || undefined);
+      void sendBookingCancelledSms(req.tenant!, primaryUpdatedBooking, syntheticService, finalReason || undefined);
       void sendPushToPhone(primaryUpdatedBooking.phone, {
         title: '❌ Booking Cancelled',
         body: `Your booking for ${combinedName} on ${primaryUpdatedBooking.date} has been cancelled.${finalReason ? ` Reason: ${finalReason}` : ''}`,

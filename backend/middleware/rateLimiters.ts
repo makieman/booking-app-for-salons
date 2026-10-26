@@ -64,3 +64,16 @@ export const pushTestLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many test push notifications sent. Please try again later.' },
 });
+
+/**
+ * ── Rate Limiter: Test SMS Endpoint ────────────────────────────────────────
+ * Every test SMS costs money, so keep this tight.
+ * Limit: 5 test SMS requests per hour per client IP.
+ */
+export const smsTestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many test SMS requests. Please try again later.' },
+});

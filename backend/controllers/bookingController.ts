@@ -11,6 +11,7 @@ import {
 } from '../services/emailService';
 import { sendPushToPhone, sendPushToAdmins, sendPushToAttendant } from '../services/pushService';
 import { sendWhatsAppBookingReceived, sendWhatsAppBookingCancelled, sendWhatsAppRescheduled } from '../services/whatsappService';
+import { sendBookingReceivedSms, sendBookingCancelledSms, sendBookingRescheduledSms } from '../services/smsService';
 
 import mongoose from 'mongoose';
 import { MAX_SERVICES, isAttendantFree } from '../services/slotService';
@@ -356,6 +357,7 @@ export const createBooking = async (req: Request, res: Response) => {
     // Single unified customer notification
     void sendBookingRequestReceived(req.tenant!, primaryBooking, syntheticService, undefined);
     void sendWhatsAppBookingReceived(primaryBooking, syntheticService, undefined);
+    void sendBookingReceivedSms(req.tenant!, primaryBooking, syntheticService);
     void sendAdminNewBookingAlert(req.tenant!, primaryBooking, syntheticService, undefined);
 
     void sendPushToPhone(primaryBooking.phone, {
@@ -544,6 +546,7 @@ export const cancelBookingCustomer = async (req: Request, res: Response) => {
 
     void sendBookingCancelledToCustomer(req.tenant!, booking, syntheticService, undefined);
     void sendWhatsAppBookingCancelled(booking, syntheticService);
+    void sendBookingCancelledSms(req.tenant!, booking, syntheticService);
 
     void sendPushToPhone(booking.phone, {
       title: '❌ Booking Cancelled Successfully',
@@ -683,6 +686,7 @@ export const rescheduleBookingCustomer = async (req: Request, res: Response) => 
 
     void sendBookingRequestReceived(req.tenant!, booking, syntheticService, undefined);
     void sendWhatsAppRescheduled(booking, syntheticService, undefined);
+    void sendBookingRescheduledSms(req.tenant!, booking, syntheticService);
 
     void sendPushToPhone(booking.phone, {
       title: '📅 Appointment Rescheduled (Pending Approval)',

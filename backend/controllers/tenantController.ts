@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import Tenant from '../models/Tenant';
 import { invalidateTenantCache } from '../middleware/resolveTenant';
+import { isSmsConfigured, sendTestSms } from '../services/smsService';
+import { normalizeKenyanPhone } from '../utils/phoneNormalizer';
 
 export const getTenantSettings = async (req: Request, res: Response) => {
   try {
@@ -8,7 +10,8 @@ export const getTenantSettings = async (req: Request, res: Response) => {
     if (!tenant) {
       return res.status(404).json({ error: 'Tenant not found' });
     }
-    return res.json(tenant);
+    // smsAvailable tells the dashboard whether the server has an SMS provider set up at all.
+    return res.json({ ...tenant.toObject(), smsAvailable: isSmsConfigured() });
   } catch (error) {
     console.error('[tenantController] getTenantSettings error:', error);
     return res.status(500).json({ error: 'Failed to fetch settings' });
@@ -62,6 +65,7 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
       mpesaPaybillNumber,
       supportPhone,
       supportEmail,
+      smsEnabled,
       whatsappPhoneNumberId,
     } = req.body;
 
@@ -86,6 +90,7 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
     if (mpesaPaybillNumber !== undefined) tenant.mpesaPaybillNumber = mpesaPaybillNumber;
     if (supportPhone !== undefined) tenant.supportPhone = supportPhone;
     if (supportEmail !== undefined) tenant.supportEmail = supportEmail;
+    if (typeof smsEnabled === 'boolean') tenant.smsEnabled = smsEnabled;
 
     if (branding !== undefined) {
       tenant.branding = {
@@ -98,7 +103,7 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
     invalidateTenantCache(tenant.slug);
 
     const safeTenant = await Tenant.findById(tenant._id).select('-ownerPasswordHash');
-    return res.json(safeTenant);
+    return res.json({ ...safeTenant!.toObject(), smsAvailable: isSmsConfigured() });
   } catch (error) {
     console.error('[tenantController] updateTenantSettings error:', error);
     return res.status(500).json({ error: 'Failed to update settings' });
@@ -150,5 +155,37 @@ export const uploadFavicon = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[tenantController] uploadFavicon error:', error);
     return res.status(500).json({ error: 'Failed to upload favicon' });
+  }
+};
+
+/**
+ * POST /api/tenant/sms/test  (owner only, rate limited)
+ * Sends one test SMS to the number the owner types in, so they can confirm SMS works
+ * before switching it on for customers. Always sent to the owner's own number.
+ */
+export const sendTestSmsHandler = async (req: Request, res: Response) => {
+  try {
+    if (!isSmsConfigured()) {
+      return res.status(503).json({ error: 'SMS is not configured on the server yet.' });
+    }
+    const phone = normalizeKenyanPhone(String(req.body?.phone ?? ''));
+    if (!phone) {
+      return res.status(400).json({ error: 'Enter a valid Kenyan phone number.' });
+    }
+    const tenant = await Tenant.findById(req.tenant!._id).select('_id name smsEnabled supportPhone');
+    if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+    const result = await sendTestSms(tenant, phone);
+    if (!result.sent) {
+      const message =
+        result.reason === 'phone_limit' || result.reason === 'tenant_limit'
+          ? 'Daily SMS limit reached. Try again tomorrow.'
+          : 'The SMS provider rejected the message. Check the server logs.';
+      return res.status(502).json({ error: message, reason: result.reason });
+    }
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('[tenantController] sendTestSms error:', error);
+    return res.status(500).json({ error: 'Failed to send test SMS' });
   }
 };
