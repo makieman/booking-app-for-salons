@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 import Booking from '../models/Booking';
 import Tenant from '../models/Tenant';
 import { sendWhatsAppReminder } from './whatsappService';
+import { sendAppointmentReminderSms } from './smsService';
 
 /**
  * Runs daily at 09:00 Nairobi time (06:00 UTC).
@@ -19,7 +20,7 @@ export function startReminderScheduler(): void {
     const tomorrow = DateTime.now().setZone('Africa/Nairobi').plus({ days: 1 }).toFormat('yyyy-MM-dd');
 
     try {
-      const tenants = await Tenant.find({ isActive: true }).select('_id slug timezone');
+      const tenants = await Tenant.find({ isActive: true }).select('_id slug timezone name smsEnabled supportPhone');
 
       console.log(`[reminderService] Processing ${tenants.length} active tenant(s) for ${tomorrow}`);
 
@@ -35,10 +36,19 @@ export function startReminderScheduler(): void {
 
           console.log(`[reminderService] Tenant "${tenant.slug}": ${bookings.length} reminder(s) to send`);
 
+          // One SMS per booking reference (multi-service bookings share a reference).
+          const smsSentFor = new Set<string>();
+
           for (const booking of bookings) {
             const service      = booking.serviceId as any;
             const attendantName = (booking.attendantId as any)?.name;
             void sendWhatsAppReminder(booking, service, attendantName);
+
+            if (tenant.smsEnabled && service && !smsSentFor.has(booking.reference)) {
+              smsSentFor.add(booking.reference);
+              // Awaited one at a time so the daily spend caps are checked accurately.
+              await sendAppointmentReminderSms(tenant, booking, service, attendantName);
+            }
           }
         } catch (tenantErr) {
           // One tenant failing must not stop reminders for other tenants

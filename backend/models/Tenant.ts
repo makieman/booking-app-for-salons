@@ -55,6 +55,8 @@ export interface ITenant extends Document {
   mpesaPaybillNumber?: string;
   supportPhone?: string;
   supportEmail?: string;
+  /** Owner switch: send SMS to customers (only takes effect when the server has an SMS provider configured). */
+  smsEnabled?: boolean;
   plan: 'free' | 'paid';
   isActive: boolean;
   createdAt: Date;
@@ -135,6 +137,7 @@ const TenantSchema: Schema = new Schema(
     mpesaPaybillNumber: { type: String },
     supportPhone: { type: String },
     supportEmail: { type: String },
+    smsEnabled: { type: Boolean, default: false },
     /**
      * Meta's numeric phone_number_id for inbound Cloud API webhook routing.
      * sparse: true so tenants without WhatsApp don't collide on the unique index.

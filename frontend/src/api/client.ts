@@ -821,6 +821,18 @@ export async function updateTenantSettings(token: string, data: any): Promise<an
   return res.json();
 }
 
+export async function sendTestSms(token: string, phone: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/tenant/sms/test`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ phone }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to send test SMS');
+  }
+}
+
 export async function uploadBrandingLogo(token: string, file: File): Promise<any> {
   const formData = new FormData();
   formData.append('logo', file);
