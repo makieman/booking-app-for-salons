@@ -154,20 +154,38 @@ export function createApp(): Express {
   );
 
   // ── DB Status Middleware ─────────────────────────────────
-  // Prevents Mongoose buffering timeouts by returning 503 if DB is down
-  app.use((req, res, next) => {
-    const isDbConnected = mongoose.connection.readyState === 1;
+  // Prevents Mongoose buffering timeouts by returning 503 if DB is down.
+  // If connecting (readyState === 2), waits up to 2.5s for the TLS handshake to finish.
+  app.use(async (req, res, next) => {
     const isApiRoute = req.path.startsWith('/api');
     const isHealthCheck = req.path === '/api/health';
 
-    if (isApiRoute && !isHealthCheck && !isDbConnected) {
-      return res.status(503).json({
-        error: 'Service Unavailable',
-        message: 'Database is currently disconnected. Please check MONGODB_URI.',
-        code: 'DB_DISCONNECTED'
-      });
+    if (!isApiRoute || isHealthCheck) {
+      return next();
     }
-    next();
+
+    if (mongoose.connection.readyState === 1) {
+      return next();
+    }
+
+    if (mongoose.connection.readyState === 2) {
+      let waited = 0;
+      while ((mongoose.connection.readyState as number) === 2 && waited < 2500) {
+        await new Promise((r) => setTimeout(r, 200));
+        waited += 200;
+      }
+      if ((mongoose.connection.readyState as number) === 1) {
+        return next();
+      }
+    } else if (mongoose.connection.readyState === 0) {
+      connectDB(2, 1000).catch(() => {});
+    }
+
+    return res.status(503).json({
+      error: 'Service Unavailable',
+      message: 'Database is currently disconnected. Please check MONGODB_URI.',
+      code: 'DB_DISCONNECTED',
+    });
   });
 
   // ── Tenant Resolution ───────────────────────────────────
@@ -294,7 +312,8 @@ async function startServer(): Promise<void> {
 
 const currentFile = fileURLToPath(import.meta.url);
 const executedFile = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const isExecutedDirectly = (executedFile === currentFile || executedFile.endsWith('server.ts') || executedFile.endsWith('server.js')) && !process.argv.some(arg => arg.includes('test'));
+const isExecutedDirectly = (executedFile === currentFile || executedFile.endsWith('server.ts')
+|| executedFile.endsWith('server.js')) && !process.argv.some(arg => arg.includes('test'));
 
 if (isExecutedDirectly) {
   startServer().catch((err) => {
