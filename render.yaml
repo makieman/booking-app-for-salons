@@ -24,5 +24,13 @@ services:
         sync: false
       - key: VAPID_MAILTO
         sync: false
+      - key: SMS_PROVIDER
+        sync: false
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_API_KEY
+        sync: false
+      - key: SMS_SENDER_ID
+        sync: false
       - key: JWT_SECRET
         sync: false
