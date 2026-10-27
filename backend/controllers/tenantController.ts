@@ -196,11 +196,17 @@ export const sendTestSmsHandler = async (req: Request, res: Response) => {
       if (result.reason === 'insufficient_credits') {
         return res.status(402).json({ error: 'Not enough SMS credits. Top up to send messages.', reason: result.reason });
       }
-      const message =
-        result.reason === 'phone_limit' || result.reason === 'tenant_limit'
-          ? 'Daily SMS limit reached. Try again tomorrow.'
-          : 'The SMS provider rejected the message. Check the server logs.';
-      return res.status(502).json({ error: message, reason: result.reason });
+      let message = 'The SMS provider rejected the message. Check the server logs.';
+      if (result.reason === 'phone_limit' || result.reason === 'tenant_limit') {
+        message = 'Daily SMS limit reached. Try again tomorrow.';
+      } else if (result.error) {
+        if (result.error.includes('406') || /blacklist/i.test(result.error)) {
+          message = `Recipient rejected: ${result.error}. This number has blocked promotional SMS (e.g. Safaricom *456*9*5# DND) or is on the AT blacklist.`;
+        } else {
+          message = `SMS provider error: ${result.error}`;
+        }
+      }
+      return res.status(502).json({ error: message, reason: result.reason, details: result.error });
     }
     return res.json({ success: true });
   } catch (error) {
