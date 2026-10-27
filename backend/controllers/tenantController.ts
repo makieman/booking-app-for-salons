@@ -2,7 +2,24 @@ import { Request, Response } from 'express';
 import Tenant from '../models/Tenant';
 import { invalidateTenantCache } from '../middleware/resolveTenant';
 import { isSmsConfigured, sendTestSms } from '../services/smsService';
+import { getCreditSummary } from '../services/smsCreditService';
 import { normalizeKenyanPhone } from '../utils/phoneNormalizer';
+
+/** Owner-only SMS info for the dashboard. Never throws: a lookup failure must not break settings. */
+async function smsDashboardInfo(tenantId: string) {
+  const base = {
+    // smsAvailable tells the dashboard whether the server has an SMS provider set up at all.
+    smsAvailable: isSmsConfigured(),
+    smsTopUpContact: process.env.SMS_TOPUP_CONTACT?.trim() || undefined,
+  };
+  try {
+    const { credits, lowBalance } = await getCreditSummary(tenantId);
+    return { ...base, smsCredits: credits, smsLowBalance: lowBalance };
+  } catch (err) {
+    console.error('[tenantController] SMS credit summary failed:', err);
+    return base;
+  }
+}
 
 export const getTenantSettings = async (req: Request, res: Response) => {
   try {
@@ -10,8 +27,7 @@ export const getTenantSettings = async (req: Request, res: Response) => {
     if (!tenant) {
       return res.status(404).json({ error: 'Tenant not found' });
     }
-    // smsAvailable tells the dashboard whether the server has an SMS provider set up at all.
-    return res.json({ ...tenant.toObject(), smsAvailable: isSmsConfigured() });
+    return res.json({ ...tenant.toObject(), ...(await smsDashboardInfo(String(tenant._id))) });
   } catch (error) {
     console.error('[tenantController] getTenantSettings error:', error);
     return res.status(500).json({ error: 'Failed to fetch settings' });
@@ -103,7 +119,7 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
     invalidateTenantCache(tenant.slug);
 
     const safeTenant = await Tenant.findById(tenant._id).select('-ownerPasswordHash');
-    return res.json({ ...safeTenant!.toObject(), smsAvailable: isSmsConfigured() });
+    return res.json({ ...safeTenant!.toObject(), ...(await smsDashboardInfo(String(tenant._id))) });
   } catch (error) {
     console.error('[tenantController] updateTenantSettings error:', error);
     return res.status(500).json({ error: 'Failed to update settings' });
@@ -177,6 +193,9 @@ export const sendTestSmsHandler = async (req: Request, res: Response) => {
 
     const result = await sendTestSms(tenant, phone);
     if (!result.sent) {
+      if (result.reason === 'insufficient_credits') {
+        return res.status(402).json({ error: 'Not enough SMS credits. Top up to send messages.', reason: result.reason });
+      }
       const message =
         result.reason === 'phone_limit' || result.reason === 'tenant_limit'
           ? 'Daily SMS limit reached. Try again tomorrow.'
