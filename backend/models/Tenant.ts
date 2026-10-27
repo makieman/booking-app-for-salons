@@ -57,6 +57,10 @@ export interface ITenant extends Document {
   supportEmail?: string;
   /** Owner switch: send SMS to customers (only takes effect when the server has an SMS provider configured). */
   smsEnabled?: boolean;
+  /** Prepaid SMS balance. 1 credit = 1 SMS segment (160 chars). Changed only via smsCreditService. */
+  smsCredits?: number;
+  /** True once the free starter credits have been granted (lazy, so existing salons get them too). */
+  smsStarterGranted?: boolean;
   plan: 'free' | 'paid';
   isActive: boolean;
   createdAt: Date;
@@ -138,6 +142,8 @@ const TenantSchema: Schema = new Schema(
     supportPhone: { type: String },
     supportEmail: { type: String },
     smsEnabled: { type: Boolean, default: false },
+    smsCredits: { type: Number, default: 0, min: 0 },
+    smsStarterGranted: { type: Boolean, default: false },
     /**
      * Meta's numeric phone_number_id for inbound Cloud API webhook routing.
      * sparse: true so tenants without WhatsApp don't collide on the unique index.

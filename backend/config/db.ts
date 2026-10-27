@@ -1,6 +1,25 @@
 import mongoose from 'mongoose';
 
 let isConnecting = false;
+let reconnectListenerRegistered = false;
+
+/**
+ * Re-connects if the connection drops AFTER the app has connected once.
+ * Registered lazily (not at import time) so scripts and tests that import this file and then
+ * disconnect on purpose never trigger a reconnect to the production database.
+ */
+function registerReconnectListener(): void {
+  if (reconnectListenerRegistered) return;
+  reconnectListenerRegistered = true;
+  mongoose.connection.on('disconnected', () => {
+    console.warn('⚠️ MongoDB disconnected. Attempting auto-reconnection...');
+    if (process.env.MONGODB_URI && mongoose.connection.readyState === 0 && !isConnecting) {
+      connectDB(3, 2000).catch((err) => {
+        console.error('❌ Reconnection attempt failed:', err instanceof Error ? err.message : err);
+      });
+    }
+  });
+}
 
 /**
  * Connects to MongoDB using the MONGODB_URI environment variable with automatic retries.
@@ -26,6 +45,7 @@ const connectDB = async (retries = 5, delayMs = 3000): Promise<void> => {
         serverSelectionTimeoutMS: 5000,
       });
       console.log('✅ Connected to MongoDB');
+      registerReconnectListener();
       isConnecting = false;
       return;
     } catch (error) {
@@ -43,16 +63,5 @@ const connectDB = async (retries = 5, delayMs = 3000): Promise<void> => {
   isConnecting = false;
   console.error('❌ All initial MongoDB connection attempts failed. Auto-reconnection will trigger on incoming requests.');
 };
-
-// Reconnection listener if connection drops after initial success
-mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️ MongoDB disconnected. Attempting auto-reconnection...');
-  const uri = process.env.MONGODB_URI;
-  if (uri && mongoose.connection.readyState === 0 && !isConnecting) {
-    connectDB(3, 2000).catch((err) => {
-      console.error('❌ Reconnection attempt failed:', err instanceof Error ? err.message : err);
-    });
-  }
-});
 
 export default connectDB;

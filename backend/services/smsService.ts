@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import mongoose from 'mongoose';
 import SmsLog from '../models/SmsLog';
+import { mongoCredits, type SmsCredits } from './smsCreditService';
 import { normalizeKenyanPhone } from '../utils/phoneNormalizer';
 import type { IBooking } from '../models/Booking';
 import type { IService } from '../models/Service';
@@ -68,6 +69,8 @@ export interface SmsDeps {
   provider: SmsProvider | null;
   store: SmsStore;
   limits: SmsLimits;
+  /** Prepaid credit meter. Omit to send unmetered (used by unit tests). */
+  credits?: SmsCredits;
   now?: () => Date;
 }
 
@@ -81,7 +84,14 @@ export interface SendSmsOptions {
 
 export interface SmsSendResult {
   sent: boolean;
-  reason?: 'not_configured' | 'invalid_phone' | 'empty_message' | 'phone_limit' | 'tenant_limit' | 'provider_error';
+  reason?:
+    | 'not_configured'
+    | 'invalid_phone'
+    | 'empty_message'
+    | 'phone_limit'
+    | 'tenant_limit'
+    | 'insufficient_credits'
+    | 'provider_error';
   error?: string;
 }
 
@@ -170,8 +180,20 @@ export interface SmsMessageContext {
 }
 
 /**
+ * Picks the warmest wording that still fits ONE 160-character SMS (one credit).
+ * Candidates are ordered richest to leanest; if none fit, the leanest is used.
+ */
+function pickFitting(candidates: string[]): string {
+  const safe = candidates.map(toGsmSafe);
+  return safe.find((c) => smsSegments(c) <= 1) ?? safe[safe.length - 1];
+}
+
+/**
  * Every message starts with the salon name because, without a registered sender ID,
  * that is the only place the customer sees who is texting them.
+ *
+ * Tone: warm and welcoming. Warm extras (closing line, stylist name) are dropped first
+ * when a message would otherwise spill into a second billable segment.
  */
 export function buildSmsMessage(kind: Exclude<SmsType, 'test'>, ctx: SmsMessageContext): string {
   const salon = clip(ctx.tenantName, 30);
@@ -182,29 +204,49 @@ export function buildSmsMessage(kind: Exclude<SmsType, 'test'>, ctx: SmsMessageC
   const ref = ctx.booking.reference;
   const withStaff = ctx.attendantName ? ` with ${clip(ctx.attendantName, 20)}` : '';
 
-  let text: string;
   switch (kind) {
     case 'booking_received':
-      text = `${salon}: Hi ${name}, we received your request for ${service} on ${date} at ${time}. Ref ${ref}. We will confirm shortly.`;
-      break;
+      return pickFitting([
+        `${salon}: Hi ${name}, thanks for choosing us! We've got your request for ${service} on ${date} at ${time}. Ref ${ref}. We'll confirm very soon.`,
+        `${salon}: Hi ${name}, thanks for choosing us! We've got your request for ${service} on ${date} at ${time}. Ref ${ref}.`,
+        `${salon}: Hi ${name}, we received your request for ${service} on ${date} at ${time}. Ref ${ref}.`,
+      ]);
+
     case 'booking_confirmed':
-      text = `${salon}: Hi ${name}, your ${service}${withStaff} is confirmed for ${date} at ${time}. Ref ${ref}.`;
-      break;
+      return pickFitting([
+        `${salon}: Hi ${name}, you're booked! See you ${date} at ${time} for ${service}${withStaff}. Ref ${ref}. We can't wait to pamper you!`,
+        `${salon}: Hi ${name}, you're booked! See you ${date} at ${time} for ${service}${withStaff}. Ref ${ref}.`,
+        `${salon}: Hi ${name}, you're booked! See you ${date} at ${time} for ${service}. Ref ${ref}.`,
+        `${salon}: Hi ${name}, you're booked for ${service} on ${date} at ${time}. Ref ${ref}.`,
+        `${salon}: Hi ${name}, booked on ${date} at ${time}. Ref ${ref}.`,
+      ]);
+
     case 'booking_cancelled': {
       const reason = ctx.reason ? ` Reason: ${clip(ctx.reason, 40)}.` : '';
-      text = `${salon}: Hi ${name}, your ${service} booking on ${date} (Ref ${ref}) has been cancelled.${reason}`;
-      break;
+      return pickFitting([
+        `${salon}: Hi ${name}, we're sorry: your ${service} on ${date} (Ref ${ref}) has been cancelled.${reason} We'd love to see you soon!`,
+        `${salon}: Hi ${name}, we're sorry: your ${service} on ${date} (Ref ${ref}) has been cancelled.${reason}`,
+        `${salon}: Hi ${name}, we're sorry: your ${service} on ${date} (Ref ${ref}) has been cancelled.`,
+        `${salon}: Hi ${name}, your ${service} on ${date} (Ref ${ref}) has been cancelled.`,
+      ]);
     }
+
     case 'booking_rescheduled':
-      text = `${salon}: Hi ${name}, your ${service} has been moved to ${date} at ${time}. Ref ${ref}.`;
-      break;
+      return pickFitting([
+        `${salon}: Hi ${name}, your ${service} has been moved to ${date} at ${time}. Ref ${ref}. Thanks for being flexible - see you then!`,
+        `${salon}: Hi ${name}, your ${service} has been moved to ${date} at ${time}. Ref ${ref}.`,
+      ]);
+
     case 'appointment_reminder': {
-      const call = ctx.supportPhone ? ` Call ${ctx.supportPhone} to change.` : '';
-      text = `${salon}: Reminder - Hi ${name}, your ${service}${withStaff} is tomorrow at ${time}.${call}`;
-      break;
+      const call = ctx.supportPhone ? ` Need to change? Call ${ctx.supportPhone}.` : '';
+      return pickFitting([
+        `${salon}: Hi ${name}, a friendly reminder - we're looking forward to seeing you tomorrow at ${time} for ${service}${withStaff}.${call}`,
+        `${salon}: Hi ${name}, a friendly reminder - we're looking forward to seeing you tomorrow at ${time} for ${service}.${call}`,
+        `${salon}: Hi ${name}, a friendly reminder - see you tomorrow at ${time} for ${service}.${call}`,
+        `${salon}: Hi ${name}, see you tomorrow at ${time} for ${service}.`,
+      ]);
     }
   }
-  return toGsmSafe(text);
 }
 
 // ── Provider: Africa's Talking ──────────────────────────────────────────────
@@ -332,6 +374,7 @@ function defaultDeps(): SmsDeps {
   return {
     provider: getConfiguredProvider(),
     store: mongoStore,
+    credits: mongoCredits,
     limits: {
       // Spend protection: public booking forms can trigger SMS, so cap what one phone
       // number or one salon can cost per rolling 24 hours.
@@ -392,7 +435,30 @@ export async function sendSms(opts: SendSmsOptions, deps: SmsDeps = defaultDeps(
     console.error('[smsService] Limit check failed, continuing:', err);
   }
 
+  // Prepaid credits: take them BEFORE sending so concurrent bookings cannot overspend,
+  // and give them back below if the provider fails to send.
+  let reserved = false;
+  if (deps.credits) {
+    try {
+      reserved = await deps.credits.reserve(opts.tenantId, segments, opts.reference);
+    } catch (err) {
+      console.error('[smsService] Credit check failed, not sending:', err);
+      return skip('insufficient_credits', 'credit check failed');
+    }
+    if (!reserved) {
+      console.warn(`[smsService] Salon has no SMS credits left. Skipping ${opts.type}.`);
+      return skip('insufficient_credits');
+    }
+  }
+
   const result = await provider.send(to, message);
+  if (!result.ok && reserved) {
+    try {
+      await deps.credits!.refund(opts.tenantId, segments, opts.reference);
+    } catch (err) {
+      console.error('[smsService] Failed to refund SMS credits:', err);
+    }
+  }
   try {
     await store.record({
       tenantId: opts.tenantId,
