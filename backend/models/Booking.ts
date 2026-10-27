@@ -35,6 +35,8 @@ export interface IBooking extends Document {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no-show';
   cancellationReason?: string;
   completedAt?: Date;
+  /** Set when the day-before reminder (WhatsApp + SMS) was claimed. Null = not yet reminded. */
+  reminderSentAt?: Date | null;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -60,6 +62,7 @@ const BookingSchema: Schema = new Schema(
     bufferMinutes: { type: Number, default: 0 },
     cancellationReason: { type: String, default: null },
     completedAt: { type: Date, default: null },
+    reminderSentAt: { type: Date, default: null },
     notes: { type: String, default: null },
     status: {
       type: String,
@@ -77,6 +80,7 @@ BookingSchema.index({ tenantId: 1, reference: 1, groupOrder: 1 }, { unique: true
 BookingSchema.index({ tenantId: 1, date: 1 });
 BookingSchema.index({ tenantId: 1, status: 1 });
 BookingSchema.index({ tenantId: 1, date: 1, status: 1 });
+BookingSchema.index({ tenantId: 1, date: 1, status: 1, reminderSentAt: 1 });
 BookingSchema.index({ tenantId: 1, customerName: 1 });
 BookingSchema.index({ tenantId: 1, phone: 1 });
 BookingSchema.index({ tenantId: 1, groupId: 1 });
