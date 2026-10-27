@@ -32,5 +32,9 @@ services:
         sync: false
       - key: SMS_SENDER_ID
         sync: false
+      - key: SMS_TOPUP_CONTACT
+        sync: false
+      - key: PLATFORM_ADMIN_KEY
+        sync: false
       - key: JWT_SECRET
         sync: false

@@ -77,3 +77,16 @@ export const smsTestLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many test SMS requests. Please try again later.' },
 });
+
+/**
+ * ── Rate Limiter: Platform Admin API ───────────────────────────────────────
+ * Throttles guessing of the platform admin key and accidental grant loops.
+ * Limit: 30 requests per 15 minutes per client IP.
+ */
+export const platformAdminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many platform admin requests. Please try again later.' },
+});

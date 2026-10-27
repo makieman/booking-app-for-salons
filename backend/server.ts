@@ -26,6 +26,7 @@ import authRoutes from './routes/authRoutes';
 import attendantRoutes from './routes/attendantRoutes';
 import tenantRoutes from './routes/tenantRoutes';
 import whatsappRoutes from './routes/whatsappRoutes';
+import platformRoutes from './routes/platformRoutes';
 import { startReminderScheduler } from './services/reminderService';
 import { resolveTenant } from './middleware/resolveTenant';
 import { migratePushSubscriptionIndexes } from './scripts/migratePushSubscriptionIndex';
@@ -202,11 +203,16 @@ export function createApp(): Express {
   app.use('/api', (req, res, next) => {
     const fullPath = '/api' + req.path;
     if (PUBLIC_PATHS.includes(fullPath)) return next();
+    // Platform-operator API: not tied to one salon, guarded by its own admin key instead.
+    if (fullPath.startsWith('/api/platform/')) return next();
     return resolveTenant(req, res, next);
   });
 
   // ── WhatsApp Cloud API webhook (no tenant middleware) ────────────────────
   app.use('/api/whatsapp', whatsappRoutes);
+
+  // ── Platform operator API (no tenant middleware, admin key required) ─────
+  app.use('/api/platform', platformRoutes);
 
   // ── API Routes ───────────────────────────────────────────
   app.use('/api/services', serviceRoutes);
