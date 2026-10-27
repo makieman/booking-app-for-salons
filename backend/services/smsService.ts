@@ -327,11 +327,18 @@ let warnedMisconfigured = false;
 
 /** Returns the configured provider, or null when SMS is not set up on this server. */
 export function getConfiguredProvider(): SmsProvider | null {
-  const name = (process.env.SMS_PROVIDER ?? '').trim().toLowerCase();
-  if (name !== 'africastalking') return null;
+  const name = (process.env.SMS_PROVIDER ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^["']|["']$/g, '');
+  if (name !== 'africastalking' && name !== 'africas_talking' && name !== 'africas-talking') return null;
 
-  const username = process.env.AT_USERNAME?.trim();
-  const apiKey = process.env.AT_API_KEY?.trim();
+  const username = (process.env.AT_USERNAME || process.env.AFRICASTALKING_USERNAME)
+    ?.trim()
+    .replace(/^["']|["']$/g, '');
+  const apiKey = (process.env.AT_API_KEY || process.env.AT_APT_KEY || process.env.AFRICASTALKING_API_KEY)
+    ?.trim()
+    .replace(/^["']|["']$/g, '');
   if (!username || !apiKey) {
     if (!warnedMisconfigured) {
       warnedMisconfigured = true;
