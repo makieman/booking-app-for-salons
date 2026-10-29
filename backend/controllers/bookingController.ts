@@ -79,15 +79,35 @@ export const createBooking = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid booking submission' });
     }
 
-    if (!customerName || !phone || !date || !startTime) {
+    if (
+      typeof customerName !== 'string' ||
+      typeof phone !== 'string' ||
+      typeof date !== 'string' ||
+      typeof startTime !== 'string' ||
+      !customerName.trim() ||
+      !phone.trim() ||
+      !date.trim() ||
+      !startTime.trim()
+    ) {
       return res.status(400).json({ error: 'customerName, phone, date, and startTime are required' });
+    }
+
+    const sanitizedCustomerName = customerName.trim().slice(0, 120);
+    const sanitizedPhone = phone.trim().slice(0, 30);
+    let sanitizedEmail: string | undefined;
+    if (email !== undefined && email !== null && String(email).trim() !== '') {
+      const candidateEmail = String(email).trim().toLowerCase().slice(0, 254);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidateEmail)) {
+        return res.status(400).json({ error: 'Please provide a valid email address' });
+      }
+      sanitizedEmail = candidateEmail;
     }
 
     const bookingRules = req.tenant?.bookingRules;
     const tz = req.tenant?.timezone || 'Africa/Nairobi';
 
     // 2. Abuse cap: max 3 active (pending/confirmed) future appointments per phone in tenant
-    const normalizedPhone = normalizeKenyanPhone(phone) || phone.trim();
+    const normalizedPhone = normalizeKenyanPhone(sanitizedPhone) || sanitizedPhone;
     const todayStr = DateTime.now().setZone(tz).toISODate()!;
     const activeFutureCount = await Booking.countDocuments({
       tenantId,
@@ -95,7 +115,7 @@ export const createBooking = async (req: Request, res: Response) => {
       date: { $gte: todayStr },
       $or: [
         { phone: normalizedPhone },
-        { phone: phone.trim() },
+        { phone: sanitizedPhone },
       ],
     });
 
@@ -146,6 +166,9 @@ export const createBooking = async (req: Request, res: Response) => {
     });
 
     let currentCursor = DateTime.fromISO(`${date}T${startTime}`, { zone: tz });
+    if (!currentCursor.isValid) {
+      return res.status(400).json({ error: 'Invalid date or startTime format' });
+    }
     const resolvedSegments: Array<{
       service: any;
       attendant: any;
@@ -281,60 +304,85 @@ export const createBooking = async (req: Request, res: Response) => {
     }
 
     // Atomic insert with transaction / rollback fallback
-    let session: mongoose.ClientSession | null = null;
-    let inTransaction = false;
-    try {
-      session = await mongoose.startSession();
-      session.startTransaction();
-      inTransaction = true;
-    } catch {
-      session = null;
-    }
+    const buildSegmentDoc = (seg: (typeof resolvedSegments)[number]) =>
+      new Booking({
+        tenantId,
+        reference,
+        groupId,
+        groupOrder: seg.groupOrder,
+        price: seg.service.price,
+        customerName: sanitizedCustomerName,
+        phone: sanitizedPhone,
+        email: sanitizedEmail,
+        serviceId: seg.service._id,
+        attendantId: seg.attendant._id,
+        date,
+        startTime: seg.startTime,
+        endTime: seg.endTime,
+        bufferMinutes: seg.service.bufferAfterMinutes ?? 0,
+        status: 'pending',
+      });
 
-    const createdDocs: any[] = [];
-    try {
-      for (const seg of resolvedSegments) {
-        const doc = new Booking({
-          tenantId,
-          reference,
-          groupId,
-          groupOrder: seg.groupOrder,
-          price: seg.service.price,
-          customerName,
-          phone,
-          email,
-          serviceId: seg.service._id,
-          attendantId: seg.attendant._id,
-          date,
-          startTime: seg.startTime,
-          endTime: seg.endTime,
-          bufferMinutes: seg.service.bufferAfterMinutes ?? 0,
-          status: 'pending',
-        });
-
-        if (inTransaction && session) {
-          await doc.save({ session });
-        } else {
+    const saveWithoutTransaction = async (): Promise<any[]> => {
+      const savedDocs: any[] = [];
+      try {
+        for (const seg of resolvedSegments) {
+          const doc = buildSegmentDoc(seg);
           await doc.save();
+          savedDocs.push(doc);
         }
-        createdDocs.push(doc);
+        return savedDocs;
+      } catch (err) {
+        for (const doc of savedDocs) {
+          await Booking.deleteOne({ _id: doc._id }).catch(() => {});
+        }
+        throw err;
       }
+    };
 
-      if (inTransaction && session) {
-        await session.commitTransaction();
-      }
-    } catch (saveErr) {
-      if (inTransaction && session) {
-        await session.abortTransaction();
-      } else {
-        for (const doc of createdDocs) {
-          await Booking.deleteOne({ _id: doc._id });
+    let createdDocs: any[] = [];
+    if (resolvedSegments.length === 1) {
+      createdDocs = await saveWithoutTransaction();
+    } else {
+      let session: mongoose.ClientSession | null = null;
+      try {
+        session = await Booking.startSession();
+        session.startTransaction();
+        for (const seg of resolvedSegments) {
+          const doc = buildSegmentDoc(seg);
+          await doc.save({ session });
+          createdDocs.push(doc);
         }
-      }
-      throw saveErr;
-    } finally {
-      if (session) {
-        session.endSession();
+        await session.commitTransaction();
+      } catch (txErr: any) {
+        if (session) {
+          try {
+            if (session.inTransaction()) {
+              await session.abortTransaction();
+            }
+          } catch {
+            // ignore abort error
+          }
+        }
+        // If failure was due to session/client mismatch or transaction unsupported, fall back to direct save with manual rollback
+        const isSessionOrTxError =
+          txErr?.name === 'MongoInvalidArgumentError' ||
+          txErr?.message?.includes('ClientSession') ||
+          txErr?.message?.includes('Transaction') ||
+          txErr?.code === 20 || // IllegalOperation (standalone mongod)
+          txErr?.code === 263;
+        if (isSessionOrTxError) {
+          for (const doc of createdDocs) {
+            await Booking.deleteOne({ _id: doc._id }).catch(() => {});
+          }
+          createdDocs = await saveWithoutTransaction();
+        } else {
+          throw txErr;
+        }
+      } finally {
+        if (session) {
+          await session.endSession().catch(() => {});
+        }
       }
     }
 
@@ -402,7 +450,7 @@ export const getBookings = async (req: Request, res: Response) => {
     if (req.attendant) {
       query.attendantId = req.attendant.id;
     }
-    if (date) query.date = date as string;
+    if (date && typeof date === 'string') query.date = date.trim();
     const bookings = await Booking.find(query)
       .populate('serviceId')
       .populate('attendantId', 'name')

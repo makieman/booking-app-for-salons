@@ -90,10 +90,16 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Tenant not found' });
     }
 
-    if (whatsappPhoneNumberId !== undefined) tenant.whatsappPhoneNumberId = whatsappPhoneNumberId;
+    if (whatsappPhoneNumberId !== undefined && typeof whatsappPhoneNumberId === 'string') {
+      tenant.whatsappPhoneNumberId = whatsappPhoneNumberId.trim();
+    }
 
-    if (name !== undefined) tenant.name = name;
-    if (timezone !== undefined) tenant.timezone = timezone;
+    if (name !== undefined && typeof name === 'string' && name.trim()) {
+      tenant.name = name.trim().slice(0, 120);
+    }
+    if (timezone !== undefined && typeof timezone === 'string' && timezone.trim()) {
+      tenant.timezone = timezone.trim();
+    }
     if (workingHours !== undefined) tenant.workingHours = workingHours;
     if (bookingRules !== undefined) {
       tenant.bookingRules = {
@@ -101,17 +107,26 @@ export const updateTenantSettings = async (req: Request, res: Response) => {
         ...bookingRules,
       };
     }
-    if (locale !== undefined) tenant.locale = locale;
-    if (mpesaTillNumber !== undefined) tenant.mpesaTillNumber = mpesaTillNumber;
-    if (mpesaPaybillNumber !== undefined) tenant.mpesaPaybillNumber = mpesaPaybillNumber;
-    if (supportPhone !== undefined) tenant.supportPhone = supportPhone;
-    if (supportEmail !== undefined) tenant.supportEmail = supportEmail;
+    if (locale === 'en' || locale === 'sw') tenant.locale = locale;
+    if (mpesaTillNumber !== undefined && typeof mpesaTillNumber === 'string') tenant.mpesaTillNumber = mpesaTillNumber.trim();
+    if (mpesaPaybillNumber !== undefined && typeof mpesaPaybillNumber === 'string') tenant.mpesaPaybillNumber = mpesaPaybillNumber.trim();
+    if (supportPhone !== undefined && typeof supportPhone === 'string') tenant.supportPhone = supportPhone.trim();
+    if (supportEmail !== undefined && typeof supportEmail === 'string') tenant.supportEmail = supportEmail.trim().toLowerCase();
     if (typeof smsEnabled === 'boolean') tenant.smsEnabled = smsEnabled;
 
-    if (branding !== undefined) {
+    if (branding !== undefined && typeof branding === 'object' && branding !== null) {
+      const sanitizedBranding = { ...branding };
+      if (
+        sanitizedBranding.primaryColor !== undefined &&
+        (typeof sanitizedBranding.primaryColor !== 'string' || !/^#[0-9A-Fa-f]{3,8}$/.test(sanitizedBranding.primaryColor.trim()))
+      ) {
+        delete sanitizedBranding.primaryColor;
+      } else if (typeof sanitizedBranding.primaryColor === 'string') {
+        sanitizedBranding.primaryColor = sanitizedBranding.primaryColor.trim();
+      }
       tenant.branding = {
         ...tenant.branding,
-        ...branding,
+        ...sanitizedBranding,
       };
     }
 
