@@ -36,6 +36,7 @@ interface SendTemplateOpts {
   templateName: string;
   languageCode?: string;
   components?: Array<{ type: 'body' | 'header' | 'button'; parameters: TemplateParam[] }>;
+  fallbackText?: string;
 }
 
 async function sendTemplate(opts: SendTemplateOpts): Promise<boolean> {
@@ -67,7 +68,13 @@ async function sendTemplate(opts: SendTemplateOpts): Promise<boolean> {
     const data = await response.json() as any;
 
     if (!response.ok) {
+      const errCode = data?.error?.code;
       console.error(`[whatsappService] ❌ API error "${opts.templateName}" → ${to}:`, JSON.stringify(data?.error ?? data));
+      // If template is still pending Meta review (#132001) and fallbackText is provided, try 24h window free-text
+      if ((errCode === 132001 || errCode === 132000) && opts.fallbackText) {
+        console.log(`[whatsappService] ℹ️ Template "${opts.templateName}" pending approval — attempting free-text fallback → ${to}`);
+        return await sendWhatsAppFreeText(to, opts.fallbackText);
+      }
       return false;
     }
 
@@ -136,31 +143,37 @@ function formatTime(time: string): string {
 
 export async function sendWhatsAppBookingReceived(booking: IBooking, service: IService, attendantName?: string): Promise<void> {
   const serviceName = attendantName ? `${service.name} with ${attendantName}` : service.name;
+  const formattedDate = formatDate(booking.date);
+  const formattedTime = formatTime(booking.startTime);
   await sendTemplate({
     to: booking.phone,
     templateName: 'booking_request_received',
     components: [{ type: 'body', parameters: [
       { type: 'text', text: booking.customerName },
       { type: 'text', text: serviceName },
-      { type: 'text', text: formatDate(booking.date) },
-      { type: 'text', text: formatTime(booking.startTime) },
+      { type: 'text', text: formattedDate },
+      { type: 'text', text: formattedTime },
       { type: 'text', text: booking.reference },
     ]}],
+    fallbackText: `Hi ${booking.customerName}, we have received your booking request for ${serviceName} on ${formattedDate} at ${formattedTime}. Your booking reference is ${booking.reference}. Reply CONFIRM, RESCHEDULE, or CANCEL anytime.`,
   });
 }
 
 export async function sendWhatsAppBookingConfirmed(booking: IBooking, service: IService, attendantName?: string): Promise<void> {
   const serviceName = attendantName ? `${service.name} with ${attendantName}` : service.name;
+  const formattedDate = formatDate(booking.date);
+  const formattedTime = formatTime(booking.startTime);
   await sendTemplate({
     to: booking.phone,
     templateName: 'booking_confirmed',
     components: [{ type: 'body', parameters: [
       { type: 'text', text: booking.customerName },
       { type: 'text', text: serviceName },
-      { type: 'text', text: formatDate(booking.date) },
-      { type: 'text', text: formatTime(booking.startTime) },
+      { type: 'text', text: formattedDate },
+      { type: 'text', text: formattedTime },
       { type: 'text', text: booking.reference },
     ]}],
+    fallbackText: `Hi ${booking.customerName}, your booking for ${serviceName} on ${formattedDate} at ${formattedTime} has been confirmed! Booking reference: ${booking.reference}. See you soon!`,
   });
 }
 
@@ -169,15 +182,17 @@ export async function sendWhatsAppBookingCancelled(
   service: IService,
   reason?: string
 ): Promise<void> {
+  const formattedDate = formatDate(booking.date);
   const sent = await sendTemplate({
     to: booking.phone,
     templateName: 'booking_cancelled',
     components: [{ type: 'body', parameters: [
       { type: 'text', text: booking.customerName },
       { type: 'text', text: service.name },
-      { type: 'text', text: formatDate(booking.date) },
+      { type: 'text', text: formattedDate },
       { type: 'text', text: booking.reference },
     ]}],
+    fallbackText: `Hi ${booking.customerName}, your booking for ${service.name} on ${formattedDate} (Ref: ${booking.reference}) has been cancelled. Please contact us if you have any questions.`,
   });
 
   if (sent && reason) {
@@ -187,14 +202,16 @@ export async function sendWhatsAppBookingCancelled(
 
 export async function sendWhatsAppReminder(booking: IBooking, service: IService, attendantName?: string): Promise<void> {
   const serviceName = attendantName ? `${service.name} with ${attendantName}` : service.name;
+  const formattedTime = formatTime(booking.startTime);
   await sendTemplate({
     to: booking.phone,
     templateName: 'appointment_reminder',
     components: [{ type: 'body', parameters: [
       { type: 'text', text: booking.customerName },
       { type: 'text', text: serviceName },
-      { type: 'text', text: formatTime(booking.startTime) },
+      { type: 'text', text: formattedTime },
     ]}],
+    fallbackText: `Hi ${booking.customerName}, this is a reminder for your upcoming appointment for ${serviceName} tomorrow at ${formattedTime}. Reply CONFIRM, RESCHEDULE, or CANCEL if your plans have changed.`,
   });
 }
 
@@ -204,15 +221,18 @@ export async function sendWhatsAppRescheduled(
   attendantName?: string,
 ): Promise<void> {
   const serviceName = attendantName ? `${service.name} with ${attendantName}` : service.name;
+  const formattedDate = formatDate(booking.date);
+  const formattedTime = formatTime(booking.startTime);
   await sendTemplate({
     to: booking.phone,
     templateName: 'booking_rescheduled',
     components: [{ type: 'body', parameters: [
       { type: 'text', text: booking.customerName },
       { type: 'text', text: serviceName },
-      { type: 'text', text: formatDate(booking.date) },
-      { type: 'text', text: formatTime(booking.startTime) },
+      { type: 'text', text: formattedDate },
+      { type: 'text', text: formattedTime },
       { type: 'text', text: booking.reference },
     ]}],
+    fallbackText: `Hi ${booking.customerName}, your booking for ${serviceName} has been rescheduled to ${formattedDate} at ${formattedTime}. Your booking reference is ${booking.reference}. See you then!`,
   });
 }

@@ -20,18 +20,26 @@ export const getVapidKey = (_req: Request, res: Response): void => {
 export const subscribe = async (req: Request, res: Response): Promise<void> => {
   try {
     const { endpoint, keys, customerPhone } = req.body;
-    if (!endpoint || !keys?.p256dh || !keys?.auth || !customerPhone) {
+    if (
+      typeof endpoint !== 'string' ||
+      !/^https?:\/\/\S+$/i.test(endpoint.trim()) ||
+      typeof keys?.p256dh !== 'string' ||
+      typeof keys?.auth !== 'string' ||
+      typeof customerPhone !== 'string' ||
+      !customerPhone.trim()
+    ) {
       res.status(400).json({ error: 'endpoint, keys.p256dh, keys.auth, and customerPhone are required' });
       return;
     }
 
+    const cleanEndpoint = endpoint.trim();
     const normalizedPhone = normalizeKenyanPhone(customerPhone) || customerPhone.trim();
 
     await PushSubscription.findOneAndUpdate(
-      { endpoint, role: 'customer', attendantId: null },
+      { endpoint: cleanEndpoint, role: 'customer', attendantId: null },
       {
-        endpoint,
-        keys,
+        endpoint: cleanEndpoint,
+        keys: { p256dh: keys.p256dh.trim(), auth: keys.auth.trim() },
         customerPhone: normalizedPhone,
         role: 'customer',
         attendantId: null,
