@@ -214,9 +214,13 @@ async function sendEmail(opts: {
 // Helper to determine the From and Reply-To headers from tenant branding
 function getEmailHeaders(tenant: ITenant) {
   const fromEmailOnly = FROM.includes('<') ? FROM.split('<')[1].replace('>', '').trim() : FROM;
-  const fromName = tenant.branding?.emailFromName || tenant.name;
+  const rawFromName = tenant.branding?.emailFromName || tenant.name || 'Salon';
+  const fromName = String(rawFromName).replace(/["\r\n<>]/g, '').trim() || 'Salon';
   const from = `"${fromName}" <${fromEmailOnly}>`;
-  const replyTo = tenant.branding?.emailReplyTo || undefined;
+  const rawReplyTo = tenant.branding?.emailReplyTo;
+  const replyTo = typeof rawReplyTo === 'string' && /^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/.test(rawReplyTo.trim())
+    ? rawReplyTo.trim()
+    : undefined;
   return { from, replyTo };
 }
 
