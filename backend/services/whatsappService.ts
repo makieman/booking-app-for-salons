@@ -127,6 +127,74 @@ export async function sendWhatsAppFreeText(to: string, text: string): Promise<bo
   }
 }
 
+/**
+ * Send a native WhatsApp Business Contact Card (vCard) for Flo Sisterlocks.
+ * Allows the customer to save "Flo Sisterlocks" in 1 tap so the chat header
+ * displays "Flo Sisterlocks" instead of the raw phone number.
+ */
+export async function sendWhatsAppBusinessContactCard(to: string): Promise<boolean> {
+  const normalized = normalizeKenyanPhone(to);
+  if (!normalized) return false;
+
+  const config = getConfig();
+  if (!config) return false;
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: normalized,
+    type: 'contacts',
+    contacts: [
+      {
+        name: {
+          formatted_name: 'Flo Sisterlocks',
+          first_name: 'Flo',
+          last_name: 'Sisterlocks',
+        },
+        org: {
+          company: 'Flo Sisterlocks',
+          title: 'Certified Sisterlocks™ & Natural Hair Studio',
+        },
+        phones: [
+          {
+            phone: '+254 783 746104',
+            wa_id: '254783746104',
+            type: 'WORK',
+          },
+        ],
+        emails: [
+          {
+            email: 'support@flosisterlocks.com',
+            type: 'WORK',
+          },
+        ],
+        urls: [
+          {
+            url: 'https://booking-app-for-salons.vercel.app/flo-sisterlocks',
+            type: 'WORK',
+          },
+        ],
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch(config.url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${config.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json() as any;
+    if (!response.ok) {
+      return false;
+    }
+    console.log(`[whatsappService] ✅ Contact card → ${normalized} | msgId: ${data?.messages?.[0]?.id}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ── Formatters ───────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
@@ -155,8 +223,9 @@ export async function sendWhatsAppBookingReceived(booking: IBooking, service: IS
       { type: 'text', text: formattedTime },
       { type: 'text', text: booking.reference },
     ]}],
-    fallbackText: `Hi ${booking.customerName}, we have received your booking request for ${serviceName} on ${formattedDate} at ${formattedTime}. Your booking reference is ${booking.reference}. Reply CONFIRM, RESCHEDULE, or CANCEL anytime.`,
+    fallbackText: `*Flo Sisterlocks*\n\nHi ${booking.customerName}, we have received your booking request for ${serviceName} on ${formattedDate} at ${formattedTime}. Your booking reference is ${booking.reference}. Reply CONFIRM, RESCHEDULE, or CANCEL anytime.\n\n_Flo Sisterlocks • Certified Sisterlocks™ Studio_`,
   });
+  void sendWhatsAppBusinessContactCard(booking.phone);
 }
 
 export async function sendWhatsAppBookingConfirmed(booking: IBooking, service: IService, attendantName?: string): Promise<void> {
@@ -173,7 +242,7 @@ export async function sendWhatsAppBookingConfirmed(booking: IBooking, service: I
       { type: 'text', text: formattedTime },
       { type: 'text', text: booking.reference },
     ]}],
-    fallbackText: `Hi ${booking.customerName}, your booking for ${serviceName} on ${formattedDate} at ${formattedTime} has been confirmed! Booking reference: ${booking.reference}. See you soon!`,
+    fallbackText: `*Flo Sisterlocks*\n\nHi ${booking.customerName}, your booking for ${serviceName} on ${formattedDate} at ${formattedTime} has been confirmed! Booking reference: ${booking.reference}. See you soon!\n\n_Flo Sisterlocks • Certified Sisterlocks™ Studio_`,
   });
 }
 
@@ -192,11 +261,11 @@ export async function sendWhatsAppBookingCancelled(
       { type: 'text', text: formattedDate },
       { type: 'text', text: booking.reference },
     ]}],
-    fallbackText: `Hi ${booking.customerName}, your booking for ${service.name} on ${formattedDate} (Ref: ${booking.reference}) has been cancelled. Please contact us if you have any questions.`,
+    fallbackText: `*Flo Sisterlocks*\n\nHi ${booking.customerName}, your booking for ${service.name} on ${formattedDate} (Ref: ${booking.reference}) has been cancelled. Please contact us if you have any questions.\n\n_Flo Sisterlocks • Certified Sisterlocks™ Studio_`,
   });
 
   if (sent && reason) {
-    await sendWhatsAppFreeText(booking.phone, `Cancellation reason: ${reason}`);
+    await sendWhatsAppFreeText(booking.phone, `*Flo Sisterlocks*\nCancellation reason: ${reason}`);
   }
 }
 
@@ -211,7 +280,7 @@ export async function sendWhatsAppReminder(booking: IBooking, service: IService,
       { type: 'text', text: serviceName },
       { type: 'text', text: formattedTime },
     ]}],
-    fallbackText: `Hi ${booking.customerName}, this is a reminder for your upcoming appointment for ${serviceName} tomorrow at ${formattedTime}. Reply CONFIRM, RESCHEDULE, or CANCEL if your plans have changed.`,
+    fallbackText: `*Flo Sisterlocks*\n\nHi ${booking.customerName}, this is a reminder for your upcoming appointment for ${serviceName} tomorrow at ${formattedTime}. Reply CONFIRM, RESCHEDULE, or CANCEL if your plans have changed.\n\n_Flo Sisterlocks • Certified Sisterlocks™ Studio_`,
   });
 }
 
@@ -233,6 +302,6 @@ export async function sendWhatsAppRescheduled(
       { type: 'text', text: formattedTime },
       { type: 'text', text: booking.reference },
     ]}],
-    fallbackText: `Hi ${booking.customerName}, your booking for ${serviceName} has been rescheduled to ${formattedDate} at ${formattedTime}. Your booking reference is ${booking.reference}. See you then!`,
+    fallbackText: `*Flo Sisterlocks*\n\nHi ${booking.customerName}, your booking for ${serviceName} has been rescheduled to ${formattedDate} at ${formattedTime}. Your booking reference is ${booking.reference}. See you then!\n\n_Flo Sisterlocks • Certified Sisterlocks™ Studio_`,
   });
 }

@@ -20,7 +20,7 @@ export const bookingCreateLimiter = rateLimit({
  */
 export const bookingLookupLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many lookup requests. Please try again later.' },

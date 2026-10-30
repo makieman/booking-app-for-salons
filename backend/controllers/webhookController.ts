@@ -9,7 +9,9 @@ import {
   sendWhatsAppFreeText,
   sendWhatsAppBookingConfirmed,
   sendWhatsAppBookingCancelled,
+  sendWhatsAppBusinessContactCard,
 } from '../services/whatsappService';
+import { handleCustomerQuestionWithAI } from '../services/aiReceptionistService';
 import { sendPushToAdmins } from '../services/pushService';
 
 // ── Meta webhook payload shape (typed just enough for our use-case) ────────────
@@ -262,18 +264,6 @@ async function processMessage(
     }
   }
 
-  if (!buttonId) {
-    console.log(`[webhookController] Non-action message type="${message.type}" from ${senderPhone} — sending menu`);
-    void sendWhatsAppFreeText(
-      senderPhone,
-      `Hi! 👋 Welcome to ${tenant.name}. To manage your active booking via WhatsApp, reply with:\n• *CONFIRM* (or *1*) to confirm your appointment\n• *RESCHEDULE* (or *3*) to see available slots\n• *CANCEL* (or *2*) to cancel your appointment`,
-    );
-    return;
-  }
-
-  console.log(`[webhookController] Action "${buttonId}" from ${senderPhone} | tenant=${tenant.slug}`);
-
-  // ── Find customer's most recent active booking (scoped to this tenant) ──
   // Normalize: strip leading '+' so it matches the stored format, plus local 07/01 format
   const normalizedPhone = senderPhone.startsWith('+') ? senderPhone.slice(1) : senderPhone;
   const localZeroPhone = normalizedPhone.startsWith('254') && normalizedPhone.length === 12
@@ -288,6 +278,27 @@ async function processMessage(
     localZeroPhone,
     spacedLocalPhone,
   ]));
+
+  if (!buttonId) {
+    const customerText = message.type === 'text' ? ((message as WaTextMessage).text?.body ?? '').trim() : 'Hi';
+    console.log(`[webhookController] Customer question from ${senderPhone}: "${customerText}" — answering via Live DB AI Receptionist`);
+    try {
+      const aiReply = await handleCustomerQuestionWithAI(customerText, tenant, senderPhone, phoneVariants);
+      void sendWhatsAppFreeText(senderPhone, aiReply);
+      void sendWhatsAppBusinessContactCard(senderPhone);
+    } catch (err) {
+      console.error('[webhookController] AI Receptionist error:', err);
+      void sendWhatsAppFreeText(
+        senderPhone,
+        `*${tenant.name}*\n\nHi! 👋 Welcome to ${tenant.name}. To manage your active booking via WhatsApp, reply with:\n• *CONFIRM* (or *1*) to confirm your appointment\n• *RESCHEDULE* (or *3*) to see available slots\n• *CANCEL* (or *2*) to cancel your appointment`,
+      );
+    }
+    return;
+  }
+
+  console.log(`[webhookController] Action "${buttonId}" from ${senderPhone} | tenant=${tenant.slug}`);
+
+  // ── Find customer's most recent active booking (scoped to this tenant) ──
 
   let booking;
   try {

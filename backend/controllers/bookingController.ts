@@ -109,7 +109,7 @@ export const createBooking = async (req: Request, res: Response) => {
     // 2. Abuse cap: max 3 active (pending/confirmed) future appointments per phone in tenant
     const normalizedPhone = normalizeKenyanPhone(sanitizedPhone) || sanitizedPhone;
     const todayStr = DateTime.now().setZone(tz).toISODate()!;
-    const activeFutureCount = await Booking.countDocuments({
+    const activeFutureRefs = await Booking.distinct('reference', {
       tenantId,
       status: { $in: ['pending', 'confirmed'] },
       date: { $gte: todayStr },
@@ -118,6 +118,7 @@ export const createBooking = async (req: Request, res: Response) => {
         { phone: sanitizedPhone },
       ],
     });
+    const activeFutureCount = activeFutureRefs.length;
 
     if (activeFutureCount >= 3) {
       return res.status(400).json({
