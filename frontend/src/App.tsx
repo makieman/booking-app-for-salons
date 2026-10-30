@@ -1134,25 +1134,31 @@ export default function App() {
     return <BrandAppLoader />;
   }
 
-  if (viewMode === 'select') {
-    return <TenantSelectView />;
-  }
-
-  if (viewMode === 'register') {
-    return <TenantRegisterView />;
-  }
-
   if (tenantError) {
     return (
-      <div className="min-h-screen bg-brand-white flex flex-col items-center justify-center p-6 font-sans">
-        <div className="border border-brand-gray-100 bg-white p-8 space-y-6 shadow-2xl max-w-sm text-center rounded-xl">
-          <div className="text-red-500 font-bold text-3xl">⚠️ Error</div>
-          <p className="text-sm text-brand-gray-600 font-medium">{tenantError}</p>
+      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 font-sans">
+        <div className="border border-[#F0D5DE] bg-white p-8 sm:p-10 space-y-6 shadow-luxury max-w-sm w-full text-center rounded-2xl">
+          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border border-[#F0D5DE] shadow-xs bg-black flex items-center justify-center">
+            <img
+              src="/android-chrome-512x512.png"
+              alt="Flo Sisterlocks"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-serif font-black tracking-tight text-[#231F1D]">
+              Flo Sisterlocks
+            </h1>
+            <p className="text-sm text-[#6E655F] font-medium leading-relaxed">
+              We will be back online in a few moments. Thank you for your patience.
+            </p>
+          </div>
           <button
-            onClick={() => navigate('select')}
-            className="w-full bg-brand-black text-white py-3 rounded-full font-semibold uppercase tracking-wider text-xs shadow-md hover:bg-brand-gray-800 transition-all cursor-pointer"
+            type="button"
+            onClick={() => window.location.reload()}
+            className="w-full bg-[#231F1D] text-white py-3.5 rounded-full font-bold uppercase tracking-wider text-xs shadow-md hover:bg-[#C4466F] transition-all cursor-pointer"
           >
-            Go back to Selector
+            Refresh Page
           </button>
         </div>
       </div>
@@ -1904,12 +1910,6 @@ export default function App() {
                               Appointment Confirmed
                             </h2>
 
-                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
-                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C4466F]/40" />
-                              <Sparkles size={12} className="text-[#C4466F]" />
-                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-[#C4466F]/40" />
-                            </div>
-
                             <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
                               Your appointment has been approved! We look forward to welcoming you to Flo Sisterlocks.
                             </p>
@@ -1936,12 +1936,6 @@ export default function App() {
                             >
                               Appointment Cancelled
                             </h2>
-
-                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
-                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-rose-400/40" />
-                              <AlertCircle size={12} className="text-rose-500" />
-                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-rose-400/40" />
-                            </div>
 
                             <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
                               This appointment has been cancelled or declined by the salon.
@@ -1970,12 +1964,6 @@ export default function App() {
                               Appointment Completed
                             </h2>
 
-                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
-                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C4466F]/40" />
-                              <Sparkles size={12} className="text-[#C4466F]" />
-                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-[#C4466F]/40" />
-                            </div>
-
                             <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
                               Thank you for visiting Flo Sisterlocks! We look forward to seeing you again.
                             </p>
@@ -2003,12 +1991,6 @@ export default function App() {
                               Request Received
                             </h2>
 
-                            <div className="flex items-center justify-center gap-2 text-rose-300/80 my-1" aria-hidden="true">
-                              <span className="w-8 h-[1px] bg-gradient-to-r from-transparent to-[#C4466F]/40" />
-                              <Sparkles size={12} className="text-[#C4466F]" />
-                              <span className="w-8 h-[1px] bg-gradient-to-l from-transparent to-[#C4466F]/40" />
-                            </div>
-
                             <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
                               The salon team will review and confirm your appointment slot shortly.
                             </p>
@@ -2024,9 +2006,8 @@ export default function App() {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded-md bg-[#C4466F]/10 text-[#C4466F] text-[9px] font-extrabold uppercase tracking-widest border border-[#C4466F]/20 flex items-center gap-1">
-                                <Sparkles size={10} />
-                                <span>Salon Pass</span>
+                              <span className="px-2 py-0.5 rounded-md bg-[#C4466F]/10 text-[#C4466F] text-[9px] font-extrabold uppercase tracking-widest border border-[#C4466F]/20">
+                                Salon Pass
                               </span>
                               <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-[#6E655F]">
                                 Booking Reference
