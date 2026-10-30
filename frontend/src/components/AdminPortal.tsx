@@ -208,24 +208,6 @@ export function AdminPortal({
             <form onSubmit={handleOwnerSubmit} className="space-y-5">
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-gray-600 block">
-                  Salon ID.
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={ownerSlug}
-                  onChange={e => {
-                    setOwnerSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                    setOwnerError(null);
-                  }}
-                  placeholder="e.g. flo-sisterlocks"
-                  disabled={!!tenantSlug}
-                  className="w-full bg-brand-white border-2 border-brand-black/20 focus:border-brand-black p-3.5 text-sm font-medium rounded-lg focus:outline-none transition-colors disabled:bg-brand-gray-100 disabled:text-brand-gray-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-gray-600 block">
                   Owner Email
                 </label>
                 <input
@@ -335,24 +317,6 @@ export function AdminPortal({
           ) : (
             /* ── Staff PIN Login Form ── */
             <div className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-gray-600 block">
-                  Salon ID (Slug)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={staffSlug}
-                  onChange={e => {
-                    setStaffSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                    setStaffPinError(false);
-                  }}
-                  placeholder="e.g. flo-sisterlocks"
-                  disabled={!!tenantSlug}
-                  className="w-full bg-brand-white border-2 border-brand-black/20 focus:border-brand-black p-3.5 text-sm font-medium rounded-lg focus:outline-none transition-colors disabled:bg-brand-gray-100 disabled:text-brand-gray-500"
-                />
-              </div>
-
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-gray-600 block">
                   Staff Username

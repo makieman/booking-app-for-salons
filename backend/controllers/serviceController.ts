@@ -8,19 +8,24 @@ import Service from '../models/Service';
 export const createService = async (req: Request, res: Response) => {
   try {
     const { name, duration, price, priceMax, description, bufferAfterMinutes, canExceedClosingTime, latestStartTime } = req.body;
-    if (!name || !duration || price === undefined) {
+    if (typeof name !== 'string' || !name.trim() || !duration || price === undefined) {
       return res.status(400).json({ error: 'name, duration, and price are required' });
+    }
+    const parsedDuration = Number(duration);
+    const parsedPrice = Number(price);
+    if (!Number.isFinite(parsedDuration) || parsedDuration <= 0 || !Number.isFinite(parsedPrice) || parsedPrice < 0) {
+      return res.status(400).json({ error: 'duration must be positive and price must be non-negative' });
     }
     const newService = new Service({
       tenantId: req.tenant!._id,
-      name,
-      duration: Number(duration),
-      price: Number(price),
+      name: name.trim().slice(0, 120),
+      duration: parsedDuration,
+      price: parsedPrice,
       priceMax: priceMax !== undefined && priceMax !== null ? Number(priceMax) : undefined,
-      description,
+      description: typeof description === 'string' ? description.trim().slice(0, 1000) : description,
       bufferAfterMinutes: bufferAfterMinutes !== undefined ? Number(bufferAfterMinutes) : 0,
       canExceedClosingTime: canExceedClosingTime !== undefined ? Boolean(canExceedClosingTime) : false,
-      latestStartTime: latestStartTime || undefined,
+      latestStartTime: typeof latestStartTime === 'string' && latestStartTime.trim() ? latestStartTime.trim() : undefined,
     });
     await newService.save();
     invalidateServicesCache(req.tenant!._id.toString());
@@ -94,13 +99,15 @@ export const updateService = async (req: Request, res: Response) => {
     const { name, duration, price, priceMax, description, bufferAfterMinutes, canExceedClosingTime, latestStartTime } = req.body;
 
     const updates: Record<string, any> = {};
-    if (name !== undefined) updates.name = name;
+    if (name !== undefined && typeof name === 'string') updates.name = name.trim().slice(0, 120);
     if (duration !== undefined) updates.duration = Number(duration);
     if (price !== undefined) updates.price = Number(price);
     if (priceMax !== undefined) {
       updates.priceMax = priceMax !== null && priceMax !== '' ? Number(priceMax) : null;
     }
-    if (description !== undefined) updates.description = description;
+    if (description !== undefined) {
+      updates.description = typeof description === 'string' ? description.trim().slice(0, 1000) : description;
+    }
     if (bufferAfterMinutes !== undefined) {
       updates.bufferAfterMinutes = bufferAfterMinutes !== null ? Number(bufferAfterMinutes) : 0;
     }
@@ -108,7 +115,7 @@ export const updateService = async (req: Request, res: Response) => {
       updates.canExceedClosingTime = Boolean(canExceedClosingTime);
     }
     if (latestStartTime !== undefined) {
-      updates.latestStartTime = latestStartTime || null;
+      updates.latestStartTime = typeof latestStartTime === 'string' && latestStartTime.trim() ? latestStartTime.trim() : null;
     }
 
     // Scope to tenant — prevents cross-tenant updates
