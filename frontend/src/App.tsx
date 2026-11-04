@@ -1662,7 +1662,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-3 pb-28">
+                      <div className="flex flex-col gap-2.5 pb-28">
                         {isLoading ? (
                           Array.from({ length: 5 }).map((_, i) => (
                             <ServiceSelectionCardSkeleton key={i} />
@@ -2758,14 +2758,14 @@ function StepIndicator({
 
 function ServiceSelectionCardSkeleton() {
   return (
-    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[#F0D5DE] bg-white overflow-hidden animate-pulse">
-      <div className="flex-1 space-y-2.5">
-        <div className="h-4 w-2/3 bg-[#FCE2EA] rounded-full" />
-        <div className="h-3 w-1/3 bg-[#FCE2EA] rounded-full" />
+    <div className="flex flex-row items-center justify-between p-3.5 sm:p-4 gap-3.5 rounded-xl sm:rounded-2xl border border-[#F0D5DE] bg-white overflow-hidden animate-pulse">
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-1/2 bg-[#FCE2EA] rounded-full" />
+        <div className="h-3 w-16 bg-[#FCE2EA] rounded-full" />
       </div>
-      <div className="flex flex-col items-end gap-3">
-        <div className="w-6 h-6 rounded-full bg-[#FCE2EA]" />
-        <div className="h-3.5 w-14 bg-[#FCE2EA] rounded-full" />
+      <div className="flex flex-col items-end gap-2.5 shrink-0">
+        <div className="w-5 h-5 rounded-full bg-[#FCE2EA]" />
+        <div className="h-3.5 w-16 bg-[#FCE2EA] rounded-full" />
       </div>
     </div>
   );
@@ -2804,37 +2804,32 @@ function ServiceSelectionCard({
         }
       }}
       className={`
-        group flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden backdrop-blur-md
+        group flex flex-row items-center justify-between p-3.5 sm:p-4 gap-3.5 cursor-pointer transition-all duration-300 rounded-xl sm:rounded-2xl border relative overflow-hidden backdrop-blur-md
         ${isSelected
           ? 'bg-[#FFF5F8]/95 border-[#C4466F] shadow-luxury'
           : 'bg-white/85 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F]/70 hover:shadow-soft'}
       `}
       onClick={onSelect}
     >
-      <div className="flex-1 min-w-0 space-y-1.5">
+      <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-sans font-bold text-[16px] text-[#231F1D] leading-snug">{service.name}</h3>
+          <h3 className="font-sans font-bold text-[15px] sm:text-[16px] text-[#231F1D] leading-snug">{service.name}</h3>
           {selectionOrder && (
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white shadow-2xs ${selectionOrder === 1 ? 'bg-[#C4466F]' : 'bg-[#231F1D]'}`}>
+            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase text-white shadow-2xs ${selectionOrder === 1 ? 'bg-[#C4466F]' : 'bg-[#231F1D]'}`}>
               {selectionOrder === 1 ? '1st Service' : '2nd Service'}
             </span>
           )}
         </div>
-        {service.description && (
-          <p className="text-xs text-[#6E655F] line-clamp-2 leading-relaxed">
-            {service.description}
-          </p>
-        )}
-        <div className="flex items-center gap-2 pt-0.5">
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF8F5] border border-[#F0D5DE] text-[11px] font-semibold text-[#523E46]">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF8F5] border border-[#F0D5DE] text-[10px] sm:text-[11px] font-semibold text-[#523E46]">
             <Clock size={11} className="text-[#C4466F]" />
             <span>{formatServiceDurationBadge(service.duration)}</span>
           </span>
         </div>
       </div>
-      <div className="flex flex-col items-end justify-between gap-3 shrink-0">
-        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-[#C4466F] bg-[#C4466F] scale-105 shadow-2xs' : 'border-[#EAD3DA] bg-white group-hover:border-[#C4466F]'}`}>
-          {isSelected && <Check size={13} strokeWidth={3} className="text-white" />}
+      <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
+        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-[#C4466F] bg-[#C4466F] scale-105 shadow-2xs' : 'border-[#EAD3DA] bg-white group-hover:border-[#C4466F]'}`}>
+          {isSelected && <Check size={11} strokeWidth={3} className="text-white" />}
         </div>
         <p className="font-extrabold text-sm text-[#231F1D] tracking-tight">{formatPrice(service.price, service.priceMax)}</p>
       </div>
