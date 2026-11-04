@@ -1638,7 +1638,7 @@ export default function App() {
                         </div>
 
                         {/* Category Chips */}
-                        <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+                        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide py-0.5">
                           {['All Services', 'Hair Care', 'Sisterlocks', 'Treatments'].map((cat, idx) => {
                             const isActive = (cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()));
                             return (
@@ -1650,9 +1650,9 @@ export default function App() {
                                   else setSearchQuery(cat.split(' ')[0]);
                                 }}
                                 aria-pressed={Boolean(isActive)}
-                                className={`min-h-[38px] px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 border cursor-pointer ${isActive
-                                  ? 'bg-[#231F1D] text-white border-[#231F1D] shadow-xs ring-2 ring-[#C4466F]/35'
-                                  : 'bg-white/80 text-[#523E46] border-[#F0D5DE] hover:border-[#C4466F] hover:bg-white'
+                                className={`px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all duration-200 border cursor-pointer ${isActive
+                                  ? 'bg-[#231F1D] text-white border-[#231F1D] shadow-2xs'
+                                  : 'bg-white/80 text-[#523E46] border-[#F0D5DE] hover:border-[#C4466F]/60 hover:text-[#C4466F] hover:bg-white'
                                   }`}
                               >
                                 {cat}
@@ -1824,8 +1824,6 @@ export default function App() {
                         aria-label="Selected appointment summary"
                         className="relative overflow-hidden bg-white/85 backdrop-blur-md p-5 sm:p-6 rounded-2xl border border-[rgba(240,213,222,0.85)] shadow-luxury space-y-4"
                       >
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C4466F] via-[#D4A359] to-[#C4466F] opacity-85" />
-
                         <div className="flex items-start justify-between gap-3 border-b border-[rgba(240,213,222,0.6)] pb-3.5">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -2112,9 +2110,6 @@ export default function App() {
 
                       {/* 2. Official Salon Pass / Reference Card */}
                       <div className="w-full relative overflow-hidden bg-white/90 backdrop-blur-md border border-[rgba(240,213,222,0.85)] rounded-2xl p-6 sm:p-7 text-left shadow-luxury transition-all duration-300">
-                        {/* Decorative subtle luxury accent bar on top */}
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C4466F] via-[#D4A359] to-[#C4466F] opacity-80" />
-
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-2">
@@ -2581,8 +2576,6 @@ export default function App() {
 
                                   return (
                                     <div key={booking._id} className="relative overflow-hidden border border-[rgba(240,213,222,0.85)] p-5 sm:p-6 space-y-4 bg-white/85 backdrop-blur-md rounded-2xl shadow-luxury">
-                                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C4466F] via-[#D4A359] to-[#C4466F] opacity-80" />
-
                                       <div className="flex justify-between items-center border-b border-[rgba(240,213,222,0.6)] pb-3">
                                         <span className="font-mono font-black text-sm text-[#231F1D]">#{booking.reference || 'FLO-PASS'}</span>
                                         <span className={`text-[10px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full border ${booking.status === 'confirmed'
