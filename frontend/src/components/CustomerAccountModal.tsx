@@ -711,7 +711,7 @@ export function CustomerAccountModal({
 
         {/* Modal Footer */}
         <div className="px-6 py-4 border-t border-brand-gray-200 bg-brand-white flex items-center justify-between text-xs text-brand-gray-500 font-normal">
-          <span>Flo Sisterlocks • Client Concierge</span>
+          <span>Flo Sisterlocks Client Concierge</span>
           <button
             type="button"
             onClick={onClose}
