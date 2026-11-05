@@ -1136,31 +1136,143 @@ export default function App() {
 
   if (tenantError) {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-6 font-sans">
-        <div className="border border-[#F0D5DE] bg-white p-8 sm:p-10 space-y-6 shadow-luxury max-w-sm w-full text-center rounded-2xl">
-          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border border-[#F0D5DE] shadow-xs bg-black flex items-center justify-center">
-            <img
-              src="/android-chrome-512x512.png"
-              alt="Flo Sisterlocks"
-              className="w-full h-full object-cover"
-            />
+      <div className="min-h-screen bg-[#FAF8F5] text-[#231F1D] relative overflow-hidden flex flex-col justify-between font-sans selection:bg-[#C4466F]/15">
+        {/* Framer-style architectural grid + radial ambient glow */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#f0d5de40_1px,transparent_1px),linear-gradient(to_bottom,#f0d5de40_1px,transparent_1px)] bg-[size:32px_32px] sm:bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_80%_70%_at_50%_40%,#000_60%,transparent_100%)]"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[340px] sm:w-[640px] h-[340px] sm:h-[420px] rounded-full bg-gradient-to-tr from-[#C4466F]/12 via-[#D4A359]/10 to-transparent blur-3xl"
+        />
+
+        {/* Top Bar (Desktop & Mobile) */}
+        <header className="relative z-10 w-full max-w-5xl mx-auto px-5 sm:px-8 pt-5 sm:pt-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border border-[#F0D5DE] bg-black shadow-xs flex items-center justify-center shrink-0">
+              <img
+                src="/android-chrome-512x512.png"
+                alt="Flo Sisterlocks"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div>
+              <span className="block font-serif font-black text-base sm:text-lg tracking-tight text-[#231F1D] leading-none">
+                Flo Sisterlocks
+              </span>
+              <span className="block text-[10px] uppercase tracking-[0.2em] text-[#6E655F] font-bold mt-1">
+                Client Concierge
+              </span>
+            </div>
           </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-serif font-black tracking-tight text-[#231F1D]">
-              Flo Sisterlocks
-            </h1>
-            <p className="text-sm text-[#6E655F] font-medium leading-relaxed">
-              We will be back online in a few moments. Thank you for your patience.
-            </p>
+
+          <div className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-[#F0D5DE] shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#231F1D]">
+              Updating
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="w-full bg-[#231F1D] text-white py-3.5 rounded-full font-bold uppercase tracking-wider text-xs shadow-md hover:bg-[#C4466F] transition-all cursor-pointer"
+        </header>
+
+        {/* Main Centerpiece (Desktop Editorial Layout + Mobile Card Stack) */}
+        <main className="relative z-10 flex-1 flex items-center justify-center px-5 sm:px-8 py-10 sm:py-16">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            className="w-full max-w-2xl mx-auto text-center space-y-8 sm:space-y-10"
           >
-            Refresh Page
-          </button>
-        </div>
+            {/* Hero Copy */}
+            <div className="space-y-4 sm:space-y-5">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#C4466F]/10 border border-[#C4466F]/20 text-[#C4466F] text-[11px] font-extrabold uppercase tracking-[0.22em]">
+                <Clock size={13} className="shrink-0" />
+                <span>Brief Scheduled Refresh</span>
+              </div>
+
+              <h1 className="text-3xl sm:text-5xl lg:text-[54px] font-serif font-black tracking-tight text-[#231F1D] leading-[1.12]">
+                We&apos;ll be back online in a few moments.
+              </h1>
+
+              <p className="text-sm sm:text-base lg:text-lg text-[#6E655F] font-medium max-w-xl mx-auto leading-relaxed">
+                Thank you for your patience while we fine-tune our booking studio. All existing appointments remain safely confirmed.
+              </p>
+            </div>
+
+            {/* Action Buttons (Full-width stack on Mobile, Side-by-side Pill Row on Desktop) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 max-w-md sm:max-w-none mx-auto">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-full bg-[#231F1D] text-white font-bold uppercase tracking-[0.16em] text-xs shadow-luxury hover:bg-[#C4466F] active:scale-[0.98] transition-all cursor-pointer min-h-[48px]"
+              >
+                <Loader2 size={15} className="animate-spin" />
+                <span>Refresh Page</span>
+              </button>
+
+              <a
+                href="https://wa.me/254783746104?text=Hi%20Flo%20Sisterlocks%2C%20I%20would%20like%20to%20inquire%20about%20an%20appointment."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-full bg-white/90 backdrop-blur-md border border-[#F0D5DE] text-[#231F1D] font-bold uppercase tracking-[0.16em] text-xs shadow-2xs hover:border-[#C4466F] hover:text-[#C4466F] active:scale-[0.98] transition-all min-h-[48px]"
+              >
+                <MessageCircle size={15} className="text-emerald-600 shrink-0" />
+                <span>Chat on WhatsApp</span>
+              </a>
+            </div>
+
+            {/* Flowstep-style 3-Card Bento Status Strip (1 col Mobile, 3 cols Desktop) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-left pt-2">
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/85 backdrop-blur-md border border-[#F0D5DE] shadow-2xs flex sm:flex-col items-center sm:items-start gap-3.5 sm:gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-700 flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={17} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6E655F]">
+                    Saved Bookings
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-[#231F1D] mt-0.5">
+                    100% Safe &amp; Confirmed
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/85 backdrop-blur-md border border-[#F0D5DE] shadow-2xs flex sm:flex-col items-center sm:items-start gap-3.5 sm:gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-700 flex items-center justify-center shrink-0">
+                  <Clock size={17} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6E655F]">
+                    Estimated Wait
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-[#231F1D] mt-0.5">
+                    Just a Few Moments
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/85 backdrop-blur-md border border-[#F0D5DE] shadow-2xs flex sm:flex-col items-center sm:items-start gap-3.5 sm:gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#C4466F]/10 border border-[#C4466F]/20 text-[#C4466F] flex items-center justify-center shrink-0">
+                  <Phone size={17} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6E655F]">
+                    Instant Support
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-[#231F1D] mt-0.5">
+                    WhatsApp AI Active 24/7
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </main>
+
+        {/* Minimal Footer */}
+        <footer className="relative z-10 w-full max-w-5xl mx-auto px-5 sm:px-8 pb-6 sm:pb-8 text-center sm:flex sm:items-center sm:justify-between text-[11px] text-[#6E655F] font-medium">
+          <p>Flo Sisterlocks • Certified Sisterlocks™ &amp; Natural Hair Studio</p>
+          <p className="mt-1 sm:mt-0 text-[#8C827B]">Nairobi, Kenya</p>
+        </footer>
       </div>
     );
   }
@@ -1526,7 +1638,7 @@ export default function App() {
                         </div>
 
                         {/* Category Chips */}
-                        <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+                        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide py-0.5">
                           {['All Services', 'Hair Care', 'Sisterlocks', 'Treatments'].map((cat, idx) => {
                             const isActive = (cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()));
                             return (
@@ -1538,9 +1650,9 @@ export default function App() {
                                   else setSearchQuery(cat.split(' ')[0]);
                                 }}
                                 aria-pressed={Boolean(isActive)}
-                                className={`min-h-[38px] px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 border cursor-pointer ${isActive
-                                  ? 'bg-[#231F1D] text-white border-[#231F1D] shadow-xs ring-2 ring-[#C4466F]/35'
-                                  : 'bg-white/80 text-[#523E46] border-[#F0D5DE] hover:border-[#C4466F] hover:bg-white'
+                                className={`px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all duration-200 border cursor-pointer ${isActive
+                                  ? 'bg-[#231F1D] text-white border-[#231F1D] shadow-2xs'
+                                  : 'bg-white/80 text-[#523E46] border-[#F0D5DE] hover:border-[#C4466F]/60 hover:text-[#C4466F] hover:bg-white'
                                   }`}
                               >
                                 {cat}
@@ -1550,7 +1662,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-3 pb-28">
+                      <div className="flex flex-col gap-2.5 pb-28">
                         {isLoading ? (
                           Array.from({ length: 5 }).map((_, i) => (
                             <ServiceSelectionCardSkeleton key={i} />
@@ -1712,8 +1824,6 @@ export default function App() {
                         aria-label="Selected appointment summary"
                         className="relative overflow-hidden bg-white/85 backdrop-blur-md p-5 sm:p-6 rounded-2xl border border-[rgba(240,213,222,0.85)] shadow-luxury space-y-4"
                       >
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C4466F] via-[#D4A359] to-[#C4466F] opacity-85" />
-
                         <div className="flex items-start justify-between gap-3 border-b border-[rgba(240,213,222,0.6)] pb-3.5">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -2000,9 +2110,6 @@ export default function App() {
 
                       {/* 2. Official Salon Pass / Reference Card */}
                       <div className="w-full relative overflow-hidden bg-white/90 backdrop-blur-md border border-[rgba(240,213,222,0.85)] rounded-2xl p-6 sm:p-7 text-left shadow-luxury transition-all duration-300">
-                        {/* Decorative subtle luxury accent bar on top */}
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C4466F] via-[#D4A359] to-[#C4466F] opacity-80" />
-
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-2">
@@ -2469,8 +2576,6 @@ export default function App() {
 
                                   return (
                                     <div key={booking._id} className="relative overflow-hidden border border-[rgba(240,213,222,0.85)] p-5 sm:p-6 space-y-4 bg-white/85 backdrop-blur-md rounded-2xl shadow-luxury">
-                                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#C4466F] via-[#D4A359] to-[#C4466F] opacity-80" />
-
                                       <div className="flex justify-between items-center border-b border-[rgba(240,213,222,0.6)] pb-3">
                                         <span className="font-mono font-black text-sm text-[#231F1D]">#{booking.reference || 'FLO-PASS'}</span>
                                         <span className={`text-[10px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full border ${booking.status === 'confirmed'
@@ -2646,14 +2751,14 @@ function StepIndicator({
 
 function ServiceSelectionCardSkeleton() {
   return (
-    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[#F0D5DE] bg-white overflow-hidden animate-pulse">
-      <div className="flex-1 space-y-2.5">
-        <div className="h-4 w-2/3 bg-[#FCE2EA] rounded-full" />
-        <div className="h-3 w-1/3 bg-[#FCE2EA] rounded-full" />
+    <div className="flex flex-row items-center justify-between p-3.5 sm:p-4 gap-3.5 rounded-xl sm:rounded-2xl border border-[#F0D5DE] bg-white overflow-hidden animate-pulse">
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-1/2 bg-[#FCE2EA] rounded-full" />
+        <div className="h-3 w-16 bg-[#FCE2EA] rounded-full" />
       </div>
-      <div className="flex flex-col items-end gap-3">
-        <div className="w-6 h-6 rounded-full bg-[#FCE2EA]" />
-        <div className="h-3.5 w-14 bg-[#FCE2EA] rounded-full" />
+      <div className="flex flex-col items-end gap-2.5 shrink-0">
+        <div className="w-5 h-5 rounded-full bg-[#FCE2EA]" />
+        <div className="h-3.5 w-16 bg-[#FCE2EA] rounded-full" />
       </div>
     </div>
   );
@@ -2692,37 +2797,32 @@ function ServiceSelectionCard({
         }
       }}
       className={`
-        group flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden backdrop-blur-md
+        group flex flex-row items-center justify-between p-3.5 sm:p-4 gap-3.5 cursor-pointer transition-all duration-300 rounded-xl sm:rounded-2xl border relative overflow-hidden backdrop-blur-md
         ${isSelected
           ? 'bg-[#FFF5F8]/95 border-[#C4466F] shadow-luxury'
           : 'bg-white/85 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F]/70 hover:shadow-soft'}
       `}
       onClick={onSelect}
     >
-      <div className="flex-1 min-w-0 space-y-1.5">
+      <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-sans font-bold text-[16px] text-[#231F1D] leading-snug">{service.name}</h3>
+          <h3 className="font-sans font-bold text-[15px] sm:text-[16px] text-[#231F1D] leading-snug">{service.name}</h3>
           {selectionOrder && (
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white shadow-2xs ${selectionOrder === 1 ? 'bg-[#C4466F]' : 'bg-[#231F1D]'}`}>
+            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase text-white shadow-2xs ${selectionOrder === 1 ? 'bg-[#C4466F]' : 'bg-[#231F1D]'}`}>
               {selectionOrder === 1 ? '1st Service' : '2nd Service'}
             </span>
           )}
         </div>
-        {service.description && (
-          <p className="text-xs text-[#6E655F] line-clamp-2 leading-relaxed">
-            {service.description}
-          </p>
-        )}
-        <div className="flex items-center gap-2 pt-0.5">
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF8F5] border border-[#F0D5DE] text-[11px] font-semibold text-[#523E46]">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF8F5] border border-[#F0D5DE] text-[10px] sm:text-[11px] font-semibold text-[#523E46]">
             <Clock size={11} className="text-[#C4466F]" />
             <span>{formatServiceDurationBadge(service.duration)}</span>
           </span>
         </div>
       </div>
-      <div className="flex flex-col items-end justify-between gap-3 shrink-0">
-        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-[#C4466F] bg-[#C4466F] scale-105 shadow-2xs' : 'border-[#EAD3DA] bg-white group-hover:border-[#C4466F]'}`}>
-          {isSelected && <Check size={13} strokeWidth={3} className="text-white" />}
+      <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
+        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-[#C4466F] bg-[#C4466F] scale-105 shadow-2xs' : 'border-[#EAD3DA] bg-white group-hover:border-[#C4466F]'}`}>
+          {isSelected && <Check size={11} strokeWidth={3} className="text-white" />}
         </div>
         <p className="font-extrabold text-sm text-[#231F1D] tracking-tight">{formatPrice(service.price, service.priceMax)}</p>
       </div>
