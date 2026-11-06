@@ -4,6 +4,8 @@ import App from './App.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import { TenantProvider } from './hooks/useTenant.tsx';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Register the service worker for PWA functionality.
 // onNeedRefresh fires when a new SW is installed and waiting.
@@ -33,6 +35,8 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <TenantProvider>
       <App />
+      <Analytics />
+      <SpeedInsights />
     </TenantProvider>
   </StrictMode>,
 );

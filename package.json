@@ -17,6 +17,8 @@
     "concurrently": "^9.1.0"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.1.0",
     "web-push": "^3.6.7"
   }
 }
