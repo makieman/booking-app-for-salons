@@ -1477,7 +1477,11 @@ export default function App() {
                         ))}
                       </div>
 
-                      <div className="flex flex-col gap-3 pb-24">
+                      <div className={`flex flex-col gap-3 pb-24 transition-all duration-500 ${
+                        isScrolled
+                          ? '[mask-image:linear-gradient(to_bottom,transparent_0px,black_32px,black_calc(100%-40px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0px,black_32px,black_calc(100%-40px),transparent_100%)]'
+                          : '[mask-image:linear-gradient(to_bottom,black_0px,black_calc(100%-40px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0px,black_calc(100%-40px),transparent_100%)]'
+                      }`}>
                         {isLoading ? (
                           Array.from({ length: 5 }).map((_, i) => (
                             <ServiceSelectionCardSkeleton key={i} />
@@ -2365,10 +2369,13 @@ function ServiceSelectionCard({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y: 22, scale: 0.98 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, margin: '-20px' }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
+      transition={{
+        duration: 0.45,
+        ease: [0.16, 1, 0.3, 1],
+      }}
       whileTap={{ scale: 0.99 }}
       className={`
         flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden backdrop-blur-md
