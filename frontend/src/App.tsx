@@ -38,8 +38,16 @@ export default function App() {
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const y = window.scrollY;
+          setIsScrolled(prev => (prev ? y > 8 : y > 24));
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -1271,15 +1279,15 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <header className={`px-4 sm:px-8 flex justify-between items-center sticky top-0 z-40 transition-all duration-300 ${
+        <header className={`px-4 sm:px-8 py-4 sm:py-5 flex justify-between items-center z-40 transition-[background-color,border-color,box-shadow] duration-300 ${
+          viewMode === 'admin' && ownerToken ? 'relative lg:hidden' : 'sticky top-0'
+        } ${
           isScrolled
-            ? 'py-3 sm:py-4 bg-white/90 backdrop-blur-md shadow-xs border-b border-[#F0D5DE]/80'
-            : 'py-6 sm:py-10 bg-brand-white border-b border-brand-gray-100'
-        } ${viewMode === 'admin' && ownerToken ? 'lg:hidden' : ''}`}>
+            ? 'bg-white/95 backdrop-blur-md shadow-xs border-b border-[#F0D5DE]/80'
+            : 'bg-brand-white border-b border-brand-gray-100'
+        }`}>
           <div className="flex items-center gap-4 sm:gap-5 cursor-pointer group" onClick={resetFlow}>
-            <div className={`flex items-center justify-center transition-all duration-300 group-hover:scale-105 ${
-              isScrolled ? 'h-10 w-10 sm:h-12 sm:w-12' : 'h-16 w-16'
-            }`}>
+            <div className="h-12 w-12 sm:h-14 sm:w-14 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
               <img
                 src={tenant?.branding?.logoUrl || "/logo-bg.jpg"}
                 alt={tenant?.name || "Salon Logo"}
@@ -1477,11 +1485,7 @@ export default function App() {
                         ))}
                       </div>
 
-                      <div className={`flex flex-col gap-3 pb-24 transition-all duration-500 ${
-                        isScrolled
-                          ? '[mask-image:linear-gradient(to_bottom,transparent_0px,black_32px,black_calc(100%-40px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,transparent_0px,black_32px,black_calc(100%-40px),transparent_100%)]'
-                          : '[mask-image:linear-gradient(to_bottom,black_0px,black_calc(100%-40px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0px,black_calc(100%-40px),transparent_100%)]'
-                      }`}>
+                      <div className="flex flex-col gap-3 pb-24">
                         {isLoading ? (
                           Array.from({ length: 5 }).map((_, i) => (
                             <ServiceSelectionCardSkeleton key={i} />
