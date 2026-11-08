@@ -9,7 +9,9 @@ import {
   sendWhatsAppFreeText,
   sendWhatsAppBookingConfirmed,
   sendWhatsAppBookingCancelled,
+  sendWhatsAppBusinessContactCard,
 } from '../services/whatsappService';
+import { handleCustomerQuestionWithAI } from '../services/aiReceptionistService';
 import { sendPushToAdmins } from '../services/pushService';
 
 // ── Meta webhook payload shape (typed just enough for our use-case) ────────────
@@ -244,31 +246,59 @@ async function processMessage(
   const senderPhone = message.from; // E.164 without '+', e.g. '254712345678'
   const tenantId    = tenant._id.toString();
 
-  // We only handle interactive button_reply messages.
-  // Any other message type (text, image, audio, etc.) gets a gentle nudge.
-  if (message.type !== 'interactive') {
-    console.log(`[webhookController] Ignoring non-interactive message type="${message.type}" from ${senderPhone}`);
-    void sendWhatsAppFreeText(
-      senderPhone,
-      `Hi! To manage your booking please use the buttons in our confirmation message, or visit our website. 😊`,
-    );
+  let buttonId: string | null = null;
+
+  if (message.type === 'interactive') {
+    const interactive = (message as WaInteractiveMessage).interactive;
+    if (interactive?.type === 'button_reply') {
+      buttonId = interactive.button_reply.id;
+    }
+  } else if (message.type === 'text') {
+    const rawText = ((message as WaTextMessage).text?.body ?? '').trim().toUpperCase();
+    if (rawText === 'CONFIRM' || rawText === 'YES' || rawText === '1' || rawText === 'CONFIRM_BOOKING') {
+      buttonId = BTN_CONFIRM;
+    } else if (rawText === 'CANCEL' || rawText === '2' || rawText === 'CANCEL_BOOKING') {
+      buttonId = BTN_CANCEL;
+    } else if (rawText === 'RESCHEDULE' || rawText === '3' || rawText === 'RESCHEDULE_BOOKING') {
+      buttonId = BTN_RESCHEDULE;
+    }
+  }
+
+  // Normalize: strip leading '+' so it matches the stored format, plus local 07/01 format
+  const normalizedPhone = senderPhone.startsWith('+') ? senderPhone.slice(1) : senderPhone;
+  const localZeroPhone = normalizedPhone.startsWith('254') && normalizedPhone.length === 12
+    ? `0${normalizedPhone.slice(3)}`
+    : normalizedPhone;
+  const spacedLocalPhone = localZeroPhone.length === 10
+    ? `${localZeroPhone.slice(0, 4)} ${localZeroPhone.slice(4, 7)} ${localZeroPhone.slice(7)}`
+    : localZeroPhone;
+  const phoneVariants = Array.from(new Set([
+    normalizedPhone,
+    `+${normalizedPhone}`,
+    localZeroPhone,
+    spacedLocalPhone,
+  ]));
+
+  if (!buttonId) {
+    const customerText = message.type === 'text' ? ((message as WaTextMessage).text?.body ?? '').trim() : 'Hi';
+    console.log(`[webhookController] Customer question from ${senderPhone}: "${customerText}" — answering via Live DB AI Receptionist`);
+    try {
+      const aiReply = await handleCustomerQuestionWithAI(customerText, tenant, senderPhone, phoneVariants);
+      void sendWhatsAppFreeText(senderPhone, aiReply);
+      void sendWhatsAppBusinessContactCard(senderPhone);
+    } catch (err) {
+      console.error('[webhookController] AI Receptionist error:', err);
+      void sendWhatsAppFreeText(
+        senderPhone,
+        `*${tenant.name}*\n\nHi! 👋 Welcome to ${tenant.name}. To manage your active booking via WhatsApp, reply with:\n• *CONFIRM* (or *1*) to confirm your appointment\n• *RESCHEDULE* (or *3*) to see available slots\n• *CANCEL* (or *2*) to cancel your appointment`,
+      );
+    }
     return;
   }
 
-  const interactive = (message as WaInteractiveMessage).interactive;
-  if (interactive?.type !== 'button_reply') {
-    console.log(`[webhookController] Ignoring interactive type="${interactive?.type}" from ${senderPhone}`);
-    return;
-  }
-
-  const buttonId = interactive.button_reply.id;
-  console.log(`[webhookController] Button "${buttonId}" from ${senderPhone} | tenant=${tenant.slug}`);
+  console.log(`[webhookController] Action "${buttonId}" from ${senderPhone} | tenant=${tenant.slug}`);
 
   // ── Find customer's most recent active booking (scoped to this tenant) ──
-  // Normalize: strip leading '+' so it matches the stored format
-  const normalizedPhone = senderPhone.startsWith('+') ? senderPhone.slice(1) : senderPhone;
-  // Also try with '+' prefix in case stored that way
-  const phoneVariants = [normalizedPhone, `+${normalizedPhone}`];
 
   let booking;
   try {

@@ -64,99 +64,75 @@ registerRoute(
 );
 
 self.addEventListener('push', (event: PushEvent) => {
-  if (!event.data) return;
-
   event.waitUntil(
     (async () => {
-      let rawJson: any;
-      try {
-        rawJson = event.data.json();
-      } catch (e) {
-        console.error('[SW] Failed to parse push payload as JSON:', e);
-        return;
+      let rawJson: any = null;
+      if (event.data) {
+        try {
+          rawJson = event.data.json();
+        } catch {
+          try {
+            const text = event.data.text();
+            rawJson = { title: 'Flo Sisterlocks', body: text };
+          } catch {}
+        }
       }
 
-      if (!rawJson || !rawJson.title || !rawJson.body) {
-        console.warn('[SW] Push payload missing title or body:', rawJson);
-        return;
-      }
+      // Fall back to default title/body if payload is missing or incomplete
+      const title = rawJson?.title || 'Flo Sisterlocks';
+      const body = rawJson?.body || 'You have an update regarding your appointment.';
+      const url = rawJson?.url || '/';
+      const sound = rawJson?.sound || 'default';
+      const notificationId = rawJson?.id || rawJson?.tag || `flo-booking-${Date.now()}`;
 
-      const { title, body, url = '/', sound = 'default' } = rawJson;
-      // Use backend ID or tag if provided, otherwise generate one
-      const notificationId = rawJson.id || rawJson.tag || `flo-booking-${Date.now()}`;
-
+      // Duplicate check for IndexedDB: may skip saving to local DB, but MUST NEVER suppress showNotification
+      let isDuplicate = false;
       try {
         const existing = await getNotifications();
-        const isDuplicate = existing.some(
+        isDuplicate = existing.some(
           (n) => n.id === notificationId || 
           (n.title === title && n.body === body && Date.now() - n.timestamp < 5000)
         );
-        if (isDuplicate) {
-          console.log('[SW] Duplicate push notification blocked:', notificationId);
-          return;
-        }
       } catch (err) {
         console.warn('[SW] Duplicate check failed, continuing:', err);
       }
 
-      // Save notification to IndexedDB
-      try {
-        await saveNotification({
-          id: notificationId,
-          title,
-          body,
-          url,
-          sound,
-          timestamp: Date.now(),
-          read: false,
-        });
-      } catch (err) {
-        console.error('[SW] Failed to save notification to IndexedDB:', err);
+      if (!isDuplicate) {
+        try {
+          await saveNotification({
+            id: notificationId,
+            title,
+            body,
+            url,
+            sound,
+            timestamp: Date.now(),
+            read: false,
+          });
+        } catch (err) {
+          console.error('[SW] Failed to save notification to IndexedDB:', err);
+        }
       }
 
-      // Check for visible window clients before calling showNotification
-      const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const hasVisibleWindow = windowClients.some(
-        (client) => (client as any).visibilityState === 'visible'
-      );
-
-      // Determine silent and vibrate options:
-      // If sound is 'silent': always silent: true and no vibration
-      // If a visible window exists: silent: true so page plays custom audio without OS double sound
-      // If no visible window exists (background / closed): silent: false so OS plays system sound
+      // Do NOT set silent:true unless the user's explicit preference is 'silent'
       const isSilentPref = sound === 'silent';
-      let notificationSilent: boolean;
-      let notificationVibrate: number[];
+      const notificationVibrate = isSilentPref ? [] : [100, 50, 100];
 
-      if (isSilentPref) {
-        notificationSilent = true;
-        notificationVibrate = [];
-      } else if (hasVisibleWindow) {
-        notificationSilent = true;
-        notificationVibrate = [100, 50, 100];
-      } else {
-        notificationSilent = false;
-        notificationVibrate = [100, 50, 100];
-      }
-
-      // Show the notification
+      // Every push event must end in showNotification. The notification `tag` prevents duplicate banners at the OS level
       await self.registration.showNotification(title, {
         body,
         icon:     '/android-chrome-192x192.png',
         badge:    '/favicon-32x32.png',
-        silent:   notificationSilent,
+        silent:   isSilentPref,
         vibrate:  notificationVibrate,
-        tag:      notificationId,   // unique tag — prevents silent replacement
+        tag:      notificationId,
         renotify: true,
         data:     { url, sound },
       } as any);
 
-      // Tell open app windows to reload and play sound if visible
+      // Notify any open windows to update in-app notification indicators
+      const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       for (const client of windowClients) {
         client.postMessage({ type: 'PUSH_NOTIFICATION_RECEIVED', id: notificationId });
-        if (!isSilentPref && hasVisibleWindow) {
-          client.postMessage({ type: 'PLAY_NOTIFICATION_SOUND', sound });
-        }
       }
     })()
   );

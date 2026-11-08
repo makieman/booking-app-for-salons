@@ -17,14 +17,24 @@ services:
       - key: ADMIN_EMAIL
         sync: false
       - key: FROM_EMAIL
-        value: onboarding@resend.dev
+        sync: false
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
       - key: VAPID_MAILTO
         sync: false
-      - key: JWT_SECRET
+      - key: SMS_PROVIDER
         sync: false
-      - key: OWNER_PIN
+      - key: AT_USERNAME
+        sync: false
+      - key: AT_API_KEY
+        sync: false
+      - key: SMS_SENDER_ID
+        sync: false
+      - key: SMS_TOPUP_CONTACT
+        sync: false
+      - key: PLATFORM_ADMIN_KEY
+        sync: false
+      - key: JWT_SECRET
         sync: false

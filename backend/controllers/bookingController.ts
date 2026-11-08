@@ -11,9 +11,30 @@ import {
 } from '../services/emailService';
 import { sendPushToPhone, sendPushToAdmins, sendPushToAttendant } from '../services/pushService';
 import { sendWhatsAppBookingReceived, sendWhatsAppBookingCancelled, sendWhatsAppRescheduled } from '../services/whatsappService';
+import { sendBookingReceivedSms, sendBookingCancelledSms, sendBookingRescheduledSms } from '../services/smsService';
 
 import mongoose from 'mongoose';
 import { MAX_SERVICES, isAttendantFree } from '../services/slotService';
+import { normalizeKenyanPhone } from '../utils/phoneNormalizer';
+
+/**
+ * Masks phone numbers to protect customer privacy under Kenya's Data Protection Act.
+ * e.g. "0712345678" -> "07•• ••• 678", "+254712345678" -> "+254 7•• ••• 678"
+ */
+export function maskPhone(phone: string): string {
+  if (!phone || typeof phone !== 'string') return '••• ••• •••';
+  const trimmed = phone.trim();
+  if (trimmed.startsWith('+254') && trimmed.length === 13) {
+    return `+254 ${trimmed.slice(4, 5)}•• ••• ${trimmed.slice(-3)}`;
+  }
+  if (trimmed.startsWith('0') && trimmed.length === 10) {
+    return `${trimmed.slice(0, 2)}•• ••• ${trimmed.slice(-3)}`;
+  }
+  if (trimmed.length >= 7) {
+    return `${trimmed.slice(0, 2)}•• ••• ${trimmed.slice(-3)}`;
+  }
+  return '••• ••• •••';
+}
 
 /**
  * Generates a unique human-friendly booking reference (e.g. LMN-XXXXX) for a tenant.
@@ -51,14 +72,59 @@ export async function generateUniqueBookingReference(tenantId: mongoose.Types.Ob
 export const createBooking = async (req: Request, res: Response) => {
   try {
     const tenantId = req.tenant!._id;
-    const { customerName, phone, email, date, startTime } = req.body;
+    const { customerName, phone, email, date, startTime, hp, website, honeypot } = req.body;
 
-    if (!customerName || !phone || !date || !startTime) {
+    // 1. Bot honeypot: reject automated submissions with 400
+    if (hp || website || honeypot) {
+      return res.status(400).json({ error: 'Invalid booking submission' });
+    }
+
+    if (
+      typeof customerName !== 'string' ||
+      typeof phone !== 'string' ||
+      typeof date !== 'string' ||
+      typeof startTime !== 'string' ||
+      !customerName.trim() ||
+      !phone.trim() ||
+      !date.trim() ||
+      !startTime.trim()
+    ) {
       return res.status(400).json({ error: 'customerName, phone, date, and startTime are required' });
+    }
+
+    const sanitizedCustomerName = customerName.trim().slice(0, 120);
+    const sanitizedPhone = phone.trim().slice(0, 30);
+    let sanitizedEmail: string | undefined;
+    if (email !== undefined && email !== null && String(email).trim() !== '') {
+      const candidateEmail = String(email).trim().toLowerCase().slice(0, 254);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidateEmail)) {
+        return res.status(400).json({ error: 'Please provide a valid email address' });
+      }
+      sanitizedEmail = candidateEmail;
     }
 
     const bookingRules = req.tenant?.bookingRules;
     const tz = req.tenant?.timezone || 'Africa/Nairobi';
+
+    // 2. Abuse cap: max 3 active (pending/confirmed) future appointments per phone in tenant
+    const normalizedPhone = normalizeKenyanPhone(sanitizedPhone) || sanitizedPhone;
+    const todayStr = DateTime.now().setZone(tz).toISODate()!;
+    const activeFutureRefs = await Booking.distinct('reference', {
+      tenantId,
+      status: { $in: ['pending', 'confirmed'] },
+      date: { $gte: todayStr },
+      $or: [
+        { phone: normalizedPhone },
+        { phone: sanitizedPhone },
+      ],
+    });
+    const activeFutureCount = activeFutureRefs.length;
+
+    if (activeFutureCount >= 3) {
+      return res.status(400).json({
+        error: 'You have reached the maximum of 3 active appointments. Please complete or cancel existing appointments before booking more.',
+      });
+    }
 
     // Check salon holidays
     if (bookingRules?.holidays && bookingRules.holidays.includes(date)) {
@@ -101,6 +167,9 @@ export const createBooking = async (req: Request, res: Response) => {
     });
 
     let currentCursor = DateTime.fromISO(`${date}T${startTime}`, { zone: tz });
+    if (!currentCursor.isValid) {
+      return res.status(400).json({ error: 'Invalid date or startTime format' });
+    }
     const resolvedSegments: Array<{
       service: any;
       attendant: any;
@@ -236,60 +305,85 @@ export const createBooking = async (req: Request, res: Response) => {
     }
 
     // Atomic insert with transaction / rollback fallback
-    let session: mongoose.ClientSession | null = null;
-    let inTransaction = false;
-    try {
-      session = await mongoose.startSession();
-      session.startTransaction();
-      inTransaction = true;
-    } catch {
-      session = null;
-    }
+    const buildSegmentDoc = (seg: (typeof resolvedSegments)[number]) =>
+      new Booking({
+        tenantId,
+        reference,
+        groupId,
+        groupOrder: seg.groupOrder,
+        price: seg.service.price,
+        customerName: sanitizedCustomerName,
+        phone: sanitizedPhone,
+        email: sanitizedEmail,
+        serviceId: seg.service._id,
+        attendantId: seg.attendant._id,
+        date,
+        startTime: seg.startTime,
+        endTime: seg.endTime,
+        bufferMinutes: seg.service.bufferAfterMinutes ?? 0,
+        status: 'pending',
+      });
 
-    const createdDocs: any[] = [];
-    try {
-      for (const seg of resolvedSegments) {
-        const doc = new Booking({
-          tenantId,
-          reference,
-          groupId,
-          groupOrder: seg.groupOrder,
-          price: seg.service.price,
-          customerName,
-          phone,
-          email,
-          serviceId: seg.service._id,
-          attendantId: seg.attendant._id,
-          date,
-          startTime: seg.startTime,
-          endTime: seg.endTime,
-          bufferMinutes: seg.service.bufferAfterMinutes ?? 0,
-          status: 'pending',
-        });
-
-        if (inTransaction && session) {
-          await doc.save({ session });
-        } else {
+    const saveWithoutTransaction = async (): Promise<any[]> => {
+      const savedDocs: any[] = [];
+      try {
+        for (const seg of resolvedSegments) {
+          const doc = buildSegmentDoc(seg);
           await doc.save();
+          savedDocs.push(doc);
         }
-        createdDocs.push(doc);
+        return savedDocs;
+      } catch (err) {
+        for (const doc of savedDocs) {
+          await Booking.deleteOne({ _id: doc._id }).catch(() => {});
+        }
+        throw err;
       }
+    };
 
-      if (inTransaction && session) {
-        await session.commitTransaction();
-      }
-    } catch (saveErr) {
-      if (inTransaction && session) {
-        await session.abortTransaction();
-      } else {
-        for (const doc of createdDocs) {
-          await Booking.deleteOne({ _id: doc._id });
+    let createdDocs: any[] = [];
+    if (resolvedSegments.length === 1) {
+      createdDocs = await saveWithoutTransaction();
+    } else {
+      let session: mongoose.ClientSession | null = null;
+      try {
+        session = await Booking.startSession();
+        session.startTransaction();
+        for (const seg of resolvedSegments) {
+          const doc = buildSegmentDoc(seg);
+          await doc.save({ session });
+          createdDocs.push(doc);
         }
-      }
-      throw saveErr;
-    } finally {
-      if (session) {
-        session.endSession();
+        await session.commitTransaction();
+      } catch (txErr: any) {
+        if (session) {
+          try {
+            if (session.inTransaction()) {
+              await session.abortTransaction();
+            }
+          } catch {
+            // ignore abort error
+          }
+        }
+        // If failure was due to session/client mismatch or transaction unsupported, fall back to direct save with manual rollback
+        const isSessionOrTxError =
+          txErr?.name === 'MongoInvalidArgumentError' ||
+          txErr?.message?.includes('ClientSession') ||
+          txErr?.message?.includes('Transaction') ||
+          txErr?.code === 20 || // IllegalOperation (standalone mongod)
+          txErr?.code === 263;
+        if (isSessionOrTxError) {
+          for (const doc of createdDocs) {
+            await Booking.deleteOne({ _id: doc._id }).catch(() => {});
+          }
+          createdDocs = await saveWithoutTransaction();
+        } else {
+          throw txErr;
+        }
+      } finally {
+        if (session) {
+          await session.endSession().catch(() => {});
+        }
       }
     }
 
@@ -312,6 +406,7 @@ export const createBooking = async (req: Request, res: Response) => {
     // Single unified customer notification
     void sendBookingRequestReceived(req.tenant!, primaryBooking, syntheticService, undefined);
     void sendWhatsAppBookingReceived(primaryBooking, syntheticService, undefined);
+    void sendBookingReceivedSms(req.tenant!, primaryBooking, syntheticService);
     void sendAdminNewBookingAlert(req.tenant!, primaryBooking, syntheticService, undefined);
 
     void sendPushToPhone(primaryBooking.phone, {
@@ -353,7 +448,10 @@ export const getBookings = async (req: Request, res: Response) => {
   try {
     const { date } = req.query;
     const query: Record<string, unknown> = { tenantId: req.tenant!._id };
-    if (date) query.date = date as string;
+    if (req.attendant) {
+      query.attendantId = req.attendant.id;
+    }
+    if (date && typeof date === 'string') query.date = date.trim();
     const bookings = await Booking.find(query)
       .populate('serviceId')
       .populate('attendantId', 'name')
@@ -366,52 +464,68 @@ export const getBookings = async (req: Request, res: Response) => {
 
 /**
  * GET /api/bookings/lookup
- * Query: reference or phone — scoped to the resolved tenant.
- * Guarantees all segments in a multi-service group are returned.
+ * Query: reference AND phone — both required to prove appointment ownership.
+ * Removes phone-only scanning. Returns trimmed data (no email, masked phone).
  */
 export const lookupBookings = async (req: Request, res: Response) => {
   try {
     const { reference, phone } = req.query;
 
-    if (!reference && !phone) {
-      return res.status(400).json({ error: 'Either reference or phone query parameter is required' });
+    if (!reference || !phone || !(reference as string).trim() || !(phone as string).trim()) {
+      return res.status(400).json({ error: 'Both booking reference and phone number are required' });
     }
 
-    const query: Record<string, unknown> = { tenantId: req.tenant!._id };
-    if (reference) {
-      query.reference = (reference as string).trim().toUpperCase();
-    } else if (phone) {
-      query.phone = (phone as string).trim();
-    }
+    const refQuery = (reference as string).trim().toUpperCase();
+    const rawPhoneQuery = (phone as string).trim();
+    const normPhoneQuery = normalizeKenyanPhone(rawPhoneQuery) || rawPhoneQuery;
 
-    let bookings = await Booking.find(query)
-      .populate('serviceId')
+    const bookings = await Booking.find({ tenantId: req.tenant!._id, reference: refQuery })
+      .populate('serviceId', 'name duration price priceMax')
       .populate('attendantId', 'name')
-      .sort({ createdAt: -1 });
+      .sort({ groupOrder: 1 });
 
-    const groupIds = [...new Set(bookings.map(b => b.groupId).filter(Boolean))] as string[];
-    if (groupIds.length > 0) {
-      const allGroupBookings = await Booking.find({
+    if (!bookings || bookings.length === 0) {
+      return res.status(404).json({ error: 'No booking found matching the provided reference and phone number' });
+    }
+
+    const firstBooking = bookings[0];
+    const normBookingPhone = normalizeKenyanPhone(firstBooking.phone) || firstBooking.phone.trim();
+
+    // Verify phone ownership: return identical generic 404 on mismatch
+    if (normPhoneQuery !== normBookingPhone && rawPhoneQuery !== firstBooking.phone.trim()) {
+      return res.status(404).json({ error: 'No booking found matching the provided reference and phone number' });
+    }
+
+    let allBookings = bookings;
+    if (firstBooking.groupId) {
+      allBookings = await Booking.find({
         tenantId: req.tenant!._id,
-        groupId: { $in: groupIds },
+        groupId: firstBooking.groupId,
       })
-        .populate('serviceId')
+        .populate('serviceId', 'name duration price priceMax')
         .populate('attendantId', 'name')
         .sort({ groupOrder: 1 });
-
-      const seen = new Set<string>();
-      const merged = [];
-      for (const b of [...bookings, ...allGroupBookings]) {
-        const idStr = b._id.toString();
-        if (!seen.has(idStr)) {
-          seen.add(idStr);
-          merged.push(b);
-        }
-      }
-      bookings = merged;
     }
 
-    res.json(bookings);
+    // Trim data to protect customer privacy (no email, masked phone)
+    const sanitized = allBookings.map(b => ({
+      _id: b._id,
+      reference: b.reference,
+      groupId: b.groupId,
+      groupOrder: b.groupOrder,
+      customerName: b.customerName,
+      phone: maskPhone(b.phone),
+      serviceId: b.serviceId,
+      attendantId: b.attendantId,
+      date: b.date,
+      startTime: b.startTime,
+      endTime: b.endTime,
+      status: b.status,
+      price: b.price,
+      notes: b.notes,
+    }));
+
+    res.json(sanitized);
   } catch (error) {
     console.error('[bookingController] lookupBookings error:', error);
     res.status(500).json({ error: 'Failed to look up bookings' });
@@ -420,13 +534,18 @@ export const lookupBookings = async (req: Request, res: Response) => {
 
 /**
  * PATCH /api/bookings/:id/cancel-customer
- * Cancels a booking — scoped to the resolved tenant.
+ * Cancels a booking — requires matching customer phone in request body.
  * If the booking belongs to a multi-service group, cancels ALL segments in the group.
  */
 export const cancelBookingCustomer = async (req: Request, res: Response) => {
   try {
     const tenantId = req.tenant!._id;
     const { id } = req.params;
+    const { phone } = req.body;
+
+    if (!phone || typeof phone !== 'string' || !phone.trim()) {
+      return res.status(400).json({ error: 'Phone number is required for verification' });
+    }
 
     const booking = await Booking.findOne({ _id: id, tenantId })
       .populate('serviceId')
@@ -434,6 +553,12 @@ export const cancelBookingCustomer = async (req: Request, res: Response) => {
 
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const normInput = normalizeKenyanPhone(phone) || phone.trim();
+    const normBooking = normalizeKenyanPhone(booking.phone) || booking.phone.trim();
+    if (normInput !== normBooking && phone.trim() !== booking.phone.trim()) {
+      return res.status(403).json({ error: 'Unauthorized: phone number does not match booking' });
     }
 
     if (booking.status === 'cancelled') {
@@ -470,6 +595,7 @@ export const cancelBookingCustomer = async (req: Request, res: Response) => {
 
     void sendBookingCancelledToCustomer(req.tenant!, booking, syntheticService, undefined);
     void sendWhatsAppBookingCancelled(booking, syntheticService);
+    void sendBookingCancelledSms(req.tenant!, booking, syntheticService);
 
     void sendPushToPhone(booking.phone, {
       title: '❌ Booking Cancelled Successfully',
@@ -499,10 +625,14 @@ export const rescheduleBookingCustomer = async (req: Request, res: Response) => 
   try {
     const tenantId = req.tenant!._id;
     const { id } = req.params;
-    const { date, startTime } = req.body;
+    const { date, startTime, phone } = req.body;
 
     if (!date || !startTime) {
       return res.status(400).json({ error: 'date and startTime are required' });
+    }
+
+    if (!phone || typeof phone !== 'string' || !phone.trim()) {
+      return res.status(400).json({ error: 'Phone number is required for verification' });
     }
 
     const booking = await Booking.findOne({ _id: id, tenantId })
@@ -511,6 +641,12 @@ export const rescheduleBookingCustomer = async (req: Request, res: Response) => 
 
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const normInput = normalizeKenyanPhone(phone) || phone.trim();
+    const normBooking = normalizeKenyanPhone(booking.phone) || booking.phone.trim();
+    if (normInput !== normBooking && phone.trim() !== booking.phone.trim()) {
+      return res.status(403).json({ error: 'Unauthorized: phone number does not match booking' });
     }
 
     if (booking.status === 'cancelled') {
@@ -599,6 +735,7 @@ export const rescheduleBookingCustomer = async (req: Request, res: Response) => 
 
     void sendBookingRequestReceived(req.tenant!, booking, syntheticService, undefined);
     void sendWhatsAppRescheduled(booking, syntheticService, undefined);
+    void sendBookingRescheduledSms(req.tenant!, booking, syntheticService);
 
     void sendPushToPhone(booking.phone, {
       title: '📅 Appointment Rescheduled (Pending Approval)',

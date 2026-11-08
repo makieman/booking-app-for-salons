@@ -149,11 +149,30 @@ function renderTemplate(templateName: string, context: any): string {
   const templateSource = fs.readFileSync(templatePath, 'utf8');
   const layoutSource = fs.readFileSync(layoutPath, 'utf8');
 
+  // Convert context to a plain JSON object to prevent Mongoose document prototype access issues
+  const plainContext = JSON.parse(JSON.stringify(context || {}));
+
   const template = Handlebars.compile(templateSource);
   const layout = Handlebars.compile(layoutSource);
 
-  const bodyHtml = template(context);
-  return layout({ ...context, body: bodyHtml });
+  const runtimeOptions = {
+    allowProtoPropertiesByDefault: true,
+    allowProtoMethodsByDefault: true,
+  };
+
+  const bodyHtml = template(plainContext, runtimeOptions);
+  return layout({ ...plainContext, body: bodyHtml }, runtimeOptions);
+}
+
+export function verifyEmailConfig(): void {
+  const fromEmail = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+  if (fromEmail.includes('onboarding@resend.dev')) {
+    console.warn(
+      '⚠️  [emailService] WARNING: FROM_EMAIL is set to "onboarding@resend.dev" (Resend Sandbox). ' +
+      'In sandbox mode, Resend will only deliver emails to your verified account email. ' +
+      'Customer confirmation emails will fail until a verified custom domain (e.g., bookings@yourdomain.com) is configured in FROM_EMAIL.'
+    );
+  }
 }
 
 // ── Email send helper (non-throwing — logs errors, never crashes the request)
@@ -164,6 +183,7 @@ async function sendEmail(opts: {
   from: string;
   replyTo?: string;
 }): Promise<void> {
+  const recipientStr = Array.isArray(opts.to) ? opts.to.join(', ') : opts.to;
   if (!opts.to || (Array.isArray(opts.to) && opts.to.length === 0)) {
     console.warn('[emailService] Skipping send — no recipient address provided');
     return;
@@ -182,21 +202,25 @@ async function sendEmail(opts: {
 
     const { error } = await resend.emails.send(mailOptions);
     if (error) {
-      console.error('[emailService] Resend API error:', error);
+      console.error(`[emailService] ❌ Resend delivery failure to ${recipientStr}: [${error.name || 'Error'}] ${error.message}`);
     } else {
-      console.log(`[emailService] ✅ Email sent → ${opts.to} | Subject: "${opts.subject}"`);
+      console.log(`[emailService] ✅ Email sent → ${recipientStr} | Subject: "${opts.subject}"`);
     }
-  } catch (err) {
-    console.error('[emailService] Failed to send email:', err);
+  } catch (err: any) {
+    console.error(`[emailService] ❌ Failed to send email to ${recipientStr}: [${err?.name || 'Error'}] ${err?.message || err}`);
   }
 }
 
 // Helper to determine the From and Reply-To headers from tenant branding
 function getEmailHeaders(tenant: ITenant) {
   const fromEmailOnly = FROM.includes('<') ? FROM.split('<')[1].replace('>', '').trim() : FROM;
-  const fromName = tenant.branding?.emailFromName || tenant.name;
+  const rawFromName = tenant.branding?.emailFromName || tenant.name || 'Salon';
+  const fromName = String(rawFromName).replace(/["\r\n<>]/g, '').trim() || 'Salon';
   const from = `"${fromName}" <${fromEmailOnly}>`;
-  const replyTo = tenant.branding?.emailReplyTo || undefined;
+  const rawReplyTo = tenant.branding?.emailReplyTo;
+  const replyTo = typeof rawReplyTo === 'string' && /^[^\s@\r\n]+@[^\s@\r\n]+\.[^\s@\r\n]+$/.test(rawReplyTo.trim())
+    ? rawReplyTo.trim()
+    : undefined;
   return { from, replyTo };
 }
 
