@@ -14,6 +14,11 @@ import {
   sendWhatsAppBookingCancelled,
   sendWhatsAppRescheduled,
 } from '../services/whatsappService';
+import {
+  sendBookingConfirmedSms,
+  sendBookingCancelledSms,
+  sendBookingRescheduledSms,
+} from '../services/smsService';
 import { generateUniqueBookingReference } from './bookingController';
 
 /**
@@ -26,23 +31,26 @@ export const getAdminBookings = async (req: Request, res: Response) => {
     const { status, attendantId, date, startDate, endDate, search, page, limit } = req.query;
     const query: Record<string, unknown> = { tenantId: req.tenant!._id };
 
-    if (status && status !== 'all') {
-      query.status = status as string;
+    if (status && typeof status === 'string' && status !== 'all') {
+      query.status = status.trim();
     }
-    if (attendantId && attendantId !== 'all') {
-      query.attendantId = attendantId as string;
+    if (attendantId && typeof attendantId === 'string' && attendantId !== 'all') {
+      query.attendantId = attendantId.trim();
     }
-    if (date) {
-      query.date = date as string;
+    if (date && typeof date === 'string') {
+      query.date = date.trim();
     } else if (startDate || endDate) {
       const dateRange: Record<string, string> = {};
-      if (startDate) dateRange.$gte = startDate as string;
-      if (endDate) dateRange.$lte = endDate as string;
-      query.date = dateRange;
+      if (startDate && typeof startDate === 'string') dateRange.$gte = startDate.trim();
+      if (endDate && typeof endDate === 'string') dateRange.$lte = endDate.trim();
+      if (Object.keys(dateRange).length > 0) {
+        query.date = dateRange;
+      }
     }
 
-    if (search) {
-      const searchRegex = new RegExp((search as string).trim(), 'i');
+    if (search && typeof search === 'string' && search.trim()) {
+      const escapedSearch = search.trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escapedSearch, 'i');
       query.$or = [
         { customerName: searchRegex },
         { phone: searchRegex },
@@ -213,6 +221,7 @@ export const createAdminBooking = async (req: Request, res: Response) => {
       if (status === 'confirmed') {
         void sendBookingConfirmedToCustomer(req.tenant!, booking, syntheticService, assignedAttendant?.name);
         void sendWhatsAppBookingConfirmed(booking, syntheticService, assignedAttendant?.name);
+        void sendBookingConfirmedSms(req.tenant!, booking, syntheticService, assignedAttendant?.name);
         void sendPushToPhone(
           booking.phone,
           {
@@ -266,7 +275,12 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, reason, cancellationReason, notes, reschedule } = req.body;
-    const finalReason = reason || cancellationReason || null;
+    const rawReason = typeof reason === 'string'
+      ? reason.trim().slice(0, 500)
+      : typeof cancellationReason === 'string'
+        ? cancellationReason.trim().slice(0, 500)
+        : null;
+    const finalReason = rawReason || null;
 
     const allowedStatuses = ['pending', 'confirmed', 'cancelled', 'completed', 'no-show'];
     if (status && !allowedStatuses.includes(status)) {
@@ -380,14 +394,14 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
         if (status === 'completed') {
           seg.completedAt = new Date();
         } else if (status === 'cancelled') {
-          seg.cancellationReason = finalReason;
+          seg.cancellationReason = finalReason ?? undefined;
         }
       } else if (isRescheduling && seg.status === 'pending') {
         seg.status = 'confirmed';
       }
 
       if (notes !== undefined) {
-        seg.notes = notes;
+        seg.notes = typeof notes === 'string' ? notes.trim().slice(0, 1000) : null as any;
       }
 
       await seg.save();
@@ -416,6 +430,7 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
 
     if (isRescheduling) {
       void sendWhatsAppRescheduled(primaryUpdatedBooking, syntheticService, (primaryUpdatedBooking.attendantId as any)?.name);
+      void sendBookingRescheduledSms(req.tenant!, primaryUpdatedBooking, syntheticService, (primaryUpdatedBooking.attendantId as any)?.name);
       void sendBookingRescheduledToCustomer(req.tenant!, primaryUpdatedBooking, syntheticService, (primaryUpdatedBooking.attendantId as any)?.name);
       void sendPushToPhone(primaryUpdatedBooking.phone, {
         title: '📅 Appointment Rescheduled',
@@ -440,6 +455,7 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
     } else if (targetStatus === 'confirmed') {
       void sendBookingConfirmedToCustomer(req.tenant!, primaryUpdatedBooking, syntheticService, undefined);
       void sendWhatsAppBookingConfirmed(primaryUpdatedBooking, syntheticService, undefined);
+      void sendBookingConfirmedSms(req.tenant!, primaryUpdatedBooking, syntheticService);
       void sendPushToPhone(primaryUpdatedBooking.phone, {
         title: 'Appointment Confirmed!',
         body: `See you on ${primaryUpdatedBooking.date} at ${primaryUpdatedBooking.startTime} for ${combinedName}. Please arrive 5–10 mins early.`,
@@ -463,6 +479,7 @@ export const updateBookingStatus = async (req: Request, res: Response) => {
     } else if (targetStatus === 'cancelled') {
       void sendBookingCancelledToCustomer(req.tenant!, primaryUpdatedBooking, syntheticService, undefined, finalReason || undefined);
       void sendWhatsAppBookingCancelled(primaryUpdatedBooking, syntheticService, finalReason || undefined);
+      void sendBookingCancelledSms(req.tenant!, primaryUpdatedBooking, syntheticService, finalReason || undefined);
       void sendPushToPhone(primaryUpdatedBooking.phone, {
         title: '❌ Booking Cancelled',
         body: `Your booking for ${combinedName} on ${primaryUpdatedBooking.date} has been cancelled.${finalReason ? ` Reason: ${finalReason}` : ''}`,

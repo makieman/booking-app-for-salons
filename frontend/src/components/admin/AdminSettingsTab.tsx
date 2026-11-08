@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Bell, BellOff, Volume2, Loader2, Check, AlertCircle, Save } from 'lucide-react';
+import { Upload, Bell, BellOff, Volume2, Loader2, Check, AlertCircle, Save, MessageSquare, Smartphone, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { Tenant } from '../../types';
 import * as api from '../../api/client';
 import { useAdminPushNotifications } from '../../hooks/useAdminPushNotifications';
@@ -41,6 +41,17 @@ export function AdminSettingsTab({
   const [supportPhone, setSupportPhone] = useState(tenant?.supportPhone || '');
   const [supportEmail, setSupportEmail] = useState(tenant?.supportEmail || '');
 
+  // SMS: loaded from the owner-only settings endpoint (the public tenant never carries these).
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [smsAvailable, setSmsAvailable] = useState(false);
+  const [smsLoaded, setSmsLoaded] = useState(false);
+  const [smsCredits, setSmsCredits] = useState<number | null>(null);
+  const [smsLowBalance, setSmsLowBalance] = useState(false);
+  const [smsTopUpContact, setSmsTopUpContact] = useState<string>('');
+  const [showTopUpInfo, setShowTopUpInfo] = useState(false);
+  const [smsTestPhone, setSmsTestPhone] = useState('');
+  const [smsTesting, setSmsTesting] = useState(false);
+
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [faviconFile, setFaviconFile] = useState<File | null>(null);
 
@@ -48,6 +59,25 @@ export function AdminSettingsTab({
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getTenantSettings(ownerToken)
+      .then((s) => {
+        if (cancelled) return;
+        setSmsEnabled(!!s.smsEnabled);
+        setSmsAvailable(!!s.smsAvailable);
+        if (typeof (s as any).smsCredits === 'number') setSmsCredits((s as any).smsCredits);
+        if (typeof (s as any).smsLowBalance === 'boolean') setSmsLowBalance((s as any).smsLowBalance);
+        if ((s as any).smsTopUpContact) setSmsTopUpContact((s as any).smsTopUpContact);
+        setSmsLoaded(true);
+      })
+      .catch((err) => console.error('Failed to load SMS settings:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerToken]);
 
   // Sync state if tenant updates
   useEffect(() => {
@@ -83,8 +113,12 @@ export function AdminSettingsTab({
         mpesaPaybillNumber: mpesaPaybillNumber.trim(),
         supportPhone: supportPhone.trim(),
         supportEmail: supportEmail.trim(),
+        // Only send the switch once we know its real value, so a failed load can't switch it off.
+        ...(smsLoaded ? { smsEnabled } : {}),
       });
       onTenantUpdated(updated);
+      if (typeof (updated as any).smsCredits === 'number') setSmsCredits((updated as any).smsCredits);
+      if (typeof (updated as any).smsLowBalance === 'boolean') setSmsLowBalance((updated as any).smsLowBalance);
       triggerToast('Salon settings updated successfully!', 'success');
     } catch (err: any) {
       console.error(err);
@@ -92,6 +126,20 @@ export function AdminSettingsTab({
       triggerToast(err.message || 'Failed to update settings', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSendTestSms = async () => {
+    if (!smsTestPhone.trim()) return;
+    setSmsTesting(true);
+    try {
+      await api.sendTestSms(ownerToken, smsTestPhone.trim());
+      setSmsCredits(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
+      triggerToast('Test SMS sent. Check your phone.', 'success');
+    } catch (err: any) {
+      triggerToast(err.message || 'Failed to send test SMS', 'error');
+    } finally {
+      setSmsTesting(false);
     }
   };
 
@@ -335,6 +383,189 @@ export function AdminSettingsTab({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* SMS Notifications Card */}
+            <div className="p-6 bg-white border border-brand-gray-200 rounded-2xl shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-brand-gray-100 pb-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-brand-gray-500">
+                  SMS Notifications
+                </p>
+                {smsLoaded && smsAvailable && smsCredits !== null && (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                        smsCredits === 0
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : smsLowBalance
+                          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                          : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      }`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      {smsCredits} SMS credit{smsCredits === 1 ? '' : 's'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowTopUpInfo(prev => !prev)}
+                      className="text-xs font-bold bg-brand-black text-white hover:bg-neutral-800 px-3 py-1 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Top up</span>
+                      {showTopUpInfo ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {!smsLoaded ? (
+                <p className="text-xs font-semibold text-brand-gray-500">Loading SMS settings…</p>
+              ) : !smsAvailable ? (
+                <p className="text-xs font-semibold text-brand-gray-500">
+                  SMS is not set up on the server yet. Once it is connected, you can switch it on here.
+                </p>
+              ) : (
+                <>
+                  {/* Low Balance Warning */}
+                  {smsCredits !== null && smsCredits <= 10 && (
+                    <div className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
+                      smsCredits === 0
+                        ? 'bg-rose-50/70 border-rose-200 text-rose-900'
+                        : 'bg-amber-50/70 border-amber-200 text-amber-900'
+                    }`}>
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                      <div className="flex-1">
+                        <span className="font-bold">
+                          {smsCredits === 0 ? 'Out of SMS credits!' : 'SMS credits running low!'}
+                        </span>
+                        <p className="mt-0.5 text-brand-gray-600">
+                          {smsCredits === 0
+                            ? 'Client booking notifications are currently paused. Top up to resume automated text messages.'
+                            : `You have ${smsCredits} message${smsCredits === 1 ? '' : 's'} remaining. Top up to keep booking notifications flowing smoothly.`}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowTopUpInfo(true)}
+                        className="text-xs font-bold underline cursor-pointer shrink-0"
+                      >
+                        Top up now
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Top Up Instructions Drawer */}
+                  {showTopUpInfo && (
+                    <div className="p-4 bg-brand-gray-50 border border-brand-gray-200 rounded-xl space-y-3.5 text-xs animate-in fade-in duration-200">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold uppercase tracking-wider text-brand-gray-700 flex items-center gap-1.5">
+                          <Smartphone className="w-4 h-4 text-emerald-600" />
+                          How to Top Up SMS Credits
+                        </span>
+                        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-md">
+                          1 Credit = 1 SMS
+                        </span>
+                      </div>
+
+                      {/* Bundles */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="p-2.5 bg-white border border-brand-gray-200 rounded-lg text-center">
+                          <span className="text-xs font-bold block text-brand-black">100 SMS</span>
+                          <span className="text-[11px] font-medium text-brand-gray-500">KES 100</span>
+                        </div>
+                        <div className="p-2.5 bg-white border border-brand-gray-200 rounded-lg text-center">
+                          <span className="text-xs font-bold block text-brand-black">250 SMS</span>
+                          <span className="text-[11px] font-medium text-brand-gray-500">KES 250</span>
+                        </div>
+                        <div className="p-2.5 bg-white border border-emerald-300 bg-emerald-50/30 rounded-lg text-center relative">
+                          <span className="absolute -top-1.5 -right-1 text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.2 rounded-full">
+                            Save 10%
+                          </span>
+                          <span className="text-xs font-bold block text-brand-black">500 SMS</span>
+                          <span className="text-[11px] font-medium text-brand-gray-500">KES 450</span>
+                        </div>
+                        <div className="p-2.5 bg-white border border-brand-gray-200 rounded-lg text-center">
+                          <span className="text-xs font-bold block text-brand-black">1,000 SMS</span>
+                          <span className="text-[11px] font-medium text-brand-gray-500">KES 850</span>
+                        </div>
+                      </div>
+
+                      {/* Payment Steps */}
+                      <div className="p-3 bg-white border border-brand-gray-200 rounded-lg space-y-1.5 text-brand-gray-700">
+                        <p className="font-semibold text-brand-black">M-Pesa Payment Instructions:</p>
+                        <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed text-brand-gray-600">
+                          <li>Go to <strong>M-Pesa</strong> &gt; <strong>Lipa na M-Pesa</strong> &gt; <strong>Buy Goods / Paybill</strong></li>
+                          <li>
+                            Use your salon account code as the reference:{' '}
+                            <code className="px-1.5 py-0.5 bg-brand-gray-100 rounded text-brand-black font-bold">
+                              {tenant?.slug ? tenant.slug.toUpperCase() : 'YOUR-SALON-SLUG'}
+                            </code>
+                          </li>
+                          <li>Your credits will be activated immediately upon confirmation.</li>
+                        </ol>
+                      </div>
+
+                      {/* WhatsApp / Direct Support */}
+                      {smsTopUpContact && (
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[11px] text-brand-gray-500">Need instant assistance?</span>
+                          <a
+                            href={`https://wa.me/${smsTopUpContact.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                              `Hi, I would like to top up SMS credits for ${tenant?.name || 'my salon'} (Account: ${tenant?.slug?.toUpperCase()}).`
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 underline"
+                          >
+                            <span>WhatsApp Support ({smsTopUpContact})</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={smsEnabled}
+                      onChange={e => setSmsEnabled(e.target.checked)}
+                      className="mt-1 h-4 w-4 accent-brand-black"
+                    />
+                    <span className="text-sm font-semibold">
+                      Text customers about their bookings
+                      <span className="block text-xs font-medium text-brand-gray-500 mt-0.5">
+                        Sends a warm SMS when a booking is received, confirmed, moved or cancelled, and a reminder the
+                        day before. Each message starts with your salon name.
+                      </span>
+                    </span>
+                  </label>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600">Send a test SMS to</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="tel"
+                        placeholder="0712 345 678"
+                        value={smsTestPhone}
+                        onChange={e => setSmsTestPhone(e.target.value)}
+                        className="flex-1 border border-brand-gray-200 rounded-xl px-3 py-2 text-sm font-semibold focus:border-brand-black focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendTestSms}
+                        disabled={smsTesting || !smsTestPhone.trim() || smsCredits === 0}
+                        className="px-4 py-2 rounded-xl border border-brand-gray-200 text-xs font-bold uppercase tracking-wider disabled:opacity-50 hover:bg-brand-gray-50 cursor-pointer"
+                      >
+                        {smsTesting ? 'Sending…' : 'Send test'}
+                      </button>
+                    </div>
+                    {smsCredits === 0 && (
+                      <p className="text-[11px] text-rose-600 font-medium">
+                        You need at least 1 credit to send a test message.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Media Uploads Card */}
