@@ -35,6 +35,26 @@ function formatPrice(price: number, priceMax?: number): string {
 export default function App() {
   const [renderError, setRenderError] = useState<Error | null>(null);
 
+  // ── Scroll State for Dynamic Sticky Header ─────────────────────────────
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const y = window.scrollY;
+          setIsScrolled(prev => (prev ? y > 8 : y > 24));
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // ── Tenant Context and Routing ──────────────────────────────────────────
   const { tenant, loading: tenantLoading, error: tenantError, tenantSlug, viewMode, bookingRef, navigate, setTenant } = useTenant();
 
@@ -1445,9 +1465,15 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <header className={`px-4 sm:px-8 py-6 sm:py-10 flex justify-between items-center bg-brand-white sticky top-0 z-40 border-b border-brand-gray-100 ${viewMode === 'admin' && ownerToken ? 'lg:hidden' : ''}`}>
-          <div className="flex items-center gap-5 cursor-pointer group" onClick={handleLogoClick} title="Go to Services Page">
-            <div className="h-16 w-16 flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
+        <header className={`px-4 sm:px-8 py-4 sm:py-5 flex justify-between items-center z-40 transition-[background-color,border-color,box-shadow] duration-300 ${
+          viewMode === 'admin' && ownerToken ? 'relative lg:hidden' : 'sticky top-0'
+        } ${
+          isScrolled
+            ? 'bg-white/95 backdrop-blur-md shadow-xs border-b border-[#F0D5DE]/80'
+            : 'bg-brand-white border-b border-brand-gray-100'
+        }`}>
+          <div className="flex items-center gap-4 sm:gap-5 cursor-pointer group" onClick={handleLogoClick} title="Go to Services Page">
+            <div className="h-12 w-12 sm:h-14 sm:w-14 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
               <img
                 src={tenant?.branding?.logoUrl || "/logo-bg.jpg"}
                 alt={tenant?.name || "Salon Logo"}
@@ -2786,6 +2812,13 @@ function ServiceSelectionCard({
 }) {
   return (
     <motion.div
+      initial={{ opacity: 0, y: 22, scale: 0.98 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: true, margin: '-20px' }}
+      transition={{
+        duration: 0.45,
+        ease: [0.16, 1, 0.3, 1],
+      }}
       whileTap={{ scale: 0.99 }}
       role="button"
       tabIndex={0}

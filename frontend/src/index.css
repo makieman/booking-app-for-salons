@@ -74,6 +74,10 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply font-sans bg-[#FAF8F5] text-[#231F1D] selection:bg-[#231F1D] selection:text-white antialiased;
   }
