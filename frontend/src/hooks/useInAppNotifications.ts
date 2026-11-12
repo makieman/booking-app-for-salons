@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getNotifications, saveNotification, markAsRead, clearAllNotifications, deleteNotification, InAppNotification } from '../utils/db';
 import { getBackendNotifications, markBackendNotificationAsRead, markAllBackendNotificationsRead, deleteBackendNotification, clearAllBackendNotifications } from '../api/client';
+export type { InAppNotification };
 
 export interface NotificationAuth {
   token?: string;

@@ -26,18 +26,25 @@ import authRoutes from './routes/authRoutes';
 import attendantRoutes from './routes/attendantRoutes';
 import tenantRoutes from './routes/tenantRoutes';
 import whatsappRoutes from './routes/whatsappRoutes';
+import platformRoutes from './routes/platformRoutes';
 import { startReminderScheduler } from './services/reminderService';
 import { resolveTenant } from './middleware/resolveTenant';
+import { migratePushSubscriptionIndexes } from './scripts/migratePushSubscriptionIndex';
+import { verifyEmailConfig } from './services/emailService';
 
 import Tenant from './models/Tenant';
 import Attendant from './models/Attendant';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 /**
  * Seeds a default tenant (flo-sisterlocks) and default services/attendants if the DB is empty.
- * This ensures the application is ready to use in development/test environments.
+ * Only runs if SEED_DEFAULT_TENANT === 'true' and never logs credentials in production.
  */
-async function seedDefaultTenant(): Promise<void> {
+export async function seedDefaultTenant(): Promise<void> {
+  if (process.env.SEED_DEFAULT_TENANT !== 'true') {
+    return;
+  }
   if (mongoose.connection.readyState !== 1) {
     console.warn('⚠️ Skipping database seeding: No active MongoDB connection.');
     return;
@@ -46,7 +53,9 @@ async function seedDefaultTenant(): Promise<void> {
     const tenantCount = await Tenant.countDocuments();
     if (tenantCount === 0) {
       console.log('🌱 No tenants found in database. Auto-seeding default tenant "flo-sisterlocks"...');
-      const passwordHash = await bcrypt.hash('password123', 10);
+      const randomPassword = crypto.randomBytes(8).toString('hex');
+      const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+      const passwordHash = await bcrypt.hash(randomPassword, 10);
       const tenant = await Tenant.create({
         name: 'Flo Sisterlocks',
         slug: 'flo-sisterlocks',
@@ -94,7 +103,7 @@ async function seedDefaultTenant(): Promise<void> {
       const services = await Service.insertMany(DEFAULT_SERVICES);
 
       // Seed default attendant "flo"
-      const pinHash = await bcrypt.hash('1234', 10);
+      const pinHash = await bcrypt.hash(randomPin, 10);
       await Attendant.create({
         name: 'Flora',
         username: 'flo',
@@ -104,9 +113,13 @@ async function seedDefaultTenant(): Promise<void> {
         tenantId: tenant._id,
       });
 
-      console.log('✅ Default tenant "flo-sisterlocks" auto-seeded successfully!');
-      console.log('🔑 Owner Login: owner@flosisterlocks.com / password123');
-      console.log('🔑 Staff Login: flo / PIN 1234');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('✅ Default tenant "flo-sisterlocks" auto-seeded successfully!');
+        console.log(`🔑 Owner Login: owner@flosisterlocks.com / ${randomPassword}`);
+        console.log(`🔑 Staff Login: flo / PIN ${randomPin}`);
+      } else {
+        console.log('✅ Default tenant auto-seeded (credentials withheld in production).');
+      }
     }
   } catch (error) {
     console.error('❌ Failed to seed default tenant:', error);
@@ -114,17 +127,12 @@ async function seedDefaultTenant(): Promise<void> {
 }
 
 /**
- * Starts the Express server.
- * - Connects to MongoDB
- * - Seeds initial data
- * - Registers API routes
- * - Starts listening on the configured PORT
+ * Creates and configures the Express application with all middlewares, routes, and error handling.
  */
-async function startServer(): Promise<void> {
+export function createApp(): Express {
   const app: Express = express();
-  const PORT = parseInt(process.env.PORT || '5000', 10);
 
-  // Trust first proxy (Render load balancer)
+  // Trust first proxy (Render/Vercel load balancer)
   app.set('trust proxy', 1);
 
   // Lightweight health check route registered before other middlewares/rate-limiters
@@ -133,7 +141,10 @@ async function startServer(): Promise<void> {
   });
 
   // ── Middleware ────────────────────────────────────────────
-  app.use(cors());          // Allow cross-origin requests from the frontend
+  app.use(cors({
+    exposedHeaders: ['ETag']
+  }));
+
   // Parse JSON and keep req.rawBody buffer for HMAC signature verification (e.g. Meta WhatsApp)
   app.use(
     express.json({
@@ -143,33 +154,43 @@ async function startServer(): Promise<void> {
     })
   );
 
-  // ── Database ─────────────────────────────────────────────
-  await connectDB();
-  await seedDefaultTenant();
-
-  // ── Reminder Scheduler (starts after DB is ready) ────────
-  startReminderScheduler();
-
   // ── DB Status Middleware ─────────────────────────────────
-  // Prevents Mongoose buffering timeouts by returning 503 if DB is down
-  app.use((req, res, next) => {
-    const isDbConnected = mongoose.connection.readyState === 1;
+  // Prevents Mongoose buffering timeouts by returning 503 if DB is down.
+  // If connecting (readyState === 2), waits up to 2.5s for the TLS handshake to finish.
+  app.use(async (req, res, next) => {
     const isApiRoute = req.path.startsWith('/api');
     const isHealthCheck = req.path === '/api/health';
 
-    if (isApiRoute && !isHealthCheck && !isDbConnected) {
-      return res.status(503).json({
-        error: 'Service Unavailable',
-        message: 'Database is currently disconnected. Please check MONGODB_URI.',
-        code: 'DB_DISCONNECTED'
-      });
+    if (!isApiRoute || isHealthCheck) {
+      return next();
     }
-    next();
+
+    if (mongoose.connection.readyState === 1) {
+      return next();
+    }
+
+    if (mongoose.connection.readyState === 2) {
+      let waited = 0;
+      while ((mongoose.connection.readyState as number) === 2 && waited < 2500) {
+        await new Promise((r) => setTimeout(r, 200));
+        waited += 200;
+      }
+      if ((mongoose.connection.readyState as number) === 1) {
+        return next();
+      }
+    } else if (mongoose.connection.readyState === 0) {
+      connectDB(2, 1000).catch(() => {});
+    }
+
+    return res.status(503).json({
+      error: 'Service Unavailable',
+      message: 'Database is currently disconnected. Please check MONGODB_URI.',
+      code: 'DB_DISCONNECTED',
+    });
   });
 
   // ── Tenant Resolution ───────────────────────────────────
   // Applied to every /api route EXCEPT the public endpoints below.
-  // The skip-list must stay in sync with authRoutes.ts.
   const PUBLIC_PATHS = [
     '/api/auth/tenant/register',
     '/api/auth/owner/login',
@@ -182,16 +203,16 @@ async function startServer(): Promise<void> {
   app.use('/api', (req, res, next) => {
     const fullPath = '/api' + req.path;
     if (PUBLIC_PATHS.includes(fullPath)) return next();
+    // Platform-operator API: not tied to one salon, guarded by its own admin key instead.
+    if (fullPath.startsWith('/api/platform/')) return next();
     return resolveTenant(req, res, next);
   });
 
   // ── WhatsApp Cloud API webhook (no tenant middleware) ────────────────────
-  // Registered here — after DB is ready but before resolveTenant is applied
-  // to all other routes — so Meta's GET verification + POST deliveries work.
   app.use('/api/whatsapp', whatsappRoutes);
 
-  // Single-tenant auto-seed removed.
-  // New tenants receive default services via POST /api/auth/tenant/register.
+  // ── Platform operator API (no tenant middleware, admin key required) ─────
+  app.use('/api/platform', platformRoutes);
 
   // ── API Routes ───────────────────────────────────────────
   app.use('/api/services', serviceRoutes);
@@ -209,12 +230,56 @@ async function startServer(): Promise<void> {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // ── Error Handler (must be last) ────────────────────────
+  app.use(errorHandler);
+
+  return app;
+}
+
+/**
+ * Starts the Express server.
+ * - Connects to MongoDB
+ * - Seeds initial data
+ * - Registers API routes
+ * - Starts listening on the configured PORT
+ */
+async function startServer(): Promise<void> {
+  const PORT = parseInt(process.env.PORT || '5000', 10);
+
+  // ── Database ─────────────────────────────────────────────
+  await connectDB();
+  await seedDefaultTenant();
+
+  // ── Safe Migrations & Production Verifications ────────────
+  try {
+    await migratePushSubscriptionIndexes();
+  } catch (err) {
+    console.warn('[server] Warning: PushSubscription index migration failed:', err);
+  }
+  verifyEmailConfig();
+
+  // ── Reminder Scheduler (starts after DB is ready) ────────
+  startReminderScheduler();
+
+  const app = createApp();
+
+  // ── Render Free Tier Keep-Warm Ping ───────────────────────
+  const externalUrl = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL;
+  if (externalUrl) {
+    const RENDER_PING_INTERVAL_MS = 14 * 60 * 1000;
+    setInterval(async () => {
+      try {
+        await fetch(`${externalUrl}/health`);
+      } catch {
+        // Silently catch to avoid polluting logs
+      }
+    }, RENDER_PING_INTERVAL_MS);
+  }
+
   // ── Static Files (Production) ────────────────────────────
   if (process.env.NODE_ENV === 'production') {
     const frontendDist = path.join(__dirname, '../frontend/dist');
 
-    // Serve sw.js and manifest with no-cache so browsers always get the
-    // latest version. Stale service workers are the #1 cause of PWA bugs.
     app.use((req, res, next) => {
       if (
         req.path === '/sw.js' ||
@@ -227,7 +292,6 @@ async function startServer(): Promise<void> {
       next();
     });
 
-    // Serve hashed assets with long-lived immutable caching for performance.
     app.use(
       '/assets',
       express.static(path.join(frontendDist, 'assets'), {
@@ -236,27 +300,29 @@ async function startServer(): Promise<void> {
       }),
     );
 
-    // Serve remaining static files (icons, favicon, etc.) with a short cache.
     app.use(express.static(frontendDist, { maxAge: '1h' }));
 
-    // Handle SPA routing: serve index.html for any unknown routes
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api')) {
-        return next(); // Let 404 handler or error handler catch missing API routes
+        return next();
       }
       res.sendFile(path.join(frontendDist, 'index.html'));
     });
   }
 
-  // ── Error Handler (must be last) ────────────────────────
-  app.use(errorHandler);
-
-  // ── Start Server ─────────────────────────────────────────
+  // ── Start Server
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Backend server running on http://localhost:${PORT}`);
   });
 }
 
-startServer().catch((err) => {
-  console.error('❌ Fatal error in startServer:', err);
-});
+const currentFile = fileURLToPath(import.meta.url);
+const executedFile = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const isExecutedDirectly = (executedFile === currentFile || executedFile.endsWith('server.ts')
+|| executedFile.endsWith('server.js')) && !process.argv.some(arg => arg.includes('test'));
+
+if (isExecutedDirectly) {
+  startServer().catch((err) => {
+    console.error('❌ Fatal error in startServer:', err);
+  });
+}
