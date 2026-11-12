@@ -16,6 +16,12 @@ import { saveNotification, getNotifications } from './utils/db';
 self.skipWaiting();
 clientsClaim();
 
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 // ── Precache all assets injected by VitePWA's injectManifest strategy 
 precacheAndRoute(self.__WB_MANIFEST);
 
@@ -35,12 +41,13 @@ if (import.meta.env.PROD) {
 }
 
 // ── Runtime Caching: Services API ────────────────────────────────────────────
-// StaleWhileRevalidate: serves cached services instantly (<20ms) while silently
-// revalidating in the background. On first visit, fetches from network.
+// NetworkFirst: fetches fresh services immediately when online (falling back to
+// cache after 3s or when offline) so service/price updates appear right away.
 registerRoute(
   /^\/api\/services/i,
-  new StaleWhileRevalidate({
+  new NetworkFirst({
     cacheName: 'services-api-cache',
+    networkTimeoutSeconds: 3,
     plugins: [
       new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 86_400 }), // 24 h
       new CacheableResponsePlugin({ statuses: [0, 200] }),

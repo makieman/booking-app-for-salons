@@ -8,26 +8,45 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Register the service worker for PWA functionality.
-// onNeedRefresh fires when a new SW is installed and waiting.
-// We call updateSW() to skip waiting and reload — users always
-// get the latest version without a stale-cache loop.
+// When a new SW activates and takes control of an already-controlled page,
+// reload once automatically so users immediately run the latest bundle.
+if ('serviceWorker' in navigator) {
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let isRefreshing = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || isRefreshing) return;
+    isRefreshing = true;
+    window.location.reload();
+  });
+}
+
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    // Auto-reload to activate the new service worker immediately.
-    // TODO: replace with a toast prompt for a better UX if desired.
     updateSW(true);
   },
   onOfflineReady() {
     console.info('[PWA] App is ready to work offline.');
   },
   onRegisteredSW(_swUrl, registration) {
-    // Check for updates every hour while the app is open
-    if (registration) {
-      setInterval(() => {
+    if (!registration) return;
+
+    // Check for updates whenever the user returns to the app/tab or reconnects
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
         registration.update().catch(console.error);
-      }, 60 * 60 * 1000);
-    }
+      }
+    });
+
+    window.addEventListener('online', () => {
+      registration.update().catch(console.error);
+    });
+
+    // Check for updates every 5 minutes while the app is open
+    setInterval(() => {
+      registration.update().catch(console.error);
+    }, 5 * 60 * 1000);
   },
 });
 
