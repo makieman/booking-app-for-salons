@@ -2719,12 +2719,6 @@ function StepIndicator({
 
   return (
     <nav aria-label="Booking progress" className="flex items-center justify-between relative max-w-[360px] mx-auto px-2">
-      <div className="absolute top-[14px] left-6 right-6 h-[2px] bg-[#F0D5DE] -z-10">
-        <div
-          className="h-full bg-[#C4466F] transition-all duration-500 ease-out"
-          style={{ width: `${(Math.max(0, Math.min(activeIndex, steps.length - 1)) / (steps.length - 1)) * 100}%` }}
-        />
-      </div>
       {steps.map((step, idx) => {
         const isCompleted = idx < activeIndex;
         const isActive = idx === activeIndex;
@@ -2743,8 +2737,8 @@ function StepIndicator({
                 isCompleted
                   ? 'bg-[#C4466F] text-white shadow-xs group-hover:bg-[#A83257] group-hover:scale-105'
                   : isActive
-                    ? 'bg-[#231F1D] text-white ring-4 ring-[#C4466F]/25 scale-105 shadow-xs'
-                    : 'bg-white border-2 border-[#F0D5DE] text-[#8C827B]'
+                    ? 'bg-[#231F1D] text-white scale-105 shadow-xs'
+                    : 'bg-white border border-black/10 text-[#8C827B]'
               }`}
             >
               {isCompleted ? <Check size={13} strokeWidth={3} /> : idx + 1}
