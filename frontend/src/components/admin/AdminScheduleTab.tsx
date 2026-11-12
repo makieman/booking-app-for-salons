@@ -352,13 +352,7 @@ export function AdminScheduleTab({
               </button>
               <button
                 onClick={handleSetCurrentScope}
-                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-x border-brand-gray-300 transition-colors ${
-                  (scope === 'day' && selectedDate === todayStr) ||
-                  (scope === 'week' && weekDays.some(w => w.isToday && w.isSelected)) ||
-                  (scope === 'month' && selectedDate.startsWith(todayStr.slice(0, 7)))
-                    ? 'bg-brand-black text-white'
-                    : 'hover:bg-brand-gray-50 text-brand-black'
-                }`}
+                className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-x border-brand-gray-300 transition-colors hover:bg-brand-gray-50 text-brand-black"
               >
                 {scope === 'day' ? 'Today' : scope === 'week' ? 'This Week' : 'This Month'}
               </button>
