@@ -2846,10 +2846,9 @@ function ServiceSelectionCard({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#523E46]">
-          <Clock size={12} className="text-[#C4466F] shrink-0" />
-          <span>{formatServiceDurationBadge(service.duration)}</span>
-        </div>
+        <p className="text-[11px] font-medium text-[#523E46]">
+          {formatServiceDurationBadge(service.duration)}
+        </p>
       </div>
       <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-[#C4466F] bg-[#C4466F] scale-105 shadow-2xs' : 'border-[#EAD3DA] bg-white group-hover:border-[#C4466F]'}`}>
