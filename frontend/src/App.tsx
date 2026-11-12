@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence, MotionConfig, useScroll, useTransform, useSpring } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles, UserCheck } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
@@ -1621,7 +1621,7 @@ export default function App() {
                 </div>
               )}
 
-              <div className="flex-1 px-5 sm:px-8 pt-6 pb-12 overflow-x-hidden">
+              <div className="flex-1 px-5 sm:px-8 pt-6 pb-12 overflow-x-clip">
                 <AnimatePresence mode="wait">
                   {activeStep === 'service' && (
                     <motion.div
@@ -2812,25 +2812,13 @@ function ServiceSelectionCard({
   onSelect: () => void;
   key?: React.Key;
 }) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: cardRef,
-    offset: ['start end', 'end 72px'],
-  });
-  const smoothProgress = useSpring(scrollYProgress, {
-    stiffness: 300,
-    damping: 32,
-    restDelta: 0.001,
-  });
-
-  const opacity = useTransform(smoothProgress, [0, 0.12, 0.86, 1], [0, 1, 1, 0]);
-  const y = useTransform(smoothProgress, [0, 0.12, 0.86, 1], [16, 0, 0, -8]);
-  const scale = useTransform(smoothProgress, [0, 0.12, 0.86, 1], [0.98, 1, 1, 0.98]);
-
   return (
     <motion.div
-      ref={cardRef}
-      style={{ opacity, y, scale, willChange: 'transform, opacity' }}
+      initial={{ opacity: 0, y: 14, scale: 0.985 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: true, amount: 'some' }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      style={{ willChange: 'transform, opacity' }}
       whileTap={{ scale: 0.99 }}
       role="button"
       tabIndex={0}
@@ -2842,10 +2830,10 @@ function ServiceSelectionCard({
         }
       }}
       className={`
-        group flex flex-row items-center justify-between p-3.5 sm:p-4 gap-3.5 cursor-pointer transition-all duration-300 rounded-xl sm:rounded-2xl border relative overflow-hidden backdrop-blur-md
+        group flex flex-row items-center justify-between p-3.5 sm:p-4 gap-3.5 cursor-pointer transition-[background-color,border-color,box-shadow] duration-200 rounded-xl sm:rounded-2xl border relative overflow-hidden
         ${isSelected
-          ? 'bg-[#FFF5F8]/95 border-[#C4466F] shadow-luxury'
-          : 'bg-white/85 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F]/70 hover:shadow-soft'}
+          ? 'bg-[#FFF5F8] border-[#C4466F] shadow-luxury'
+          : 'bg-white/95 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F]/70 hover:shadow-soft'}
       `}
       onClick={onSelect}
     >
@@ -2858,11 +2846,9 @@ function ServiceSelectionCard({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF8F5] border border-[#F0D5DE] text-[10px] sm:text-[11px] font-semibold text-[#523E46]">
-            <Clock size={11} className="text-[#C4466F]" />
-            <span>{formatServiceDurationBadge(service.duration)}</span>
-          </span>
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-[#523E46]">
+          <Clock size={12} className="text-[#C4466F] shrink-0" />
+          <span>{formatServiceDurationBadge(service.duration)}</span>
         </div>
       </div>
       <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
