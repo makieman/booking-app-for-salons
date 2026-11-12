@@ -1631,16 +1631,6 @@ export default function App() {
                       exit={{ opacity: 0, y: -10 }}
                       className="space-y-6"
                     >
-                      {/* Editorial Welcome Header */}
-                      <div className="space-y-1.5">
-                        <h1 className="text-3xl font-serif font-black tracking-tight text-[#231F1D]">
-                          Curated Treatments
-                        </h1>
-                        <p className="text-xs text-[#6E655F] font-medium">
-                          Select up to {MAX_SERVICES} services for a seamless combined appointment.
-                        </p>
-                      </div>
-
                       <div className="space-y-3">
                         <div className="relative group">
                           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6E5660] group-focus-within:text-[#C4466F] transition-colors" size={16} />
