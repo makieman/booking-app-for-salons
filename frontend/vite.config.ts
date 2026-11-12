@@ -32,10 +32,8 @@ export default defineConfig({
       manifest: {
         name: 'Flo Sisterlocks',
         short_name: 'Flobooking',
-        description: 'Flo Sisterlocks — Certified Sisterlocks studio in Eldoret',
+        description: 'Flo Sisterlocks Certified Sisterlocks studio in Eldoret',
         start_url: '/',
-        theme_color: '#f5f5f5',
-        background_color: '#f5f5f5',
         display: 'standalone',
         icons: [
           {

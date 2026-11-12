@@ -159,6 +159,12 @@ export interface Tenant {
   mpesaPaybillNumber?: string;
   supportPhone?: string;
   supportEmail?: string;
+  /** Only present on owner settings responses, never on the public tenant. */
+  smsEnabled?: boolean;
+  smsAvailable?: boolean;
+  smsCredits?: number;
+  smsLowBalance?: boolean;
+  smsTopUpContact?: string;
   plan: 'free' | 'paid';
   isActive: boolean;
 }

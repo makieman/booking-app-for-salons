@@ -150,7 +150,12 @@ export function AdminPortal({
       >
         {/* Header */}
         <div className="p-8 pb-6 border-b border-brand-black/10 text-center space-y-3 bg-brand-gray-50/50">
-          <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full border-2 border-brand-black/10 overflow-hidden bg-brand-white shadow-sm">
+          <div
+            className="h-16 w-16 mx-auto flex items-center justify-center rounded-full border-2 border-brand-black/10 overflow-hidden
+            bg-brand-white shadow-sm cursor-pointer hover:scale-105 transition-transform"
+            onClick={() => navigate('customer', tenantSlug || undefined)}
+            title="Go to Services Page"
+          >
             <img
               src={tenant?.branding?.logoUrl || '/logo-bg.jpg'}
               alt={tenant?.name || 'Salon Logo'}
@@ -201,24 +206,6 @@ export function AdminPortal({
           {tab === 'owner' ? (
             /* ── Owner Login Form ── */
             <form onSubmit={handleOwnerSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-gray-600 block">
-                  Salon ID.
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={ownerSlug}
-                  onChange={e => {
-                    setOwnerSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                    setOwnerError(null);
-                  }}
-                  placeholder="e.g. flo-sisterlocks"
-                  disabled={!!tenantSlug}
-                  className="w-full bg-brand-white border-2 border-brand-black/20 focus:border-brand-black p-3.5 text-sm font-medium rounded-lg focus:outline-none transition-colors disabled:bg-brand-gray-100 disabled:text-brand-gray-500"
-                />
-              </div>
-
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-gray-600 block">
                   Owner Email
@@ -330,24 +317,6 @@ export function AdminPortal({
           ) : (
             /* ── Staff PIN Login Form ── */
             <div className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-gray-600 block">
-                  Salon ID (Slug)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={staffSlug}
-                  onChange={e => {
-                    setStaffSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                    setStaffPinError(false);
-                  }}
-                  placeholder="e.g. flo-sisterlocks"
-                  disabled={!!tenantSlug}
-                  className="w-full bg-brand-white border-2 border-brand-black/20 focus:border-brand-black p-3.5 text-sm font-medium rounded-lg focus:outline-none transition-colors disabled:bg-brand-gray-100 disabled:text-brand-gray-500"
-                />
-              </div>
-
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-[0.25em] text-brand-gray-600 block">
                   Staff Username
