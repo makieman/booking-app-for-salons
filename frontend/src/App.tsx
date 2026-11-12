@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig, useScroll, useTransform, useSpring } from 'motion/react';
 import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
@@ -1113,6 +1113,7 @@ export default function App() {
 
   try {
     return (
+      <MotionConfig reducedMotion="user">
       <div className={`min-h-screen ${viewMode === 'admin' && ownerToken ? 'w-full lg:max-w-none' : 'max-w-lg'} mx-auto bg-brand-white relative flex flex-col font-sans tracking-tight`}>
         <AnimatePresence>
           {apiError && (
@@ -2299,6 +2300,7 @@ export default function App() {
 
         <div className="h-1 w-full bg-brand-black mt-auto"></div>
       </div>
+      </MotionConfig>
     );
   } catch (err: any) {
     return (
@@ -2371,21 +2373,31 @@ function ServiceSelectionCard({
   onSelect: () => void;
   key?: React.Key;
 }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: cardRef,
+    offset: ['start end', 'end 72px'],
+  });
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 300,
+    damping: 32,
+    restDelta: 0.001,
+  });
+
+  const opacity = useTransform(smoothProgress, [0, 0.12, 0.86, 1], [0, 1, 1, 0]);
+  const y = useTransform(smoothProgress, [0, 0.12, 0.86, 1], [16, 0, 0, -8]);
+  const scale = useTransform(smoothProgress, [0, 0.12, 0.86, 1], [0.98, 1, 1, 0.98]);
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 22, scale: 0.98 }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: true, margin: '-20px' }}
-      transition={{
-        duration: 0.45,
-        ease: [0.16, 1, 0.3, 1],
-      }}
+      ref={cardRef}
+      style={{ opacity, y, scale, willChange: 'transform, opacity' }}
       whileTap={{ scale: 0.99 }}
       className={`
-        flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-all duration-300 rounded-2xl border relative overflow-hidden backdrop-blur-md
+        flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-[background-color,border-color,box-shadow] duration-200 rounded-2xl border relative overflow-hidden
         ${isSelected
-          ? 'bg-[#FFF5F8]/90 border-[#C4466F] shadow-md ring-2 ring-[#C4466F]/25'
-          : 'bg-white/80 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F] hover:shadow-xs'}
+          ? 'bg-[#FFF5F8] border-[#C4466F] shadow-md ring-2 ring-[#C4466F]/25'
+          : 'bg-white/95 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F] hover:shadow-xs'}
       `}
       onClick={onSelect}
     >
