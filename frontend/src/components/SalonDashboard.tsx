@@ -221,7 +221,7 @@ export function SalonDashboard({
             <span className="text-[11px] font-black uppercase tracking-widest text-brand-gray-500">
               Confirmed Today
             </span>
-            <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
+            <div className="p-2.5 text-emerald-700 rounded-xl">
               <Clock size={18} />
             </div>
           </div>
