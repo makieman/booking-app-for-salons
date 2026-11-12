@@ -128,3 +128,51 @@ export function requireAttendantAuth(req: Request, res: Response, next: NextFunc
     res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// requireStaffOrOwnerAuth
+// Validates a Bearer JWT with role='owner' OR role='attendant' and checks
+// that the token's tenantId matches the resolved tenant.
+// ════════════════════════════════════════════════════════════════════════════
+export function requireStaffOrOwnerAuth(req: Request, res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  const token = authHeader.slice(7);
+
+  let secret: string;
+  try {
+    secret = getJwtSecret();
+  } catch {
+    res.status(500).json({ error: 'Server configuration error' });
+    return;
+  }
+
+  try {
+    const payload = jwt.verify(token, secret) as any;
+
+    if (payload.role !== 'owner' && payload.role !== 'attendant') {
+      res.status(403).json({ error: 'Forbidden — staff or owner credentials required' });
+      return;
+    }
+
+    if (payload.tenantId !== req.tenant!._id.toString()) {
+      res.status(403).json({ error: 'Forbidden — token does not belong to this tenant' });
+      return;
+    }
+
+    if (payload.role === 'owner') {
+      req.owner = { tenantId: payload.tenantId, role: 'owner' };
+    } else {
+      req.attendant = { id: payload.sub, name: payload.name, role: 'attendant', tenantId: payload.tenantId };
+    }
+
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}

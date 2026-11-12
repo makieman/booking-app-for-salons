@@ -61,7 +61,7 @@ async function run() {
     const updated = await Tenant.findOneAndUpdate(
       { slug },
       { $set: { whatsappPhoneNumberId: phoneId.trim() } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updated) {
