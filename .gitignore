@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Temporary planning and working docs
+temp-*
+docs/temp-*
+docs/whatsapp-crm-plan.md

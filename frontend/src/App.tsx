@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, MotionConfig, useScroll, useTransform, useSpring } from 'motion/react';
-import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles } from 'lucide-react';
+import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles, UserCheck } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
 import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
@@ -17,6 +17,7 @@ import { AdminPortal } from './components/AdminPortal';
 import { CustomerAccountModal } from './components/CustomerAccountModal';
 import { DateTimeSelectionScreen } from './components/DateTimeSelectionScreen';
 import { AdminView } from './components/admin/AdminView';
+import { BrandAppLoader } from './components/BrandAppLoader';
 import { getTodayDateString, formatDateInTimezone } from './utils/dateUtils';
 
 /** Formats a service price as a fixed price or a range.
@@ -193,10 +194,23 @@ export default function App() {
   }, []);
 
   // Data from API
-  const [services, setServices] = useState<Service[]>([]);
+  // Initialize with cached services or top 3 default services so they appear on top instantly
+  const [services, setServices] = useState<Service[]>(() => {
+    try {
+      const cached = localStorage.getItem('cachedServices');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return FALLBACK_SERVICES.slice(0, 3);
+  });
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSyncingServices, setIsSyncingServices] = useState(true);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -304,8 +318,11 @@ export default function App() {
     const refToRestore = bookingRef || (!createdBooking && activeStep === 'service' ? localStorage.getItem('lastBookingReference') : null);
     if (!refToRestore) return;
 
+    const phoneToRestore = api.findStoredPhone(refToRestore, clientInfo.phone);
+    if (!phoneToRestore) return;
+
     if (!createdBooking || createdBooking.reference !== refToRestore) {
-      api.lookupBookings({ reference: refToRestore })
+      api.lookupBookings({ reference: refToRestore, phone: phoneToRestore })
         .then(results => {
           if (results && results.length > 0) {
             const found = results[0];
@@ -313,11 +330,11 @@ export default function App() {
             if (found.date) setSelectedDate(found.date);
             if (found.startTime) setSelectedTime(found.startTime);
             if (found.customerName || found.phone || found.email) {
-              setClientInfo({
-                name: found.customerName || '',
-                phone: found.phone || '',
-                email: found.email || '',
-              });
+              setClientInfo(prev => ({
+                name: found.customerName || prev.name,
+                phone: phoneToRestore || found.phone || prev.phone,
+                email: found.email || prev.email,
+              }));
             }
             if (typeof found.serviceId === 'object' && found.serviceId) {
               setSelectedServices([found.serviceId as Service]);
@@ -334,16 +351,19 @@ export default function App() {
           console.warn('[App] Failed to auto-restore booking reference:', err);
         });
     }
-  }, [bookingRef, tenantLoading]);
+  }, [bookingRef, tenantLoading, clientInfo.phone]);
 
   // Live polling for booking status updates when on confirmation screen
   useEffect(() => {
     if (activeStep !== 'confirmation' || !createdBooking?.reference) return;
 
+    const bookingPhone = api.findStoredPhone(createdBooking.reference, clientInfo.phone);
+    if (!bookingPhone) return;
+
     let isCancelled = false;
     const checkBookingStatus = async () => {
       try {
-        const results = await api.lookupBookings({ reference: createdBooking.reference });
+        const results = await api.lookupBookings({ reference: createdBooking.reference, phone: bookingPhone });
         if (!isCancelled && results && results.length > 0) {
           const latest = results[0];
           const statusChanged = latest.status !== createdBooking.status;
@@ -385,24 +405,23 @@ export default function App() {
     };
   }, [activeStep, createdBooking?.reference, createdBooking?.status, createdBooking?.attendantId]);
 
-  // Lookup Booking State
-  const [lookupQuery, setLookupQuery] = useState('');
-  const [lookupType, setLookupType] = useState<'reference' | 'phone'>('reference');
+  // Lookup Booking State (requires both reference and phone)
+  const [lookupReference, setLookupReference] = useState('');
+  const [lookupPhone, setLookupPhone] = useState(() => clientInfo.phone || localStorage.getItem('lastBookingPhone') || '');
   const [lookupResults, setLookupResults] = useState<Booking[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeStep === 'lookup' && !lookupQuery) {
+    if (activeStep === 'lookup' && !lookupReference) {
       try {
-        const saved = localStorage.getItem('lastBookingReference');
-        if (saved) {
-          setLookupQuery(saved);
-          setLookupType('reference');
-        }
+        const savedRef = localStorage.getItem('lastBookingReference');
+        if (savedRef) setLookupReference(savedRef);
+        const savedPhone = localStorage.getItem('lastBookingPhone') || clientInfo.phone;
+        if (savedPhone) setLookupPhone(savedPhone);
       } catch { }
     }
-  }, [activeStep, lookupQuery]);
+  }, [activeStep, lookupReference, clientInfo.phone]);
 
   // Customer Cancellation
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
@@ -545,11 +564,21 @@ export default function App() {
       };
     }
 
+    // Keep backend warm on app open and periodically while browsing
+    api.pingBackendKeepWarm();
+    const keepWarmTimer = setInterval(() => {
+      api.pingBackendKeepWarm();
+    }, 10 * 60 * 1000);
+
     const fetchInitialData = async () => {
       try {
-        setIsLoading(true);
+        if (services.length <= 3) {
+          setIsSyncingServices(true);
+        }
         const fetchedServices = await api.getServices();
-        setServices(fetchedServices);
+        if (Array.isArray(fetchedServices) && fetchedServices.length > 0) {
+          setServices(fetchedServices);
+        }
 
         if (isAdmin) {
           const fetchedBookings = await api.getBookings();
@@ -557,16 +586,20 @@ export default function App() {
         }
         setApiError(null);
       } catch (err) {
-        console.error('Failed to fetch data, falling back to mock data', err);
-        setServices(FALLBACK_SERVICES);
-        setApiError('Unable to connect to server. Showing offline data.');
+        console.warn('Sync notice: using cached/offline data', err);
+        setServices(prev => (prev.length > 0 ? prev : FALLBACK_SERVICES));
+        if (services.length === 0) {
+          setApiError('Unable to connect to server. Showing offline data.');
+        }
       } finally {
         setIsLoading(false);
+        setIsSyncingServices(false);
       }
     };
     fetchInitialData();
 
     return () => {
+      clearInterval(keepWarmTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -672,13 +705,7 @@ export default function App() {
       setBookings(prev => [...prev, newBooking]);
       try {
         if (newBooking?.reference) {
-          localStorage.setItem('lastBookingReference', newBooking.reference);
-          const refsRaw = localStorage.getItem('customerBookingRefs');
-          const refsList: string[] = refsRaw ? JSON.parse(refsRaw) : [];
-          if (!refsList.includes(newBooking.reference)) {
-            refsList.unshift(newBooking.reference);
-            localStorage.setItem('customerBookingRefs', JSON.stringify(refsList.slice(0, 50)));
-          }
+          api.saveStoredBookingRef(newBooking.reference, clientInfo.phone);
         }
         localStorage.setItem('customerProfile', JSON.stringify(clientInfo));
       } catch { }
@@ -731,7 +758,8 @@ export default function App() {
     setShowNotificationPrompt(false);
     setCreatedBooking(null);
     setCopiedReference(false);
-    setLookupQuery('');
+    setLookupReference('');
+    setLookupPhone(clientInfo.phone || '');
     setLookupResults([]);
     setLookupError(null);
     setReschedulingBooking(null);
@@ -748,7 +776,21 @@ export default function App() {
     } catch { }
   };
 
-  // ── Confirmation Screen Helpers & Action Handlers ─────────────────────────
+  const handleLogoClick = () => {
+    resetFlow();
+    setShowCustomerAccountModal(false);
+    setShowPinModal(false);
+    if (viewMode !== 'customer') {
+      setUserMode('customer');
+      navigate('customer', tenantSlug || undefined);
+    } else {
+      try {
+        window.history.pushState({ step: 'service' }, '', window.location.pathname);
+      } catch { }
+    }
+  };
+
+  // ── Confirmation Screen Helpers & Action Handlers
   const handleCopyReference = async () => {
     const ref = createdBooking?.reference;
     if (!ref) return;
@@ -773,8 +815,7 @@ export default function App() {
 
   const handleCheckBookingStatus = (ref?: string) => {
     const referenceToSearch = ref || createdBooking?.reference || '';
-    setLookupType('reference');
-    setLookupQuery(referenceToSearch);
+    setLookupReference(referenceToSearch);
     setLookupError(null);
     setLookupResults([]);
     setActiveStep('lookup');
@@ -782,20 +823,24 @@ export default function App() {
       try {
         localStorage.setItem('lastBookingReference', referenceToSearch);
       } catch { }
-      setLookupLoading(true);
-      api.lookupBookings({ reference: referenceToSearch })
-        .then(results => {
-          setLookupResults(results);
-          if (results.length === 0) {
-            setLookupError('No bookings found matching your search.');
-          }
-        })
-        .catch((err: any) => {
-          setLookupError(err?.message || 'Failed to search bookings.');
-        })
-        .finally(() => {
-          setLookupLoading(false);
-        });
+      const phone = api.findStoredPhone(referenceToSearch, clientInfo.phone);
+      if (phone) {
+        setLookupPhone(phone);
+        setLookupLoading(true);
+        api.lookupBookings({ reference: referenceToSearch, phone })
+          .then(results => {
+            setLookupResults(results);
+            if (results.length === 0) {
+              setLookupError('No bookings found matching your search.');
+            }
+          })
+          .catch((err: any) => {
+            setLookupError(err?.message || 'Failed to search bookings.');
+          })
+          .finally(() => {
+            setLookupLoading(false);
+          });
+      }
     }
   };
 
@@ -805,7 +850,13 @@ export default function App() {
       url.searchParams.set('ref', reference);
       window.history.pushState({}, '', url.toString());
     } catch { }
-    api.lookupBookings({ reference }).then(results => {
+    const phone = api.findStoredPhone(reference, clientInfo.phone);
+    if (!phone) {
+      setLookupReference(reference);
+      setActiveStep('lookup');
+      return;
+    }
+    api.lookupBookings({ reference, phone }).then(results => {
       if (results && results.length > 0) {
         const b = results[0];
         setCreatedBooking(b);
@@ -814,7 +865,7 @@ export default function App() {
         if (b.customerName || b.phone || b.email) {
           setClientInfo({
             name: b.customerName || clientInfo.name,
-            phone: b.phone || clientInfo.phone,
+            phone: phone || b.phone || clientInfo.phone,
             email: b.email || clientInfo.email,
           });
         }
@@ -907,18 +958,22 @@ export default function App() {
       const bookingMatch = url.match(/\/bookings\/([A-Za-z0-9-]+)/);
       if (bookingMatch && bookingMatch[1]) {
         const queryVal = bookingMatch[1];
-        setLookupQuery(queryVal);
+        setLookupReference(queryVal);
         setActiveStep('lookup');
-        setLookupLoading(true);
         setLookupError(null);
-        api.lookupBookings(queryVal.includes('-') ? { reference: queryVal } : { phone: queryVal })
-          .then(data => {
-            setLookupResults(data || []);
-          })
-          .catch(err => {
-            setLookupError(err?.message || 'Booking lookup failed');
-          })
-          .finally(() => setLookupLoading(false));
+        const phone = api.findStoredPhone(queryVal, clientInfo.phone);
+        if (phone) {
+          setLookupPhone(phone);
+          setLookupLoading(true);
+          api.lookupBookings({ reference: queryVal, phone })
+            .then(data => {
+              setLookupResults(data || []);
+            })
+            .catch(err => {
+              setLookupError(err?.message || 'Booking lookup failed');
+            })
+            .finally(() => setLookupLoading(false));
+        }
       } else {
         resetFlow();
       }
@@ -930,24 +985,28 @@ export default function App() {
     if (activeStep === 'contact') setActiveStep('date');
   };
 
-  // ── Lookup Handlers ────────────────────────────────────────────────────────
+  //Lookup Handlers (requires reference + phone)
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lookupQuery.trim()) return;
+    if (!lookupReference.trim() || !lookupPhone.trim()) {
+      setLookupError('Please enter both booking reference and phone number.');
+      return;
+    }
 
     setLookupLoading(true);
     setLookupError(null);
     setLookupResults([]);
 
     try {
-      const results = await api.lookupBookings(
-        lookupType === 'reference'
-          ? { reference: lookupQuery }
-          : { phone: lookupQuery }
-      );
+      const results = await api.lookupBookings({
+        reference: lookupReference.trim(),
+        phone: lookupPhone.trim(),
+      });
       setLookupResults(results);
       if (results.length === 0) {
-        setLookupError('No bookings found matching your search.');
+        setLookupError('No bookings found matching your reference and phone number.');
+      } else {
+        api.saveStoredBookingRef(lookupReference.trim(), lookupPhone.trim());
       }
     } catch (err: any) {
       setLookupError(err.message || 'Failed to search bookings.');
@@ -960,13 +1019,21 @@ export default function App() {
     const confirmCancel = window.confirm('Are you sure you want to cancel this booking? This action cannot be undone.');
     if (!confirmCancel) return;
 
+    const b = lookupResults.find(item => item._id === id);
+    let phone = lookupPhone.trim() || api.findStoredPhone(b?.reference || '', clientInfo.phone);
+    if (!phone) {
+      const entered = window.prompt('Please enter the phone number used for this booking to confirm cancellation:');
+      if (!entered) return;
+      phone = entered.trim();
+    }
+
     setCancelLoading(true);
     try {
-      await api.cancelBookingCustomer(id);
+      await api.cancelBookingCustomer(id, phone);
       setLookupResults(prev => prev.map(b => b._id === id ? { ...b, status: 'cancelled' as const } : b));
-      alert('Your appointment has been successfully cancelled.');
+      triggerToast('Your appointment has been cancelled.', 'success');
     } catch (err: any) {
-      alert(err.message || 'Failed to cancel booking.');
+      triggerToast(err.message || 'Failed to cancel booking.', 'error');
     } finally {
       setCancelLoading(false);
     }
@@ -1013,11 +1080,19 @@ export default function App() {
   const handleConfirmReschedule = async () => {
     if (!reschedulingBooking || !rescheduleTime) return;
 
+    let phone = lookupPhone.trim() || api.findStoredPhone(reschedulingBooking.reference, clientInfo.phone);
+    if (!phone) {
+      const entered = window.prompt('Please enter the phone number used for this booking to confirm reschedule:');
+      if (!entered) return;
+      phone = entered.trim();
+    }
+
     setRescheduleSubmitting(true);
     try {
       const updated = await api.rescheduleBookingCustomer(reschedulingBooking._id, {
         date: rescheduleDate,
-        startTime: rescheduleTime
+        startTime: rescheduleTime,
+        phone,
       });
 
       // Update in lookup results list
@@ -1039,10 +1114,10 @@ export default function App() {
         });
       }
 
-      alert('Appointment successfully rescheduled! It has been set to pending for review.');
+      triggerToast('Appointment rescheduled! Set to pending for salon review.', 'success');
       setReschedulingBooking(null);
     } catch (err: any) {
-      alert(err.message || 'Failed to reschedule appointment.');
+      triggerToast(err.message || 'Failed to reschedule appointment.', 'error');
     } finally {
       setRescheduleSubmitting(false);
     }
@@ -1076,37 +1151,148 @@ export default function App() {
 
 
   if (tenantLoading) {
-    return (
-      <div className="min-h-screen bg-brand-white flex flex-col items-center justify-center font-sans">
-        <div className="space-y-4 text-center">
-          <div className="w-12 h-12 border-4 border-brand-black border-t-transparent rounded-full animate-spin mx-auto" style={{ borderColor: 'var(--brand-color, #1F1F1F) transparent var(--brand-color, #1F1F1F) var(--brand-color, #1F1F1F)' }} />
-          <p className="text-[11px] font-black uppercase tracking-widest text-brand-gray-500">Loading salon details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (viewMode === 'select') {
-    return <TenantSelectView />;
-  }
-
-  if (viewMode === 'register') {
-    return <TenantRegisterView />;
+    return <BrandAppLoader />;
   }
 
   if (tenantError) {
     return (
-      <div className="min-h-screen bg-brand-white flex flex-col items-center justify-center p-6 font-sans">
-        <div className="border border-brand-gray-100 bg-white p-8 space-y-6 shadow-2xl max-w-sm text-center rounded-xl">
-          <div className="text-red-500 font-bold text-3xl">⚠️ Error</div>
-          <p className="text-sm text-brand-gray-600 font-medium">{tenantError}</p>
-          <button
-            onClick={() => navigate('select')}
-            className="w-full bg-brand-black text-white py-3 rounded-full font-semibold uppercase tracking-wider text-xs shadow-md hover:bg-brand-gray-800 transition-all cursor-pointer"
+      <div className="min-h-screen bg-[#FAF8F5] text-[#231F1D] relative overflow-hidden flex flex-col justify-between font-sans selection:bg-[#C4466F]/15">
+        {/* Framer-style architectural grid + radial ambient glow */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#f0d5de40_1px,transparent_1px),linear-gradient(to_bottom,#f0d5de40_1px,transparent_1px)] bg-[size:32px_32px] sm:bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_80%_70%_at_50%_40%,#000_60%,transparent_100%)]"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[340px] sm:w-[640px] h-[340px] sm:h-[420px] rounded-full bg-gradient-to-tr from-[#C4466F]/12 via-[#D4A359]/10 to-transparent blur-3xl"
+        />
+
+        {/* Top Bar (Desktop & Mobile) */}
+        <header className="relative z-10 w-full max-w-5xl mx-auto px-5 sm:px-8 pt-5 sm:pt-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border border-[#F0D5DE] bg-black shadow-xs flex items-center justify-center shrink-0">
+              <img
+                src="/android-chrome-512x512.png"
+                alt="Flo Sisterlocks"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div>
+              <span className="block font-serif font-black text-base sm:text-lg tracking-tight text-[#231F1D] leading-none">
+                Flo Sisterlocks
+              </span>
+              <span className="block text-[10px] uppercase tracking-[0.2em] text-[#6E655F] font-bold mt-1">
+                Client Concierge
+              </span>
+            </div>
+          </div>
+
+          <div className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-[#F0D5DE] shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#231F1D]">
+              Updating
+            </span>
+          </div>
+        </header>
+
+        {/* Main Centerpiece (Desktop Editorial Layout + Mobile Card Stack) */}
+        <main className="relative z-10 flex-1 flex items-center justify-center px-5 sm:px-8 py-10 sm:py-16">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+            className="w-full max-w-2xl mx-auto text-center space-y-8 sm:space-y-10"
           >
-            Go back to Selector
-          </button>
-        </div>
+            {/* Hero Copy */}
+            <div className="space-y-4 sm:space-y-5">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#C4466F]/10 border border-[#C4466F]/20 text-[#C4466F] text-[11px] font-extrabold uppercase tracking-[0.22em]">
+                <Clock size={13} className="shrink-0" />
+                <span>Brief Scheduled Refresh</span>
+              </div>
+
+              <h1 className="text-3xl sm:text-5xl lg:text-[54px] font-serif font-black tracking-tight text-[#231F1D] leading-[1.12]">
+                We&apos;ll be back online in a few moments.
+              </h1>
+
+              <p className="text-sm sm:text-base lg:text-lg text-[#6E655F] font-medium max-w-xl mx-auto leading-relaxed">
+                Thank you for your patience while we fine-tune our booking studio. All existing appointments remain safely confirmed.
+              </p>
+            </div>
+
+            {/* Action Buttons (Full-width stack on Mobile, Side-by-side Pill Row on Desktop) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 max-w-md sm:max-w-none mx-auto">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-full bg-[#231F1D] text-white font-bold uppercase tracking-[0.16em] text-xs shadow-luxury hover:bg-[#C4466F] active:scale-[0.98] transition-all cursor-pointer min-h-[48px]"
+              >
+                <Loader2 size={15} className="animate-spin" />
+                <span>Refresh Page</span>
+              </button>
+
+              <a
+                href="https://wa.me/254783746104?text=Hi%20Flo%20Sisterlocks%2C%20I%20would%20like%20to%20inquire%20about%20an%20appointment."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-full bg-white/90 backdrop-blur-md border border-[#F0D5DE] text-[#231F1D] font-bold uppercase tracking-[0.16em] text-xs shadow-2xs hover:border-[#C4466F] hover:text-[#C4466F] active:scale-[0.98] transition-all min-h-[48px]"
+              >
+                <MessageCircle size={15} className="text-emerald-600 shrink-0" />
+                <span>Chat on WhatsApp</span>
+              </a>
+            </div>
+
+            {/* Flowstep-style 3-Card Bento Status Strip (1 col Mobile, 3 cols Desktop) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-left pt-2">
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/85 backdrop-blur-md border border-[#F0D5DE] shadow-2xs flex sm:flex-col items-center sm:items-start gap-3.5 sm:gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-700 flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={17} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6E655F]">
+                    Saved Bookings
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-[#231F1D] mt-0.5">
+                    100% Safe &amp; Confirmed
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/85 backdrop-blur-md border border-[#F0D5DE] shadow-2xs flex sm:flex-col items-center sm:items-start gap-3.5 sm:gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-700 flex items-center justify-center shrink-0">
+                  <Clock size={17} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6E655F]">
+                    Estimated Wait
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-[#231F1D] mt-0.5">
+                    Just a Few Moments
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-5 rounded-2xl bg-white/85 backdrop-blur-md border border-[#F0D5DE] shadow-2xs flex sm:flex-col items-center sm:items-start gap-3.5 sm:gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#C4466F]/10 border border-[#C4466F]/20 text-[#C4466F] flex items-center justify-center shrink-0">
+                  <Phone size={17} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#6E655F]">
+                    Instant Support
+                  </p>
+                  <p className="text-xs sm:text-sm font-bold text-[#231F1D] mt-0.5">
+                    WhatsApp AI Active 24/7
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </main>
+
+        {/* Minimal Footer */}
+        <footer className="relative z-10 w-full max-w-5xl mx-auto px-5 sm:px-8 pb-6 sm:pb-8 text-center sm:flex sm:items-center sm:justify-between text-[11px] text-[#6E655F] font-medium">
+          <p>Flo Sisterlocks • Certified Sisterlocks™ &amp; Natural Hair Studio</p>
+          <p className="mt-1 sm:mt-0 text-[#8C827B]">Nairobi, Kenya</p>
+        </footer>
       </div>
     );
   }
@@ -1287,7 +1473,7 @@ export default function App() {
             ? 'bg-white/95 backdrop-blur-md shadow-xs border-b border-[#F0D5DE]/80'
             : 'bg-brand-white border-b border-brand-gray-100'
         }`}>
-          <div className="flex items-center gap-4 sm:gap-5 cursor-pointer group" onClick={resetFlow}>
+          <div className="flex items-center gap-4 sm:gap-5 cursor-pointer group" onClick={handleLogoClick} title="Go to Services Page">
             <div className="h-12 w-12 sm:h-14 sm:w-14 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
               <img
                 src={tenant?.branding?.logoUrl || "/logo-bg.jpg"}
@@ -1314,13 +1500,12 @@ export default function App() {
             {userMode === 'customer' && activeStep !== 'lookup' && (
               <button
                 onClick={() => {
-                  if (!lookupQuery) {
+                  if (!lookupReference) {
                     try {
-                      const saved = localStorage.getItem('lastBookingReference');
-                      if (saved) {
-                        setLookupQuery(saved);
-                        setLookupType('reference');
-                      }
+                      const savedRef = localStorage.getItem('lastBookingReference');
+                      if (savedRef) setLookupReference(savedRef);
+                      const savedPhone = localStorage.getItem('lastBookingPhone') || clientInfo.phone;
+                      if (savedPhone) setLookupPhone(savedPhone);
                     } catch { }
                   }
                   setActiveStep('lookup');
@@ -1431,12 +1616,12 @@ export default function App() {
           ) : (
             <div className="flex-1 flex flex-col">
               {activeStep !== 'confirmation' && activeStep !== 'lookup' && (
-                <div className="bg-brand-white px-8 pt-6 pb-12">
-                  <StepIndicator activeStep={activeStep} />
+                <div className="bg-brand-white/80 backdrop-blur-md px-6 sm:px-8 pt-5 pb-6 border-b border-[rgba(240,213,222,0.45)]">
+                  <StepIndicator activeStep={activeStep} onStepClick={navigateStep} />
                 </div>
               )}
 
-              <div className="flex-1 px-8 pb-12 overflow-x-hidden">
+              <div className="flex-1 px-5 sm:px-8 pt-6 pb-12 overflow-x-hidden">
                 <AnimatePresence mode="wait">
                   {activeStep === 'service' && (
                     <motion.div
@@ -1444,92 +1629,134 @@ export default function App() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="space-y-8"
+                      className="space-y-6"
                     >
-                      <div className="space-y-4">
+                      {/* Editorial Welcome Header */}
+                      <div className="space-y-1.5">
+                        <h1 className="text-3xl font-serif font-black tracking-tight text-[#231F1D]">
+                          Curated Treatments
+                        </h1>
+                        <p className="text-xs text-[#6E655F] font-medium">
+                          Select up to {MAX_SERVICES} services for a seamless combined appointment.
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
                         <div className="relative group">
-                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6E5660]" size={16} />
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#6E5660] group-focus-within:text-[#C4466F] transition-colors" size={16} />
                           <input
                             type="text"
-                            placeholder="Search services..."
+                            placeholder="Search treatments (e.g. Retightening, Styling)..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#FFF0F3] border border-[#F0D5DE] rounded-full py-3.5 pl-12 pr-10 focus:outline-none focus:border-[#C4466F] focus:bg-white transition-all font-semibold text-[15px] text-[#1A1215] placeholder:text-[#6E5660]/70"
+                            aria-label="Search treatments"
+                            className="w-full bg-white/85 backdrop-blur-md border border-[#F0D5DE] rounded-2xl py-3.5 pl-11 pr-10 focus:outline-none focus:border-[#C4466F] focus:ring-2 focus:ring-[#C4466F]/15 focus:bg-white transition-all font-semibold text-sm text-[#1A1215] placeholder:text-[#6E5660]/65 shadow-2xs"
                           />
                           {searchQuery && (
                             <button
+                              type="button"
                               onClick={() => setSearchQuery('')}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6E5660] hover:text-[#1A1215]"
+                              aria-label="Clear search"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full text-[#6E5660] hover:text-[#1A1215] hover:bg-[#FAF8F5]"
                             >
                               <X size={14} />
                             </button>
                           )}
                         </div>
+
+                        {/* Category Chips */}
+                        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide py-0.5">
+                          {['All Services', 'Hair Care', 'Sisterlocks', 'Treatments'].map((cat, idx) => {
+                            const isActive = (cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()));
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  if (cat === 'All Services') setSearchQuery('');
+                                  else setSearchQuery(cat.split(' ')[0]);
+                                }}
+                                aria-pressed={Boolean(isActive)}
+                                className={`px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all duration-200 border cursor-pointer ${isActive
+                                  ? 'bg-[#231F1D] text-white border-[#231F1D] shadow-2xs'
+                                  : 'bg-white/80 text-[#523E46] border-[#F0D5DE] hover:border-[#C4466F]/60 hover:text-[#C4466F] hover:bg-white'
+                                  }`}
+                              >
+                                {cat}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
 
-                      {/* Category Chips */}
-                      <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
-                        {['All Services', 'Hair Care', 'Sisterlocks', 'Treatments'].map((cat, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              if (cat === 'All Services') setSearchQuery('');
-                              else setSearchQuery(cat.split(' ')[0]);
-                            }}
-                            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 border ${(cat === 'All Services' && !searchQuery) || (searchQuery && cat.toLowerCase().includes(searchQuery.toLowerCase()))
-                              ? 'bg-[#C4466F] text-white border-[#C4466F] shadow-sm'
-                              : 'bg-white text-[#523E46] border-[#F0D5DE] hover:border-[#C4466F]'
-                              }`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="flex flex-col gap-3 pb-24">
+                      <div className="flex flex-col gap-2.5 pb-28">
                         {isLoading ? (
                           Array.from({ length: 5 }).map((_, i) => (
                             <ServiceSelectionCardSkeleton key={i} />
                           ))
                         ) : filteredServices.length > 0 ? (
-                          filteredServices.map(service => {
-                            const selectedIndex = selectedServices.findIndex(s => s._id === service._id);
-                            const isSelected = selectedIndex !== -1;
-                            const selectionOrder = isSelected ? selectedIndex + 1 : null;
-                            return (
-                              <ServiceSelectionCard
-                                key={service._id}
-                                service={service}
-                                isSelected={isSelected}
-                                selectionOrder={selectionOrder}
-                                onSelect={() => handleToggleService(service)}
-                              />
-                            );
-                          })
+                          <>
+                            {filteredServices.map(service => {
+                              const selectedIndex = selectedServices.findIndex(s => s._id === service._id);
+                              const isSelected = selectedIndex !== -1;
+                              const selectionOrder = isSelected ? selectedIndex + 1 : null;
+                              return (
+                                <ServiceSelectionCard
+                                  key={service._id}
+                                  service={service}
+                                  isSelected={isSelected}
+                                  selectionOrder={selectionOrder}
+                                  onSelect={() => handleToggleService(service)}
+                                />
+                              );
+                            })}
+
+                            {/* Skeleton cards underneath cached top services while client internet is fetching fresh services */}
+                            {isSyncingServices && !searchQuery && (
+                              <div className="space-y-3 pt-2">
+                                <div className="flex items-center gap-2 px-1 text-[11px] font-semibold text-[#8C6D77] animate-pulse">
+                                  <Loader2 size={12} className="animate-spin text-[#C4466F]" />
+                                  <span>Loading additional services...</span>
+                                </div>
+                                {Array.from({ length: 2 }).map((_, i) => (
+                                  <ServiceSelectionCardSkeleton key={`sync-skel-${i}`} />
+                                ))}
+                              </div>
+                            )}
+                          </>
                         ) : (
-                          <div className="py-12 text-center border border-dashed border-[#F0D5DE] rounded-2xl bg-white">
-                            <p className="text-[#523E46] text-sm font-medium">No services found matching your criteria.</p>
+                          <div className="py-12 px-6 text-center border border-dashed border-[#F0D5DE] rounded-2xl bg-white/80 space-y-3">
+                            <Scissors size={24} className="mx-auto text-[#C4466F]/70" />
+                            <p className="text-[#231F1D] text-sm font-serif font-bold">No treatments match &ldquo;{searchQuery}&rdquo;</p>
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery('')}
+                              className="text-xs font-bold uppercase tracking-wider text-[#C4466F] underline cursor-pointer"
+                            >
+                              Show all services
+                            </button>
                           </div>
                         )}
                       </div>
                       <AnimatePresence>
                         {selectedServices.length > 0 && (
                           <motion.div
-                            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 50, scale: 0.95 }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-                            className="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-50"
+                            initial={{ opacity: 0, y: 40 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 40 }}
+                            transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+                            className="fixed bottom-0 left-0 right-0 z-40 bg-[rgba(44,34,30,0.92)] backdrop-blur-[16px] border-t border-white/12 shadow-2xl"
                           >
-                            <div className="bg-[#1A1215] text-white p-4.5 rounded-2xl shadow-2xl border border-white/10 backdrop-blur-md space-y-3">
+                            <div className="max-w-md mx-auto px-4 py-3 sm:py-3.5 space-y-2.5 text-white">
                               {selectedServices.length === 2 && (
-                                <div className="flex items-center justify-between text-xs border-b border-white/10 pb-2.5">
-                                  <span className="text-white/80 truncate pr-2">
-                                    <strong className="text-white">1st:</strong> {selectedServices[0].name} ➔ <strong className="text-white">2nd:</strong> {selectedServices[1].name}
+                                <div className="flex items-center justify-between text-xs border-b border-white/12 pb-2">
+                                  <span className="text-white/85 truncate pr-2">
+                                    <strong className="text-[#E8829F]">1st:</strong> {selectedServices[0].name} ➔ <strong className="text-[#E8829F]">2nd:</strong> {selectedServices[1].name}
                                   </span>
                                   <button
+                                    type="button"
                                     onClick={handleSwapServices}
-                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white font-medium transition-colors cursor-pointer shrink-0"
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold transition-colors cursor-pointer shrink-0 text-[11px]"
                                     title="Swap which service comes first"
                                   >
                                     <ArrowUpDown size={12} />
@@ -1537,20 +1764,22 @@ export default function App() {
                                   </button>
                                 </div>
                               )}
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-xs text-white/60 uppercase tracking-wider font-semibold">
-                                    {selectedServices.length === 1 ? '1 Service Selected' : '2 Services Selected'}
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="space-y-0.5">
+                                  <p className="text-[11px] text-white/75 uppercase tracking-wider font-bold">
+                                    {selectedServices.length === 1 ? '1 service' : '2 services'} • {Math.floor(totalServiceDuration / 60) > 0 ? `${Math.floor(totalServiceDuration / 60)}h ` : ''}{totalServiceDuration % 60 > 0 ? `${totalServiceDuration % 60}m` : ''}
                                   </p>
-                                  <p className="text-sm font-bold text-white mt-0.5">
-                                    KES {totalServicePrice.toLocaleString()} • {Math.floor(totalServiceDuration / 60) > 0 ? `${Math.floor(totalServiceDuration / 60)}h ` : ''}{totalServiceDuration % 60 > 0 ? `${totalServiceDuration % 60}m` : ''}
+                                  <p className="text-base font-black tracking-tight text-white">
+                                    KES {totalServicePrice.toLocaleString()}
                                   </p>
                                 </div>
                                 <button
+                                  type="button"
                                   onClick={() => navigateStep('date')}
-                                  className="bg-[#C4466F] text-white px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-[#A83257] active:scale-95 transition-all cursor-pointer shadow-lg"
+                                  className="min-h-[46px] px-7 bg-[#C4466F] text-white font-bold text-xs uppercase tracking-[0.2em] rounded-xl transition-all hover:bg-[#A83257] hover:tracking-[0.24em] active:scale-[0.98] shadow-lg shrink-0 cursor-pointer flex items-center gap-2"
                                 >
-                                  {selectedServices.length === 1 ? 'Continue (1)' : 'Continue (2)'}
+                                  <span>Choose Time</span>
+                                  <ChevronRight size={15} />
                                 </button>
                               </div>
                             </div>
@@ -1587,106 +1816,197 @@ export default function App() {
                     </motion.div>
                   )}
 
-
-
-
                   {activeStep === 'contact' && (
                     <motion.div
                       key="contact"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="space-y-12"
+                      className="space-y-6 pb-28"
                     >
-                      <button onClick={handleStepBack} className="flex items-center gap-3 text-brand-black hover:translate-x-[-4px] transition-all duration-300">
-                        <ArrowLeft size={16} strokeWidth={3} />
-                        <span className="text-sm font-black uppercase tracking-[0.2em]">Previous</span>
-                      </button>
+                      {/* Top Navigation */}
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={handleStepBack}
+                          aria-label="Go back to date and time selection"
+                          className="flex items-center gap-2 text-[#231F1D] hover:translate-x-[-3px] transition-all duration-200 min-h-[44px] -ml-2 px-2 cursor-pointer"
+                        >
+                          <ArrowLeft size={18} strokeWidth={2.5} />
+                          <span className="text-xs font-bold uppercase tracking-[0.2em]">Previous</span>
+                        </button>
+                      </div>
 
-                      <div className="space-y-10">
-                        <section className="bg-brand-gray-50 p-6 sm:p-8 flex items-center justify-between rounded-2xl border border-brand-gray-100 shadow-xs">
+                      <div className="space-y-1">
+                        <h1 className="text-3xl font-serif font-black tracking-tight text-[#231F1D]">
+                          Your Details
+                        </h1>
+                        <p className="text-xs text-[#6E655F] font-medium">
+                          Review your booking summary and enter where we should send your salon pass.
+                        </p>
+                      </div>
+
+                      {/* Ticket-Style Booking Summary Card with Quick Edit Links */}
+                      <section
+                        aria-label="Selected appointment summary"
+                        className="relative overflow-hidden bg-white/85 backdrop-blur-md p-5 sm:p-6 rounded-2xl border border-[rgba(240,213,222,0.85)] shadow-luxury space-y-4"
+                      >
+                        <div className="flex items-start justify-between gap-3 border-b border-[rgba(240,213,222,0.6)] pb-3.5">
                           <div className="space-y-1">
-                            <p className="text-xs uppercase font-bold tracking-wider text-brand-gray-600">Appointment Detail</p>
-                            <p className="font-serif text-2xl font-bold leading-snug text-brand-black">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] uppercase font-extrabold tracking-[0.2em] text-[#C4466F]">
+                                Appointment Summary
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => navigateStep('service')}
+                                className="text-[11px] font-bold text-[#6E655F] hover:text-[#C4466F] underline cursor-pointer"
+                              >
+                                Edit Services
+                              </button>
+                            </div>
+                            <p className="font-serif text-xl font-black leading-snug text-[#231F1D]">
                               {selectedServices.map(s => s.name).join(' + ')}
                             </p>
-                            <p className="text-xs font-semibold text-brand-gray-500 mt-2">
-                              {new Date(selectedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {selectedTime}
-                            </p>
                           </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-black tracking-tight text-brand-black">
+                          <div className="text-right shrink-0">
+                            <p className="text-lg font-black tracking-tight text-[#231F1D]">
                               KES {totalServicePrice.toLocaleString()}
                             </p>
-                            <p className="text-xs text-brand-gray-500 font-semibold mt-0.5">
+                            <p className="text-[11px] text-[#6E655F] font-semibold">
                               {Math.floor(totalServiceDuration / 60) > 0 ? `${Math.floor(totalServiceDuration / 60)}h ` : ''}{totalServiceDuration % 60 > 0 ? `${totalServiceDuration % 60}m` : ''}
                             </p>
                           </div>
-                        </section>
+                        </div>
 
-                        <section className="space-y-8">
-                          <div className="space-y-2">
-                            <h2 className="text-3xl sm:text-4xl font-serif font-black tracking-tight text-brand-black">Client Details</h2>
-                            <div className="w-12 h-1 bg-primary rounded-full"></div>
+                        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#6E655F]">
+                          <div className="flex items-center gap-4 flex-wrap">
+                            <span className="inline-flex items-center gap-1.5 font-semibold text-[#231F1D]">
+                              <Calendar size={14} className="text-[#C4466F]" />
+                              <span>{confirmationFriendlyDate || selectedDate}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 font-semibold text-[#231F1D]">
+                              <Clock size={14} className="text-[#C4466F]" />
+                              <span>{confirmationTimeRange || selectedTime}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 font-medium text-[#6E655F]">
+                              <User size={14} className="text-[#C4466F]" />
+                              <span>{selectedAttendant?.name || 'Any Available Specialist'}</span>
+                            </span>
                           </div>
-                          <div className="space-y-6">
-                            <div className="space-y-2 group">
-                              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Full Name</label>
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  placeholder="e.g. Jane Doe"
-                                  value={clientInfo.name}
-                                  onChange={e => setClientInfo(prev => ({ ...prev, name: e.target.value }))}
-                                  className="w-full bg-transparent border-b-2 border-brand-gray-100 py-3.5 focus:outline-none focus:border-primary transition-all font-semibold text-base text-brand-black placeholder:text-brand-gray-400/50"
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2 group">
-                              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Phone Number</label>
-                              <div className="relative">
-                                <input
-                                  type="tel"
-                                  placeholder="e.g. 0712 345 678"
-                                  value={clientInfo.phone}
-                                  onChange={e => setClientInfo(prev => ({ ...prev, phone: e.target.value }))}
-                                  className="w-full bg-transparent border-b-2 border-brand-gray-100 py-3.5 focus:outline-none focus:border-primary transition-all font-semibold text-base text-brand-black placeholder:text-brand-gray-400/50"
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2 group">
-                              <label className="text-xs font-bold uppercase tracking-wider text-brand-gray-600 group-focus-within:text-brand-black transition-colors">Email Address</label>
-                              <div className="relative">
-                                <input
-                                  type="email"
-                                  placeholder="e.g. jane@example.com"
-                                  value={clientInfo.email}
-                                  onChange={e => setClientInfo(prev => ({ ...prev, email: e.target.value }))}
-                                  className="w-full bg-transparent border-b-2 border-brand-gray-100 py-3.5 focus:outline-none focus:border-primary transition-all font-semibold text-base text-brand-black placeholder:text-brand-gray-400/50"
-                                />
-                              </div>
+                          <button
+                            type="button"
+                            onClick={() => navigateStep('date')}
+                            className="text-[11px] font-bold text-[#C4466F] hover:text-[#A83257] underline cursor-pointer"
+                          >
+                            Change Time
+                          </button>
+                        </div>
+                      </section>
+
+                      {/* Client Details Glass Form */}
+                      <section className="bg-white/80 backdrop-blur-md p-5 sm:p-6 rounded-2xl border border-[rgba(240,213,222,0.85)] shadow-soft space-y-5">
+                        <div className="space-y-4">
+                          <div className="space-y-1.5">
+                            <label htmlFor="booking-client-name" className="block text-xs font-bold uppercase tracking-wider text-[#523E46]">
+                              Full Name <span className="text-[#C4466F]">*</span>
+                            </label>
+                            <div className="relative">
+                              <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6E655F]" aria-hidden="true" />
+                              <input
+                                id="booking-client-name"
+                                type="text"
+                                required
+                                autoComplete="name"
+                                placeholder="e.g. Maryann Wangechi"
+                                value={clientInfo.name}
+                                onChange={e => setClientInfo(prev => ({ ...prev, name: e.target.value }))}
+                                className="w-full bg-[#FAF8F5] border border-[#F0D5DE] rounded-xl py-3.5 pl-10 pr-4 focus:outline-none focus:border-[#C4466F] focus:ring-2 focus:ring-[#C4466F]/15 focus:bg-white transition-all font-semibold text-sm text-[#231F1D] placeholder:text-[#6E655F]/50"
+                              />
                             </div>
                           </div>
-                        </section>
+
+                          <div className="space-y-1.5">
+                            <label htmlFor="booking-client-phone" className="block text-xs font-bold uppercase tracking-wider text-[#523E46]">
+                              WhatsApp / Mobile Number <span className="text-[#C4466F]">*</span>
+                            </label>
+                            <div className="relative">
+                              <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6E655F]" aria-hidden="true" />
+                              <input
+                                id="booking-client-phone"
+                                type="tel"
+                                required
+                                inputMode="tel"
+                                autoComplete="tel"
+                                placeholder="e.g. 0712 345 678"
+                                value={clientInfo.phone}
+                                onChange={e => setClientInfo(prev => ({ ...prev, phone: e.target.value }))}
+                                className="w-full bg-[#FAF8F5] border border-[#F0D5DE] rounded-xl py-3.5 pl-10 pr-4 focus:outline-none focus:border-[#C4466F] focus:ring-2 focus:ring-[#C4466F]/15 focus:bg-white transition-all font-semibold text-sm text-[#231F1D] placeholder:text-[#6E655F]/50"
+                              />
+                            </div>
+                            <p className="text-[11px] text-[#6E655F] flex items-center gap-1.5 pt-0.5">
+                              <MessageCircle size={12} className="text-[#25D366] shrink-0" aria-hidden="true" />
+                              <span>Instant booking pass &amp; 24h reminder sent via WhatsApp.</span>
+                            </p>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label htmlFor="booking-client-email" className="block text-xs font-bold uppercase tracking-wider text-[#523E46]">
+                              Email Address <span className="text-[#C4466F]">*</span>
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6E655F] text-xs font-bold" aria-hidden="true">@</span>
+                              <input
+                                id="booking-client-email"
+                                type="email"
+                                required
+                                inputMode="email"
+                                autoComplete="email"
+                                placeholder="e.g. chumba@example.com"
+                                value={clientInfo.email}
+                                onChange={e => setClientInfo(prev => ({ ...prev, email: e.target.value }))}
+                                className="w-full bg-[#FAF8F5] border border-[#F0D5DE] rounded-xl py-3.5 pl-10 pr-4 focus:outline-none focus:border-[#C4466F] focus:ring-2 focus:ring-[#C4466F]/15 focus:bg-white transition-all font-semibold text-sm text-[#231F1D] placeholder:text-[#6E655F]/50"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+
+                      {/* Sticky Bottom Dock for Final Confirmation */}
+                      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[rgba(44,34,30,0.92)] backdrop-blur-[16px] border-t border-white/12 shadow-2xl">
+                        <div className="max-w-md mx-auto px-4 py-3 sm:py-3.5 flex items-center justify-between gap-4 text-white">
+                          <div className="space-y-0.5">
+                            <p className="text-[11px] uppercase tracking-wider font-bold text-white/75">
+                              Total Due at Salon
+                            </p>
+                            <p className="text-base font-black tracking-tight text-white">
+                              KES {totalServicePrice.toLocaleString()}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={!clientInfo.name.trim() || !clientInfo.phone.trim() || !clientInfo.email.trim() || isOffline || isSubmittingBooking}
+                            onClick={handleConfirmBooking}
+                            aria-busy={isSubmittingBooking}
+                            className="min-h-[46px] px-6 bg-[#C4466F] text-white font-bold text-xs uppercase tracking-[0.18em] rounded-xl transition-all disabled:opacity-30 hover:bg-[#A83257] active:scale-[0.98] shadow-lg shrink-0 flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                          >
+                            {isOffline ? (
+                              <span>Offline</span>
+                            ) : isSubmittingBooking ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin text-white shrink-0" />
+                                <span>Booking...</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 size={15} />
+                                <span>Confirm Booking</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
-
-                      <button
-                        disabled={!clientInfo.name || !clientInfo.phone || !clientInfo.email || isOffline || isSubmittingBooking}
-                        onClick={handleConfirmBooking}
-                        aria-busy={isSubmittingBooking}
-                        className="w-full bg-brand-black hover:bg-black text-brand-white py-5 rounded-xl font-bold uppercase tracking-wider text-xs transition-all shadow-md disabled:opacity-30 active:scale-[0.99] flex items-center justify-center gap-3 cursor-pointer disabled:cursor-not-allowed"
-                      >
-                        {isOffline ? (
-                          'Offline - Booking Disabled'
-                        ) : isSubmittingBooking ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin text-brand-white shrink-0" />
-                            <span>Finalizing Booking...</span>
-                          </>
-                        ) : (
-                          'Finalize Booking'
-                        )}
-                      </button>
                     </motion.div>
                   )}
 
@@ -1697,243 +2017,296 @@ export default function App() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="flex flex-col items-center justify-center py-8 sm:py-12 text-center space-y-8 sm:space-y-10 max-w-xl mx-auto"
                     >
-                      {/* 1. Heading, Status Badge & Subtitle */}
-                      <div className="space-y-3">
+                      {/* 1. Status Seal, Heading, Badge & Concierge Subtitle */}
+                      <div className="space-y-4">
                         {createdBooking?.status === 'confirmed' ? (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="relative">
+                              <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-glass flex items-center justify-center">
+                                <CheckCircle2 size={32} strokeWidth={2.2} />
+                              </div>
+                              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#C4466F] text-white flex items-center justify-center shadow-xs">
+                                <Sparkles size={12} />
+                              </span>
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-emerald-50 text-emerald-900 border border-emerald-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
-                              <span>Confirmed</span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" aria-hidden="true" />
+                              <span>Reserved & Confirmed</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-emerald-950"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
                               Appointment Confirmed
                             </h2>
-                            <div className="w-16 h-1 bg-emerald-700 mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                              Your appointment has been approved! We look forward to seeing you at the salon.
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                              Your appointment has been approved! We look forward to welcoming you to Flo Sisterlocks.
                             </p>
-                          </>
+                          </div>
                         ) : createdBooking?.status === 'cancelled' ? (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-700 border border-rose-200/90 shadow-glass flex items-center justify-center">
+                              <AlertCircle size={32} strokeWidth={2.2} />
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-red-100 text-red-900 border border-red-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-rose-50 text-rose-900 border border-rose-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-600" aria-hidden="true" />
                               <span>Cancelled</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-red-950"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
                               Appointment Cancelled
                             </h2>
-                            <div className="w-16 h-1 bg-red-600 mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
                               This appointment has been cancelled or declined by the salon.
                             </p>
-                          </>
+                          </div>
                         ) : createdBooking?.status === 'completed' ? (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-glass flex items-center justify-center">
+                              <Sparkles size={32} strokeWidth={2.2} />
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-blue-100 text-blue-900 border border-blue-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-emerald-50 text-emerald-900 border border-emerald-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-blue-500" aria-hidden="true" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" aria-hidden="true" />
                               <span>Completed</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none text-blue-950"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
                               Appointment Completed
                             </h2>
-                            <div className="w-16 h-1 bg-blue-600 mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-600 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                              Thank you for visiting! We look forward to seeing you again.
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                              Thank you for visiting Flo Sisterlocks! We look forward to seeing you again.
                             </p>
-                          </>
+                          </div>
                         ) : (
-                          <>
+                          <div className="flex flex-col items-center space-y-3">
+                            <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-700 border border-amber-200/90 shadow-glass flex items-center justify-center">
+                              <Clock size={32} strokeWidth={2.2} className="animate-pulse" />
+                            </div>
+
                             <div
                               role="status"
                               aria-live="polite"
-                              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-amber-100 text-amber-900 border border-amber-300 shadow-sm"
+                              className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] bg-amber-50 text-amber-900 border border-amber-200/80 shadow-2xs"
                             >
-                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
-                              <span>Pending approval</span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" aria-hidden="true" />
+                              <span>Pending Salon Approval</span>
                             </div>
 
                             <h2
                               ref={confirmationHeadingRef}
                               tabIndex={-1}
-                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight uppercase outline-none focus:outline-none"
+                              className="text-3xl sm:text-4xl font-serif font-black tracking-tight leading-tight text-[#231F1D] outline-none focus:outline-none"
                             >
-                              Request received
+                              Request Received
                             </h2>
-                            <div className="w-16 h-1 bg-brand-black mx-auto" aria-hidden="true" />
-                            <p className="text-brand-gray-500 font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed pt-1">
-                              The salon will review your request shortly.
+
+                            <p className="text-[#6E655F] font-medium text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                              The salon team will review and confirm your appointment slot shortly.
                             </p>
-                          </>
+                          </div>
                         )}
                       </div>
 
-                      {/* 3. Prominent Reference */}
-                      <div className="w-full bg-brand-white border-2 border-brand-black rounded-lg p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-sm">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.3em] font-black text-brand-gray-500">
-                            Booking Reference
-                          </p>
-                          <p className="text-2xl sm:text-3xl font-mono font-black tracking-wider text-brand-black mt-0.5">
-                            #{createdBooking?.reference || 'PENDING'}
-                          </p>
+                      {/* 2. Official Salon Pass / Reference Card */}
+                      <div className="w-full relative overflow-hidden bg-white/90 backdrop-blur-md border border-[rgba(240,213,222,0.85)] rounded-2xl p-6 sm:p-7 text-left shadow-luxury transition-all duration-300">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded-md bg-[#C4466F]/10 text-[#C4466F] text-[9px] font-extrabold uppercase tracking-widest border border-[#C4466F]/20">
+                                Salon Pass
+                              </span>
+                              <span className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-[#6E655F]">
+                                Booking Reference
+                              </span>
+                            </div>
+                            <p className="text-2xl sm:text-3xl font-mono font-black tracking-wider text-[#231F1D]">
+                              #{createdBooking?.reference || 'PENDING'}
+                            </p>
+                            <p className="text-xs text-[#6E655F]">
+                              Present this pass code upon arrival or use it to view booking status.
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleCopyReference}
+                            className={`inline-flex items-center justify-center gap-2 self-start sm:self-auto px-5 py-3 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 shadow-2xs min-h-[44px] cursor-pointer ${
+                              copiedReference
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-[#FAF8F5] text-[#231F1D] border-[rgba(240,213,222,0.9)] hover:bg-[#231F1D] hover:text-white hover:border-[#231F1D]'
+                            }`}
+                            aria-label={copiedReference ? 'Reference copied to clipboard' : 'Copy reference to clipboard'}
+                          >
+                            {copiedReference ? (
+                              <>
+                                <Check size={15} className="stroke-[2.5]" aria-hidden="true" />
+                                <span>Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={15} aria-hidden="true" />
+                                <span>Copy Pass</span>
+                              </>
+                            )}
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleCopyReference}
-                          className="inline-flex items-center justify-center gap-2 self-start sm:self-auto px-4 py-2.5 rounded-lg border-2 border-brand-black bg-brand-white hover:bg-brand-black hover:text-white transition-all text-xs font-black uppercase tracking-widest active:scale-95 shadow-sm"
-                          aria-label={copiedReference ? 'Reference copied to clipboard' : 'Copy reference to clipboard'}
-                        >
-                          {copiedReference ? (
-                            <>
-                              <Check size={14} className="text-emerald-600 sm:group-hover:text-white" aria-hidden="true" />
-                              <span>Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={14} aria-hidden="true" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
                       </div>
 
-                      {/* 2. What happens next */}
-                      <div className="w-full bg-brand-gray-50 border-2 border-brand-black/15 rounded-lg p-6 sm:p-7 text-left space-y-4">
-                        <div className="flex items-center gap-2 border-b border-brand-black/10 pb-3">
-                          <Clock size={16} className="text-brand-gray-600" aria-hidden="true" />
-                          <h3 className="text-xs font-black uppercase tracking-[0.25em] text-brand-gray-700">
-                            {createdBooking?.status === 'confirmed' ? 'Appointment Information' : 'What happens next'}
-                          </h3>
+                      {/* 3. Appointment Information & Next Steps */}
+                      <div className="w-full bg-white/70 backdrop-blur-sm border border-[rgba(240,213,222,0.85)] rounded-2xl p-6 sm:p-7 text-left space-y-4 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-[rgba(240,213,222,0.6)] pb-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-[#C4466F]/10 text-[#C4466F] flex items-center justify-center">
+                              <Calendar size={14} />
+                            </div>
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#231F1D]">
+                              {createdBooking?.status === 'confirmed' ? 'Appointment Information' : 'What Happens Next'}
+                            </h3>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-[#C4466F] bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-100/80">
+                            Concierge Guide
+                          </span>
                         </div>
 
-                        <ol className="space-y-3.5 text-xs sm:text-sm text-brand-gray-600">
-                          {createdBooking?.status === 'confirmed' ? (
-                            <>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white font-bold text-[11px] flex items-center justify-center">
-                                  ✓
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  <span className="font-bold text-brand-black">Your appointment is confirmed.</span> Your stylist and slot have been scheduled.
-                                </div>
-                              </li>
-                              {createdBooking?.attendantId && typeof createdBooking.attendantId === 'object' && (
-                                <li className="flex items-start gap-3">
-                                  <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                    ★
-                                  </span>
-                                  <div className="pt-0.5 leading-relaxed">
-                                    <span className="font-bold text-brand-black">Assigned Stylist:</span>{' '}
-                                    <span className="font-semibold text-emerald-800">
-                                      {(createdBooking.attendantId as any).name}
-                                    </span>
-                                  </div>
-                                </li>
-                              )}
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  ⏱
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  Please arrive <span className="font-bold text-brand-black">5 minutes early</span> to ensure a smooth session.
-                                </div>
-                              </li>
-                            </>
-                          ) : createdBooking?.status === 'cancelled' ? (
-                            <li className="flex items-start gap-3">
-                              <span className="shrink-0 w-6 h-6 rounded-full bg-red-600 text-white font-bold text-[11px] flex items-center justify-center">
-                                ✕
-                              </span>
-                              <div className="pt-0.5 leading-relaxed">
-                                This booking was cancelled. If you would like to reschedule, please select a new date and time.
+                        {createdBooking?.status === 'confirmed' ? (
+                          <div className="grid gap-3 pt-1">
+                            {/* Confirmed Slot */}
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)] transition-all">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/90 flex items-center justify-center shadow-2xs">
+                                <CheckCircle2 size={16} strokeWidth={2.2} />
                               </div>
-                            </li>
-                          ) : (
-                            <>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  1
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  <span className="font-bold text-brand-black">The salon reviews your request.</span> Staff will check stylist availability and confirm the slot.
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Your appointment is officially confirmed.</span>
+                                Your designated slot has been locked in our schedule.
+                              </div>
+                            </div>
+
+                            {/* Assigned Stylist */}
+                            {createdBooking?.attendantId && typeof createdBooking.attendantId === 'object' && (
+                              <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)] transition-all">
+                                <div className="shrink-0 w-8 h-8 rounded-xl bg-[#C4466F]/10 text-[#C4466F] border border-[#C4466F]/20 flex items-center justify-center shadow-2xs">
+                                  <UserCheck size={16} strokeWidth={2.2} />
                                 </div>
-                              </li>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  2
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  We'll email you a confirmation{clientInfo.email || createdBooking?.email ? (
-                                    <>
-                                      {' '}at{' '}
-                                      <strong className="text-brand-black underline decoration-brand-black/30 break-all">
-                                        {createdBooking?.email || clientInfo.email}
-                                      </strong>
-                                    </>
-                                  ) : null}{' '}
-                                  once approved (please check your spam folder).
+                                <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                  <span className="font-bold text-[#231F1D] block">Assigned Specialist Stylist</span>
+                                  <span className="inline-flex items-center gap-1.5 font-bold text-[#C4466F] bg-white px-2.5 py-1 rounded-lg border border-rose-100/80 mt-1 shadow-2xs">
+                                    <Sparkles size={12} />
+                                    {(createdBooking.attendantId as any).name}
+                                  </span>
                                 </div>
-                              </li>
-                              <li className="flex items-start gap-3">
-                                <span className="shrink-0 w-6 h-6 rounded-full bg-brand-black text-white font-bold text-[11px] flex items-center justify-center">
-                                  3
-                                </span>
-                                <div className="pt-0.5 leading-relaxed">
-                                  If notifications are enabled, you'll also get a notification when it's approved.
-                                </div>
-                              </li>
-                            </>
-                          )}
-                        </ol>
+                              </div>
+                            )}
+
+                            {/* Early Arrival */}
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)] transition-all">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/90 flex items-center justify-center shadow-2xs">
+                                <Clock size={16} strokeWidth={2.2} />
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Arrival Guidance</span>
+                                Please arrive <strong className="text-[#231F1D]">5 minutes early</strong> to relax and ensure a smooth start to your session.
+                              </div>
+                            </div>
+                          </div>
+                        ) : createdBooking?.status === 'cancelled' ? (
+                          <div className="p-4 rounded-xl bg-rose-50/80 border border-rose-200/70 text-xs sm:text-sm text-rose-900 leading-relaxed flex items-start gap-3">
+                            <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block">This booking was cancelled.</span>
+                              If you would like to reschedule or choose an alternative slot, please browse our available appointments below.
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid gap-3 pt-1">
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#231F1D] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                                1
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Salon Team Review</span>
+                                Staff will check stylist availability and confirm your designated slot.
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#231F1D] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                                2
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Email & WhatsApp Notification</span>
+                                We'll send your confirmation pass{clientInfo.email || createdBooking?.email ? (
+                                  <>
+                                    {' '}to{' '}
+                                    <strong className="text-[#231F1D] underline decoration-[rgba(196,70,111,0.4)] break-all font-semibold">
+                                      {createdBooking?.email || clientInfo.email}
+                                    </strong>
+                                  </>
+                                ) : null}{' '}
+                                once approved (please check your spam folder).
+                              </div>
+                            </div>
+
+                            <div className="flex items-start gap-3.5 p-3.5 rounded-xl bg-[#FAF8F5]/80 border border-[rgba(240,213,222,0.6)]">
+                              <div className="shrink-0 w-8 h-8 rounded-xl bg-[#231F1D] text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                                3
+                              </div>
+                              <div className="text-xs sm:text-sm text-[#6E655F] leading-relaxed">
+                                <span className="font-bold text-[#231F1D] block">Instant Push Alerts</span>
+                                If notifications are enabled, you'll also get an instant alert the moment your appointment is approved.
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* 4. Details Card */}
-                      <div className="bg-brand-gray-50 w-full p-6 sm:p-7 text-left space-y-6 border-2 border-brand-black/15 rounded-lg">
-                        <div className="border-b border-brand-black/10 pb-4 flex flex-row items-center justify-between gap-3">
+                      <div className="bg-white/80 backdrop-blur-md w-full p-6 sm:p-7 text-left space-y-6 border border-[rgba(240,213,222,0.85)] rounded-2xl shadow-luxury">
+                        <div className="border-b border-[rgba(240,213,222,0.6)] pb-4 flex flex-row items-center justify-between gap-3">
                           <div>
-                            <span className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500 block">
+                            <span className="text-[11px] uppercase tracking-[0.25em] font-black text-[#6E655F] block">
                               Scheduled Date & Time
                             </span>
-                            <p className="font-serif font-black text-lg sm:text-xl text-brand-black mt-1">
+                            <p className="font-serif font-black text-lg sm:text-xl text-[#231F1D] mt-1">
                               {confirmationFriendlyDate}
                             </p>
                           </div>
                           <div className="shrink-0 text-right">
-                            <span className="inline-flex items-center justify-center whitespace-nowrap px-3.5 py-1.5 bg-brand-black text-white text-xs font-mono font-bold tracking-wider border-2 border-brand-black rounded-lg transition-all duration-300 hover:bg-brand-white hover:text-brand-black cursor-default select-none shadow-sm hover:shadow-md">
+                            <span className="inline-flex items-center justify-center whitespace-nowrap px-4 py-2 bg-[#231F1D] text-white text-xs font-mono font-bold tracking-wider rounded-xl transition-all duration-300 hover:bg-[#C4466F] cursor-default select-none shadow-xs">
                               {confirmationTimeRange}
                             </span>
                           </div>
                         </div>
 
                         <div className="space-y-4">
-                          <p className="text-[11px] uppercase tracking-[0.25em] font-black text-brand-gray-500">
+                          <p className="text-[11px] uppercase tracking-[0.25em] font-black text-[#6E655F]">
                             Requested Services ({selectedServices.length > 0 ? selectedServices.length : 1})
                           </p>
                           <div className="space-y-3">
@@ -1950,23 +2323,23 @@ export default function App() {
                                 return (
                                   <div
                                     key={service._id || idx}
-                                    className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2"
+                                    className="p-4 bg-[#FAF8F5]/90 border border-[rgba(240,213,222,0.7)] rounded-xl space-y-2 shadow-2xs"
                                   >
                                     <div className="flex justify-between items-start gap-3">
-                                      <span className="font-black text-sm uppercase text-brand-black leading-snug">
+                                      <span className="font-black text-sm uppercase text-[#231F1D] leading-snug">
                                         {service.name}
                                       </span>
-                                      <span className="font-bold text-xs text-brand-black shrink-0">
+                                      <span className="font-bold text-xs text-[#231F1D] shrink-0">
                                         {formatPrice(service.price, service.priceMax)}
                                       </span>
                                     </div>
-                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6E655F]">
                                       <span className="inline-flex items-center gap-1.5">
-                                        <User size={13} className="text-brand-gray-400" />
-                                        <span>Artist: <strong className="text-brand-black font-semibold">{artistName}</strong></span>
+                                        <User size={13} className="text-[#C4466F]" />
+                                        <span>Artist: <strong className="text-[#231F1D] font-semibold">{artistName}</strong></span>
                                       </span>
                                       <span className="inline-flex items-center gap-1.5">
-                                        <Clock size={13} className="text-brand-gray-400" />
+                                        <Clock size={13} className="text-[#C4466F]" />
                                         <span>{serviceTime}</span>
                                       </span>
                                     </div>
@@ -1974,23 +2347,23 @@ export default function App() {
                                 );
                               })
                             ) : (
-                              <div className="p-4 bg-brand-white border border-brand-black/10 rounded-md space-y-2">
+                              <div className="p-4 bg-[#FAF8F5]/90 border border-[rgba(240,213,222,0.7)] rounded-xl space-y-2 shadow-2xs">
                                 <div className="flex justify-between items-start gap-3">
-                                  <span className="font-black text-sm uppercase text-brand-black leading-snug">
+                                  <span className="font-black text-sm uppercase text-[#231F1D] leading-snug">
                                     {typeof createdBooking?.serviceId === 'object' && createdBooking?.serviceId ? createdBooking.serviceId.name : 'Appointment'}
                                   </span>
                                   {createdBooking?.price !== undefined && (
-                                    <span className="font-bold text-xs text-brand-black shrink-0">
+                                    <span className="font-bold text-xs text-[#231F1D] shrink-0">
                                       KES {createdBooking.price.toLocaleString()}
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-brand-gray-600">
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6E655F]">
                                   <span className="inline-flex items-center gap-1.5">
-                                    <User size={13} className="text-brand-gray-400" />
+                                    <User size={13} className="text-[#C4466F]" />
                                     <span>
                                       Artist:{' '}
-                                      <strong className="text-brand-black font-semibold">
+                                      <strong className="text-[#231F1D] font-semibold">
                                         {typeof createdBooking?.attendantId === 'object' && createdBooking?.attendantId
                                           ? createdBooking.attendantId.name
                                           : 'Any Available'}
@@ -1998,7 +2371,7 @@ export default function App() {
                                     </span>
                                   </span>
                                   <span className="inline-flex items-center gap-1.5">
-                                    <Clock size={13} className="text-brand-gray-400" />
+                                    <Clock size={13} className="text-[#C4466F]" />
                                     <span>{confirmationTimeRange}</span>
                                   </span>
                                 </div>
@@ -2007,11 +2380,11 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="border-t border-brand-black/15 pt-5 flex justify-between items-center">
-                          <span className="text-xs uppercase tracking-[0.25em] font-black text-brand-gray-600">
+                        <div className="border-t border-[rgba(240,213,222,0.6)] pt-5 flex justify-between items-center">
+                          <span className="text-xs uppercase tracking-[0.25em] font-black text-[#6E655F]">
                             Total Cost
                           </span>
-                          <span className="font-black text-base sm:text-lg text-brand-black">
+                          <span className="font-black text-base sm:text-lg text-[#231F1D]">
                             KES {(totalServicePrice || createdBooking?.price || 0).toLocaleString()}
                           </span>
                         </div>
@@ -2023,7 +2396,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => handleCheckBookingStatus(createdBooking?.reference)}
-                          className="w-full bg-brand-black text-brand-white py-5 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-brand-gray-800 hover:tracking-[0.3em] active:scale-[0.98] shadow-md flex items-center justify-center gap-2"
+                          className="w-full bg-[#231F1D] text-white py-4.5 rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#362F2B] active:scale-[0.98] shadow-md flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
                         >
                           <Search size={15} />
                           <span>Check booking status</span>
@@ -2035,7 +2408,7 @@ export default function App() {
                             href={whatsAppUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full bg-[#25D366] text-white py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:bg-[#20ba59] active:scale-[0.98] shadow-sm flex items-center justify-center gap-2"
+                            className="w-full bg-[#25D366] text-white py-4 rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#20ba59] active:scale-[0.98] shadow-2xs flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
                           >
                             <MessageCircle size={16} />
                             <span>Message us on WhatsApp</span>
@@ -2046,7 +2419,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={resetFlow}
-                          className="w-full bg-transparent border-2 border-brand-black/30 text-brand-black py-4 rounded-[10px] font-black uppercase tracking-[0.25em] text-xs transition-all hover:border-brand-black hover:bg-brand-black hover:text-white active:scale-[0.98]"
+                          className="w-full bg-white/80 border border-[rgba(240,213,222,0.9)] text-[#231F1D] py-4 rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#231F1D] hover:text-white active:scale-[0.98] cursor-pointer min-h-[48px]"
                         >
                           Book another appointment
                         </button>
@@ -2060,42 +2433,59 @@ export default function App() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="space-y-8"
+                      className="space-y-6"
                     >
-                      <div className="flex justify-between items-center border-b border-brand-black pb-4">
-                        <h2 className="text-3xl font-serif font-black uppercase tracking-tight">Lookup Booking</h2>
+                      <div className="flex justify-between items-center border-b border-[rgba(240,213,222,0.75)] pb-4">
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#C4466F]">
+                            Salon Pass &amp; Appointments
+                          </span>
+                          <h2 className="text-3xl font-serif font-black tracking-tight text-[#231F1D]">
+                            Find Your Booking
+                          </h2>
+                        </div>
                         <button
+                          type="button"
                           onClick={resetFlow}
-                          className="text-xs font-black uppercase tracking-widest bg-brand-gray-50 border border-brand-gray-200 py-2 px-3 hover:bg-brand-black hover:text-white transition-all"
+                          className="min-h-[40px] text-xs font-bold uppercase tracking-wider bg-white/80 border border-[#F0D5DE] text-[#231F1D] rounded-xl py-2 px-4 hover:bg-[#231F1D] hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
                         >
-                          Back
+                          <ArrowLeft size={14} />
+                          <span>Back</span>
                         </button>
                       </div>
 
                       {/* Reschedule Overlay Panel */}
                       {reschedulingBooking && (
-                        <div className="border-2 border-brand-black bg-brand-white p-6 space-y-6 rounded-lg">
-                          <div className="border-b border-brand-black/10 pb-3 flex justify-between items-center">
-                            <h3 className="text-sm font-black uppercase tracking-[0.2em]">Reschedule Slot</h3>
-                            <span className="text-xs font-serif italic">#{reschedulingBooking.reference}</span>
+                        <div className="bg-white/90 backdrop-blur-md border border-[rgba(240,213,222,0.85)] p-6 space-y-6 rounded-2xl shadow-luxury">
+                          <div className="border-b border-[rgba(240,213,222,0.6)] pb-3.5 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <Calendar size={16} className="text-[#C4466F]" />
+                              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#231F1D]">Reschedule Appointment</h3>
+                            </div>
+                            <span className="text-xs font-mono font-bold text-[#C4466F] bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200/60">
+                              #{reschedulingBooking.reference}
+                            </span>
                           </div>
 
                           <div className="space-y-4">
                             <div>
-                              <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">New Date</label>
+                              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#523E46] mb-2">New Date</label>
                               <input
                                 type="date"
                                 value={rescheduleDate}
                                 min={formatDateInTimezone(Date.now() + 86400000)} // from tomorrow
                                 onChange={e => handleRescheduleDateChange(e.target.value)}
-                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none"
+                                className="w-full bg-[#FAF8F5] border border-[#F0D5DE] rounded-xl p-3.5 text-sm font-bold text-[#231F1D] focus:outline-none focus:border-[#C4466F] focus:ring-2 focus:ring-[#C4466F]/15"
                               />
                             </div>
 
                             <div>
-                              <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">New Time Slot</label>
+                              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#523E46] mb-2">New Time Slot</label>
                               {rescheduleSlotsLoading ? (
-                                <div className="text-center py-6 text-xs font-serif italic text-brand-gray-400">Checking availability...</div>
+                                <div className="text-center py-6 text-xs font-serif italic text-[#6E655F] flex items-center justify-center gap-2">
+                                  <Loader2 size={14} className="animate-spin text-[#C4466F]" />
+                                  <span>Checking availability...</span>
+                                </div>
                               ) : rescheduleSlots.length > 0 ? (
                                 <div className="grid grid-cols-3 gap-2">
                                   {rescheduleSlots.map(slot => (
@@ -2103,9 +2493,9 @@ export default function App() {
                                       key={slot}
                                       type="button"
                                       onClick={() => setRescheduleTime(slot)}
-                                      className={`py-3 text-xs font-black tracking-widest border transition-all rounded-lg ${rescheduleTime === slot
-                                        ? 'bg-brand-black text-white border-brand-black'
-                                        : 'bg-transparent text-brand-black border-brand-gray-200 hover:border-brand-black'
+                                      className={`min-h-[44px] py-2.5 text-xs font-black tracking-wider border transition-all rounded-xl cursor-pointer ${rescheduleTime === slot
+                                        ? 'bg-[#231F1D] text-white border-[#231F1D] ring-2 ring-[#C4466F]/40 shadow-sm'
+                                        : 'bg-[#FAF8F5] text-[#231F1D] border-[#F0D5DE] hover:border-[#C4466F] hover:bg-white'
                                         }`}
                                     >
                                       {slot}
@@ -2113,26 +2503,26 @@ export default function App() {
                                   ))}
                                 </div>
                               ) : (
-                                <div className="text-center py-6 text-xs font-serif italic text-brand-gray-400 border border-dashed border-brand-gray-200">
+                                <div className="text-center py-6 text-xs font-serif italic text-[#6E655F] border border-dashed border-[#F0D5DE] rounded-xl bg-[#FAF8F5]/60">
                                   No available slots for this date.
                                 </div>
                               )}
                             </div>
                           </div>
 
-                          <div className="flex gap-2 pt-2">
+                          <div className="flex gap-2.5 pt-2">
                             <button
                               type="button"
                               disabled={!rescheduleTime || rescheduleSubmitting}
                               onClick={handleConfirmReschedule}
-                              className="flex-1 bg-brand-black text-white py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
+                              className="flex-1 min-h-[46px] bg-[#C4466F] text-white py-3.5 font-bold uppercase tracking-[0.18em] text-xs transition-all hover:bg-[#A83257] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl shadow-md cursor-pointer"
                             >
                               {rescheduleSubmitting ? 'Updating...' : 'Confirm Reschedule'}
                             </button>
                             <button
                               type="button"
                               onClick={() => setReschedulingBooking(null)}
-                              className="flex-1 bg-transparent border-2 border-brand-black text-brand-black py-4 font-black uppercase tracking-[0.2em] text-[11px] transition-all hover:bg-brand-black hover:text-white rounded-[10px]"
+                              className="flex-1 min-h-[46px] bg-white border border-[#F0D5DE] text-[#231F1D] py-3.5 font-bold uppercase tracking-[0.18em] text-xs transition-all hover:bg-[#231F1D] hover:text-white rounded-xl cursor-pointer"
                             >
                               Cancel
                             </button>
@@ -2142,60 +2532,69 @@ export default function App() {
 
                       {!reschedulingBooking && (
                         <>
-                          {/* Search Forms */}
-                          <form onSubmit={handleLookup} className="space-y-6">
-                            <div className="flex border-2 border-brand-black rounded-[10px] overflow-hidden">
-                              <button
-                                type="button"
-                                onClick={() => { setLookupType('reference'); setLookupResults([]); setLookupError(null); }}
-                                className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest border-r-2 border-brand-black transition-all ${lookupType === 'reference' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
-                                  }`}
-                              >
-                                Search Reference
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => { setLookupType('phone'); setLookupResults([]); setLookupError(null); }}
-                                className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest transition-all ${lookupType === 'phone' ? 'bg-brand-black text-white' : 'bg-brand-white text-brand-black hover:bg-brand-gray-50'
-                                  }`}
-                              >
-                                Search Phone
-                              </button>
-                            </div>
-
-                            <div className="space-y-4">
-                              <label className="block text-[11px] font-black uppercase tracking-widest text-brand-gray-600 mb-2">
-                                {lookupType === 'reference' ? 'Service Reference Number' : 'Customer Phone Number'}
+                          {/* Search Form (requires reference + phone) */}
+                          <form onSubmit={handleLookup} className="bg-white/80 backdrop-blur-md border border-[rgba(240,213,222,0.85)] p-5 sm:p-6 rounded-2xl shadow-soft space-y-4">
+                            <div>
+                              <label htmlFor="lookup-ref-input" className="block text-xs font-bold uppercase tracking-wider text-[#523E46] mb-1.5">
+                                Booking Reference Code
                               </label>
                               <input
+                                id="lookup-ref-input"
                                 type="text"
-                                value={lookupQuery}
-                                onChange={e => setLookupQuery(e.target.value)}
-                                placeholder={lookupType === 'reference' ? 'e.g. LMN-XXXXX' : 'e.g. 07XXXXXXXX'}
-                                className="w-full bg-brand-white border-2 border-brand-black p-4 text-[13px] font-black uppercase tracking-widest focus:outline-none placeholder:text-brand-gray-300 animate-none"
+                                value={lookupReference}
+                                onChange={e => setLookupReference(e.target.value.toUpperCase())}
+                                placeholder="e.g. FLO-ABC123"
+                                className="w-full bg-[#FAF8F5] border border-[#F0D5DE] rounded-xl p-3.5 text-sm font-mono font-bold uppercase tracking-wider text-[#231F1D] focus:outline-none focus:border-[#C4466F] focus:ring-2 focus:ring-[#C4466F]/15 focus:bg-white placeholder:text-[#6E655F]/45"
                               />
-                              <button
-                                type="submit"
-                                disabled={lookupLoading || !lookupQuery.trim()}
-                                className="w-full bg-brand-black text-white py-5 font-black uppercase tracking-[0.2em] text-xs transition-all hover:bg-brand-gray-800 disabled:opacity-30 disabled:cursor-not-allowed rounded-[10px]"
-                              >
-                                {lookupLoading ? 'Searching...' : 'Find Booking'}
-                              </button>
                             </div>
+
+                            <div>
+                              <label htmlFor="lookup-phone-input" className="block text-xs font-bold uppercase tracking-wider text-[#523E46] mb-1.5">
+                                Phone Number (used during booking)
+                              </label>
+                              <input
+                                id="lookup-phone-input"
+                                type="tel"
+                                inputMode="tel"
+                                value={lookupPhone}
+                                onChange={e => setLookupPhone(e.target.value)}
+                                placeholder="e.g. 0712 345 678"
+                                className="w-full bg-[#FAF8F5] border border-[#F0D5DE] rounded-xl p-3.5 text-sm font-semibold text-[#231F1D] focus:outline-none focus:border-[#C4466F] focus:ring-2 focus:ring-[#C4466F]/15 focus:bg-white placeholder:text-[#6E655F]/45"
+                              />
+                            </div>
+
+                            <button
+                              type="submit"
+                              disabled={lookupLoading || !lookupReference.trim() || !lookupPhone.trim()}
+                              className="w-full min-h-[48px] bg-[#C4466F] text-white py-4 font-bold uppercase tracking-[0.2em] text-xs transition-all hover:bg-[#A83257] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                              {lookupLoading ? (
+                                <>
+                                  <Loader2 size={15} className="animate-spin" />
+                                  <span>Searching...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Search size={15} />
+                                  <span>Find Booking</span>
+                                </>
+                              )}
+                            </button>
                           </form>
 
                           {/* Lookup Errors */}
                           {lookupError && (
-                            <div className="p-5 border-2 border-dashed border-red-500 bg-red-50/50 text-center">
-                              <p className="font-serif italic text-sm text-red-600">{lookupError}</p>
+                            <div className="p-4 border border-rose-200 bg-rose-50/90 rounded-2xl text-center flex items-center justify-center gap-2 text-rose-800">
+                              <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                              <p className="font-semibold text-xs">{lookupError}</p>
                             </div>
                           )}
 
                           {/* Results Listing */}
                           {lookupResults.length > 0 && (
-                            <div className="space-y-6 pt-4">
-                              <h3 className="text-xs font-black uppercase tracking-[0.3em] text-brand-gray-500 border-b border-brand-black/5 pb-2">
-                                Appointments Found ({lookupResults.length})
+                            <div className="space-y-4 pt-2">
+                              <h3 className="text-xs font-black uppercase tracking-[0.25em] text-[#6E655F]">
+                                Matching Appointments ({lookupResults.length})
                               </h3>
                               <div className="space-y-4">
                                 {lookupResults.map(booking => {
@@ -2203,47 +2602,47 @@ export default function App() {
                                   const attendant = typeof booking.attendantId === 'object' ? booking.attendantId : null;
 
                                   return (
-                                    <div key={booking._id} className="border-2 border-brand-black p-6 space-y-4 bg-brand-gray-50 rounded-lg">
-                                      <div className="flex justify-between items-center border-b border-brand-black/10 pb-3">
-                                        <span className="font-black text-xs uppercase italic">#{booking.reference || 'LMN-LEGACY'}</span>
-                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 border ${booking.status === 'confirmed'
-                                          ? 'bg-green-500 text-white border-green-500'
+                                    <div key={booking._id} className="relative overflow-hidden border border-[rgba(240,213,222,0.85)] p-5 sm:p-6 space-y-4 bg-white/85 backdrop-blur-md rounded-2xl shadow-luxury">
+                                      <div className="flex justify-between items-center border-b border-[rgba(240,213,222,0.6)] pb-3">
+                                        <span className="font-mono font-black text-sm text-[#231F1D]">#{booking.reference || 'FLO-PASS'}</span>
+                                        <span className={`text-[10px] font-extrabold uppercase tracking-widest px-3 py-1 rounded-full border ${booking.status === 'confirmed'
+                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                           : booking.status === 'cancelled'
-                                            ? 'bg-red-500 text-white border-red-500'
+                                            ? 'bg-rose-50 text-rose-800 border-rose-200'
                                             : booking.status === 'completed'
-                                              ? 'bg-brand-gray-400 text-white border-brand-gray-400'
-                                              : 'bg-yellow-500 text-white border-yellow-500'
+                                              ? 'bg-stone-100 text-stone-700 border-stone-200'
+                                              : 'bg-amber-50 text-amber-800 border-amber-200'
                                           }`}>
                                           {booking.status}
                                         </span>
                                       </div>
 
-                                      <div className="grid grid-cols-2 gap-y-3 text-xs">
+                                      <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs">
                                         <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Service</p>
-                                          <p className="font-bold uppercase">{svc ? svc.name : 'Unknown Service'}</p>
+                                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#6E655F] mb-0.5">Treatment</p>
+                                          <p className="font-bold text-[#231F1D]">{svc ? svc.name : 'Salon Appointment'}</p>
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Cost</p>
-                                          <p className="font-bold">{svc ? formatPrice(svc.price, svc.priceMax) : 'KES 0'}</p>
+                                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#6E655F] mb-0.5">Cost</p>
+                                          <p className="font-bold text-[#231F1D]">{svc ? formatPrice(svc.price, svc.priceMax) : (booking.price ? `KES ${booking.price.toLocaleString()}` : 'KES 0')}</p>
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Stylist / Artist</p>
-                                          <p className="font-serif italic text-sm">{attendant ? attendant.name : 'Any Available'}</p>
+                                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#6E655F] mb-0.5">Specialist</p>
+                                          <p className="font-semibold text-[#231F1D]">{attendant ? attendant.name : 'Any Available'}</p>
                                         </div>
                                         <div>
-                                          <p className="text-[10px] font-black uppercase tracking-widest text-brand-gray-600 mb-1">Schedule</p>
-                                          <p className="font-bold">{booking.date} @ {booking.startTime}</p>
+                                          <p className="text-[10px] font-bold uppercase tracking-wider text-[#6E655F] mb-0.5">Date &amp; Time</p>
+                                          <p className="font-bold text-[#231F1D]">{booking.date} • {booking.startTime}</p>
                                         </div>
                                       </div>
 
                                       {/* Action items for active bookings */}
                                       {booking.status !== 'cancelled' && booking.status !== 'completed' && (
-                                        <div className="flex gap-2 pt-2 border-t border-brand-black/5">
+                                        <div className="flex gap-2.5 pt-2 border-t border-[rgba(240,213,222,0.5)]">
                                           <button
                                             type="button"
                                             onClick={() => handleStartReschedule(booking)}
-                                            className="flex-1 bg-brand-white border border-brand-black text-brand-black py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-brand-black hover:text-white rounded-[10px]"
+                                            className="flex-1 min-h-[42px] bg-[#FAF8F5] border border-[#F0D5DE] text-[#231F1D] py-2.5 font-bold uppercase tracking-wider text-[11px] transition-all hover:bg-[#231F1D] hover:text-white rounded-xl cursor-pointer"
                                           >
                                             Reschedule
                                           </button>
@@ -2251,9 +2650,9 @@ export default function App() {
                                             type="button"
                                             disabled={cancelLoading}
                                             onClick={() => handleCancelBooking(booking._id)}
-                                            className="flex-1 bg-transparent border border-red-500 text-red-500 py-2.5 font-black uppercase tracking-[0.2em] text-[10px] transition-all hover:bg-red-500 hover:text-white disabled:opacity-55 rounded-[10px]"
+                                            className="flex-1 min-h-[42px] bg-rose-50/70 border border-rose-200 text-rose-700 py-2.5 font-bold uppercase tracking-wider text-[11px] transition-all hover:bg-rose-600 hover:text-white disabled:opacity-55 rounded-xl cursor-pointer"
                                           >
-                                            Cancel Appt
+                                            Cancel Booking
                                           </button>
                                         </div>
                                       )}
@@ -2313,52 +2712,92 @@ export default function App() {
   }
 }
 
-function StepIndicator({ activeStep }: { activeStep: BookingStep }) {
-  const steps: { key: BookingStep, label: string }[] = [
+function StepIndicator({
+  activeStep,
+  onStepClick,
+}: {
+  activeStep: BookingStep;
+  onStepClick?: (step: BookingStep) => void;
+}) {
+  const steps: { key: BookingStep; label: string }[] = [
     { key: 'service', label: 'Services' },
     { key: 'date', label: 'Date & Time' },
     { key: 'contact', label: 'Details' },
-    { key: 'confirmation', label: 'Confirm' }
+    { key: 'confirmation', label: 'Confirm' },
   ];
   const activeIndex = steps.findIndex(s => s.key === activeStep);
 
   return (
-    <div className="flex items-center justify-between relative max-w-[340px] mx-auto px-2">
-      <div className="absolute top-[8px] left-4 right-4 h-[2px] bg-[#F0D5DE] -z-10">
+    <nav aria-label="Booking progress" className="flex items-center justify-between relative max-w-[360px] mx-auto px-2">
+      <div className="absolute top-[14px] left-6 right-6 h-[2px] bg-[#F0D5DE] -z-10">
         <div
-          className="h-full bg-[#C4466F] transition-all duration-700 ease-out"
+          className="h-full bg-[#C4466F] transition-all duration-500 ease-out"
           style={{ width: `${(Math.max(0, Math.min(activeIndex, steps.length - 1)) / (steps.length - 1)) * 100}%` }}
         />
       </div>
       {steps.map((step, idx) => {
         const isCompleted = idx < activeIndex;
         const isActive = idx === activeIndex;
+        const canNavigate = isCompleted && Boolean(onStepClick);
         return (
-          <div key={idx} className="flex flex-col items-center gap-2">
-            <div className={`w-[14px] h-[14px] rounded-full transition-all duration-500 ${isCompleted || isActive ? 'bg-[#C4466F] scale-110 shadow-sm' : 'bg-[#F0D5DE]'}`}></div>
-            <span className={`text-[11px] tracking-normal transition-colors duration-500 ${isActive ? 'text-[#1A1215] font-bold' : 'text-[#523E46] font-medium'}`}>
+          <button
+            key={step.key}
+            type="button"
+            disabled={!canNavigate}
+            onClick={() => canNavigate && onStepClick?.(step.key)}
+            aria-current={isActive ? 'step' : undefined}
+            className={`flex flex-col items-center gap-1.5 group focus:outline-none ${canNavigate ? 'cursor-pointer' : 'cursor-default'}`}
+          >
+            <div
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 ${
+                isCompleted
+                  ? 'bg-[#C4466F] text-white shadow-xs group-hover:bg-[#A83257] group-hover:scale-105'
+                  : isActive
+                    ? 'bg-[#231F1D] text-white ring-4 ring-[#C4466F]/25 scale-105 shadow-xs'
+                    : 'bg-white border-2 border-[#F0D5DE] text-[#8C827B]'
+              }`}
+            >
+              {isCompleted ? <Check size={13} strokeWidth={3} /> : idx + 1}
+            </div>
+            <span
+              className={`text-[11px] tracking-normal transition-colors duration-300 ${
+                isActive
+                  ? 'text-[#231F1D] font-extrabold'
+                  : isCompleted
+                    ? 'text-[#C4466F] font-bold group-hover:underline'
+                    : 'text-[#6E655F] font-medium'
+              }`}
+            >
               {step.label}
             </span>
-          </div>
+          </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 
 function ServiceSelectionCardSkeleton() {
   return (
-    <div className="flex flex-row items-center justify-between p-5 gap-4 rounded-2xl border border-[#F0D5DE] bg-white overflow-hidden animate-pulse">
-      <div className="flex-1 space-y-2.5">
-        <div className="h-4 w-2/3 bg-[#FCE2EA] rounded-full" />
-        <div className="h-3 w-1/3 bg-[#FCE2EA] rounded-full" />
+    <div className="flex flex-row items-center justify-between p-3.5 sm:p-4 gap-3.5 rounded-xl sm:rounded-2xl border border-[#F0D5DE] bg-white overflow-hidden animate-pulse">
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-1/2 bg-[#FCE2EA] rounded-full" />
+        <div className="h-3 w-16 bg-[#FCE2EA] rounded-full" />
       </div>
-      <div className="flex flex-col items-end gap-3">
+      <div className="flex flex-col items-end gap-2.5 shrink-0">
         <div className="w-5 h-5 rounded-full bg-[#FCE2EA]" />
-        <div className="h-3.5 w-14 bg-[#FCE2EA] rounded-full" />
+        <div className="h-3.5 w-16 bg-[#FCE2EA] rounded-full" />
       </div>
     </div>
   );
+}
+
+function formatServiceDurationBadge(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h} hr${h > 1 ? 's' : ''}`;
+  return `${m} min`;
 }
 
 function ServiceSelectionCard({
@@ -2393,32 +2832,44 @@ function ServiceSelectionCard({
       ref={cardRef}
       style={{ opacity, y, scale, willChange: 'transform, opacity' }}
       whileTap={{ scale: 0.99 }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       className={`
-        flex flex-row items-center justify-between p-5 gap-4 cursor-pointer transition-[background-color,border-color,box-shadow] duration-200 rounded-2xl border relative overflow-hidden
+        group flex flex-row items-center justify-between p-3.5 sm:p-4 gap-3.5 cursor-pointer transition-all duration-300 rounded-xl sm:rounded-2xl border relative overflow-hidden backdrop-blur-md
         ${isSelected
-          ? 'bg-[#FFF5F8] border-[#C4466F] shadow-md ring-2 ring-[#C4466F]/25'
-          : 'bg-white/95 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F] hover:shadow-xs'}
+          ? 'bg-[#FFF5F8]/95 border-[#C4466F] shadow-luxury'
+          : 'bg-white/85 border-[#F0D5DE] hover:bg-white hover:border-[#C4466F]/70 hover:shadow-soft'}
       `}
       onClick={onSelect}
     >
-      <div className="flex-1">
+      <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="font-sans font-semibold text-[16px] text-[#1A1215] leading-tight transition-transform duration-300">{service.name}</h3>
+          <h3 className="font-sans font-bold text-[15px] sm:text-[16px] text-[#231F1D] leading-snug">{service.name}</h3>
           {selectionOrder && (
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase text-white shadow-xs ${selectionOrder === 1 ? 'bg-[#C4466F]' : 'bg-[#4A2D35]'}`}>
+            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase text-white shadow-2xs ${selectionOrder === 1 ? 'bg-[#C4466F]' : 'bg-[#231F1D]'}`}>
               {selectionOrder === 1 ? '1st Service' : '2nd Service'}
             </span>
           )}
         </div>
-        <p className="mt-1.5 text-xs font-medium text-[#523E46]">
-          {service.duration > 60 ? `${Math.round(service.duration / 60)} hrs` : `${service.duration} min`}
-        </p>
-      </div>
-      <div className="flex flex-col items-end gap-3">
-        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'border-[#C4466F] bg-[#C4466F]' : 'border-[#F0D5DE] group-hover:border-[#C4466F]'}`}>
-          {isSelected && <CheckCircle2 size={12} strokeWidth={3} className="text-white" />}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FAF8F5] border border-[#F0D5DE] text-[10px] sm:text-[11px] font-semibold text-[#523E46]">
+            <Clock size={11} className="text-[#C4466F]" />
+            <span>{formatServiceDurationBadge(service.duration)}</span>
+          </span>
         </div>
-        <p className="font-bold text-sm text-[#1A1215] tracking-tight">{formatPrice(service.price, service.priceMax)}</p>
+      </div>
+      <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
+        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-[#C4466F] bg-[#C4466F] scale-105 shadow-2xs' : 'border-[#EAD3DA] bg-white group-hover:border-[#C4466F]'}`}>
+          {isSelected && <Check size={11} strokeWidth={3} className="text-white" />}
+        </div>
+        <p className="font-extrabold text-sm text-[#231F1D] tracking-tight">{formatPrice(service.price, service.priceMax)}</p>
       </div>
     </motion.div>
   );

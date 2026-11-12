@@ -50,12 +50,9 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const first = segments[0];
 
-    if (first === 'select') {
-      return { slug: null, view: 'select' as const, bookingRef, queryParams };
-    }
-
-    if (first === 'register') {
-      return { slug: null, view: 'register' as const, bookingRef, queryParams };
+    if (first === 'select' || first === 'register') {
+      const storedSlug = localStorage.getItem('lastTenantSlug') || 'flo-sisterlocks';
+      return { slug: storedSlug, view: 'customer' as const, bookingRef, queryParams };
     }
 
     if (first === 'admin' || first === 'owner') {
@@ -171,15 +168,11 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
 
-    if (view === 'register') {
-      path = '/register';
-    } else if (view === 'select') {
-      path = '/select';
-    } else if (view === 'admin') {
+    if (view === 'admin') {
       path = slug ? `/${slug}/admin` : '/admin';
     } else if (view === 'staff') {
       path = slug ? `/${slug}/staff` : '/staff';
-    } else if (slug && slug !== 'flo-sisterlocks') {
+    } else if (slug && slug !== 'flo-sisterlocks' && view === 'customer') {
       path = `/${slug}`;
     } else {
       path = '/';

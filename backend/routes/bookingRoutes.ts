@@ -6,13 +6,19 @@ import {
   cancelBookingCustomer,
   rescheduleBookingCustomer,
 } from '../controllers/bookingController';
+import { requireStaffOrOwnerAuth } from '../middleware/authMiddleware';
+import {
+  bookingCreateLimiter,
+  bookingLookupLimiter,
+  bookingModifyLimiter,
+} from '../middleware/rateLimiters';
 
 const router = express.Router();
 
-router.post('/', createBooking);
-router.get('/', getBookings);
-router.get('/lookup', lookupBookings);
-router.patch('/:id/cancel-customer', cancelBookingCustomer);
-router.patch('/:id/reschedule-customer', rescheduleBookingCustomer);
+router.post('/', bookingCreateLimiter, createBooking);
+router.get('/', requireStaffOrOwnerAuth, getBookings);
+router.get('/lookup', bookingLookupLimiter, lookupBookings);
+router.patch('/:id/cancel-customer', bookingModifyLimiter, cancelBookingCustomer);
+router.patch('/:id/reschedule-customer', bookingModifyLimiter, rescheduleBookingCustomer);
 
 export default router;

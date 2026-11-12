@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -19,9 +19,9 @@ function arrayBufferToBase64Url(buffer: ArrayBuffer): string {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
+export type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
-interface UsePushNotifications {
+export interface UsePushNotifications {
   permission:   PermissionState;
   isSubscribed: boolean;
   isLoading:    boolean;
@@ -30,7 +30,7 @@ interface UsePushNotifications {
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
-export function usePushNotifications(): UsePushNotifications {
+export function usePushNotifications(customerPhone?: string): UsePushNotifications {
   const isSupported =
     typeof window !== 'undefined' &&
     'Notification' in window &&
@@ -42,23 +42,41 @@ export function usePushNotifications(): UsePushNotifications {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading]       = useState(false);
 
-  // Check existing subscription on mount
+  // Check subscription state on mount or phone change.
+  // Note: An admin subscription on this browser does NOT mean the customer is subscribed!
+  // We track customer subscription separately via localStorage 'customerPushPhone'.
   useEffect(() => {
     if (!isSupported) return;
 
     navigator.serviceWorker.ready
       .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => setIsSubscribed(sub !== null))
+      .then((sub) => {
+        const savedPhone = localStorage.getItem('customerPushPhone');
+        if (!sub || !savedPhone || Notification.permission !== 'granted') {
+          setIsSubscribed(false);
+          return;
+        }
+
+        if (customerPhone && customerPhone.trim()) {
+          const cleanSaved = savedPhone.replace(/[\s\-().]/g, '');
+          const cleanInput = customerPhone.trim().replace(/[\s\-().]/g, '');
+          const matches = cleanSaved === cleanInput || cleanSaved.endsWith(cleanInput) || cleanInput.endsWith(cleanSaved);
+
+          setIsSubscribed(matches);
+        } else {
+          setIsSubscribed(true);
+        }
+      })
       .catch((err) => console.error('[usePushNotifications] getSubscription error:', err));
-  }, [isSupported]);
+  }, [isSupported, customerPhone]);
 
   // ── subscribe ───────────────────────────────────────────────────────────────
-  const subscribe = async (customerPhone: string): Promise<boolean> => {
-    if (!isSupported) return false;
+  const subscribe = useCallback(async (phone: string): Promise<boolean> => {
+    if (!isSupported || !phone || !phone.trim()) return false;
 
     setIsLoading(true);
     try {
-      // 1. Request permission
+      // 1. Request permission if not already granted
       const perm = await Notification.requestPermission();
       setPermission(perm as PermissionState);
       if (perm !== 'granted') return false;
@@ -68,28 +86,35 @@ export function usePushNotifications(): UsePushNotifications {
       if (!vapidRes.ok) throw new Error('Failed to fetch VAPID key');
       const { publicKey } = await vapidRes.json() as { publicKey: string };
 
-      // 3. Subscribe via PushManager
+      // 3. Get existing subscription or create new via PushManager
       const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly:      true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly:      true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
 
       // 4. Extract keys as URL-safe base64
       const p256dh = arrayBufferToBase64Url(sub.getKey('p256dh')!);
       const auth   = arrayBufferToBase64Url(sub.getKey('auth')!);
 
-      // 5. Send subscription to backend
+      // 5. Send subscription to backend scoped to role='customer'
       const saveRes = await fetch(`${API_BASE}/push/subscribe`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           endpoint:      sub.endpoint,
           keys:          { p256dh, auth },
-          customerPhone,
+          customerPhone: phone.trim(),
         }),
       });
       if (!saveRes.ok) throw new Error('Failed to save subscription on server');
+
+      const data = await saveRes.json().catch(() => ({}));
+      const savedPhone = data.phone || phone.trim();
+      localStorage.setItem('customerPushPhone', savedPhone);
 
       setIsSubscribed(true);
       return true;
@@ -99,7 +124,26 @@ export function usePushNotifications(): UsePushNotifications {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isSupported]);
+
+  // Automatically re-save customer subscription if permission is already granted and customer phone changed
+  useEffect(() => {
+    if (!isSupported || !customerPhone || !customerPhone.trim()) return;
+    if (Notification.permission !== 'granted') return;
+
+    const savedPhone = localStorage.getItem('customerPushPhone');
+    if (!savedPhone) return;
+
+    const cleanSaved = savedPhone.replace(/[\s\-().]/g, '');
+    const cleanInput = customerPhone.trim().replace(/[\s\-().]/g, '');
+    const isSamePhone = cleanSaved === cleanInput || cleanSaved.endsWith(cleanInput) || cleanInput.endsWith(cleanSaved);
+
+    if (!isSamePhone) {
+      subscribe(customerPhone.trim()).catch((err) =>
+        console.warn('[usePushNotifications] Failed to auto-resave push on phone change:', err)
+      );
+    }
+  }, [customerPhone, isSupported, subscribe]);
 
   // ── unsubscribe ─────────────────────────────────────────────────────────────
   const unsubscribe = async (): Promise<void> => {
@@ -109,17 +153,17 @@ export function usePushNotifications(): UsePushNotifications {
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
-      if (!sub) return;
 
-      // Remove from backend first
-      await fetch(`${API_BASE}/push/unsubscribe`, {
-        method:  'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ endpoint: sub.endpoint }),
-      });
+      // Remove customer subscription from backend
+      if (sub) {
+        await fetch(`${API_BASE}/push/unsubscribe`, {
+          method:  'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ endpoint: sub.endpoint }),
+        });
+      }
 
-      // Then unsubscribe locally
-      await sub.unsubscribe();
+      localStorage.removeItem('customerPushPhone');
       setIsSubscribed(false);
     } catch (err) {
       console.error('[usePushNotifications] unsubscribe error:', err);
