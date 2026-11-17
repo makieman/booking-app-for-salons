@@ -276,6 +276,8 @@ describe('slotService & enforcement tests', () => {
     const origFindOneAttendant = Attendant.findOne;
     const origFindBooking = Booking.find;
     const origFindOneBooking = Booking.findOne;
+    const origCountDocumentsBooking = Booking.countDocuments;
+    const origDistinctBooking = Booking.distinct;
     const origSaveBooking = Booking.prototype.save;
 
     try {
@@ -292,6 +294,7 @@ describe('slotService & enforcement tests', () => {
       (Booking.findOne as any) = async () => null; // for reference uniqueness
       (Booking.find as any) = async () => [];
       (Booking.countDocuments as any) = async () => 0;
+      (Booking.distinct as any) = async () => [];
       (Booking.prototype.save as any) = async function(this: any) { return this; };
 
       // Case A: Salon Holiday
@@ -375,6 +378,8 @@ describe('slotService & enforcement tests', () => {
       Attendant.findOne = origFindOneAttendant;
       Booking.find = origFindBooking;
       Booking.findOne = origFindOneBooking;
+      Booking.countDocuments = origCountDocumentsBooking;
+      Booking.distinct = origDistinctBooking;
       Booking.prototype.save = origSaveBooking;
     }
   });

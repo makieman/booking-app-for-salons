@@ -485,4 +485,29 @@ describe('Security Hardening & Privacy Tests', () => {
       assert.strictEqual(countAfter, countBefore, 'Seeding must not run when SEED_DEFAULT_TENANT is false');
     });
   });
+
+  // ── 7. HELMET SECURITY HEADERS & CORS ALLOW-LIST ────────────────────────────
+  describe('7. Helmet security headers & CORS allow-list', () => {
+    it('sets helmet headers and allows configured FRONTEND_URL origin on /health and /api/health', async () => {
+      const allowedOrigin = 'https://booking-app-for-salons.vercel.app';
+      const res = await fetch(`${baseUrl}/health`, {
+        headers: { Origin: allowedOrigin },
+      });
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.headers.get('access-control-allow-origin'), allowedOrigin);
+      assert.strictEqual(res.headers.get('access-control-expose-headers'), 'ETag');
+      assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff');
+      assert.strictEqual(res.headers.get('x-frame-options'), 'SAMEORIGIN');
+      assert.strictEqual(res.headers.get('cross-origin-resource-policy'), 'cross-origin');
+      assert.strictEqual(res.headers.get('x-powered-by'), null);
+    });
+
+    it('blocks unknown external origins from receiving Access-Control-Allow-Origin', async () => {
+      const res = await fetch(`${baseUrl}/api/health`, {
+        headers: { Origin: 'https://evil.example.com' },
+      });
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.headers.get('access-control-allow-origin'), null);
+    });
+  });
 });

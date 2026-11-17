@@ -136,12 +136,7 @@ export function createApp(): Express {
   // Trust first proxy (Render/Vercel load balancer)
   app.set('trust proxy', 1);
 
-  // Lightweight health check route registered before other middlewares/rate-limiters
-  app.get('/health', (_req, res) => {
-    res.status(200).json({ status: 'ok' });
-  });
-
-  // ── Middleware ────────────────────────────────────────────
+  // ── Security & CORS Middleware (registered before /health so browser keep-warm pings get CORS headers) ──
   app.use(
     helmet({
       // This is a JSON API; the SPA is served from a different origin (Vercel).
@@ -171,6 +166,11 @@ export function createApp(): Express {
     },
     exposedHeaders: ['ETag']
   }));
+
+  // Lightweight health check route registered before JSON/DB/rate-limiter middlewares
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ status: 'ok' });
+  });
 
   // Parse JSON and keep req.rawBody buffer for HMAC signature verification (e.g. Meta WhatsApp)
   app.use(
