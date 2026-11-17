@@ -1,5 +1,6 @@
 import express, { Express } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import connectDB from './config/db';
 import { errorHandler } from './middleware/errorHandler';
@@ -141,7 +142,33 @@ export function createApp(): Express {
   });
 
   // ── Middleware ────────────────────────────────────────────
+  app.use(
+    helmet({
+      // This is a JSON API; the SPA is served from a different origin (Vercel).
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    })
+  );
+
+  // CORS allow-list: FRONTEND_URL + comma-separated CORS_ORIGINS (+ localhost outside production).
+  // Requests with no Origin header (Meta webhooks, health checks, curl) are not browser CORS requests.
+  const allowedOrigins = new Set<string>(
+    [
+      process.env.FRONTEND_URL ?? 'https://booking-app-for-salons.vercel.app',
+      ...(process.env.CORS_ORIGINS ?? '').split(','),
+    ]
+      .map((o) => o.trim().replace(/\/+$/, ''))
+      .filter(Boolean)
+  );
+  const isDev = process.env.NODE_ENV !== 'production';
   app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const normalized = origin.replace(/\/+$/, '');
+      if (allowedOrigins.has(normalized)) return callback(null, true);
+      if (isDev && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) return callback(null, true);
+      return callback(null, false);
+    },
     exposedHeaders: ['ETag']
   }));
 

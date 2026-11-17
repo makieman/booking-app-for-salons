@@ -2,7 +2,6 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { Phone, CheckCircle2, ArrowLeft, Shield, LayoutDashboard, Search, X, WifiOff, Bell, BellOff, User, CircleUserRound, Clock, Lock, Unlock, Volume2, Plus, Trash2, Key, ChevronRight, ArrowUpDown, Copy, Check, MessageCircle, LogOut, Calendar, AlertCircle, Scissors, Users, Settings, UserPlus, Eye, EyeOff, ChevronDown, Loader2, Sparkles, UserCheck } from 'lucide-react';
 import { Service, Booking, BookingStep, Attendant, UserMode, AttendantSession, MAX_SERVICES, MultiSlotOption } from './types';
-import { FALLBACK_SERVICES, FALLBACK_TIME_SLOTS } from './data/mockData';
 import * as api from './api/client';
 import { InstallPrompt } from './components/InstallPrompt';
 import { NotificationPrompt } from './components/NotificationPrompt';
@@ -165,7 +164,6 @@ export default function App() {
   const [pin, setPin] = useState('');
   const [ownerSessionPin, setOwnerSessionPin] = useState('');
   const [pinError, setPinError] = useState(false);
-  const ADMIN_PIN = import.meta.env.VITE_OWNER_PIN ?? '1234'; // Keep for client-side gate
   // Staff login
   const [staffUsername, setStaffUsername] = useState('');
   const [staffPin, setStaffPin] = useState('');
@@ -205,7 +203,7 @@ export default function App() {
         }
       }
     } catch {}
-    return FALLBACK_SERVICES.slice(0, 3);
+    return [];
   });
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [timeSlots, setTimeSlots] = useState<string[]>([]);
@@ -522,7 +520,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showPinModal, loginTab, ADMIN_PIN]);
+  }, [showPinModal, loginTab]);
 
 
   // Initial Data Fetch & Offline Listeners
@@ -542,10 +540,9 @@ export default function App() {
       };
     }
 
-    // If tenant resolution failed with an error, fall back to mock data
+    // If tenant resolution failed, keep any cached services (never fabricate demo data)
     if (tenantError) {
-      setServices(FALLBACK_SERVICES);
-      setApiError('Unable to connect to server. Showing offline data.');
+      setApiError('Unable to connect to the server. Please check your connection and try again.');
       setIsLoading(false);
       return () => {
         window.removeEventListener('online', handleOnline);
@@ -587,9 +584,8 @@ export default function App() {
         setApiError(null);
       } catch (err) {
         console.warn('Sync notice: using cached/offline data', err);
-        setServices(prev => (prev.length > 0 ? prev : FALLBACK_SERVICES));
         if (services.length === 0) {
-          setApiError('Unable to connect to server. Showing offline data.');
+          setApiError('Unable to connect to the server. Please check your connection and try again.');
         }
       } finally {
         setIsLoading(false);
@@ -624,8 +620,9 @@ export default function App() {
         setMultiSlotOptions(result.options || []);
       } catch (err) {
         console.error('Failed to fetch multi slots, falling back', err);
-        setTimeSlots(FALLBACK_TIME_SLOTS);
+        setTimeSlots([]);
         setMultiSlotOptions([]);
+        setApiError('Could not load available times. Please try again.');
       } finally {
         setIsLoadingSlots(false);
       }
